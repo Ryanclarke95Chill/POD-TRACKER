@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Consignment } from "@shared/schema";
 import TimelineEvent from "./timeline-event";
@@ -82,7 +83,9 @@ export default function ConsignmentDetailModal({
 
   return (
     <Dialog open={!!consignment} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden rounded-xl">
+      <DialogTitle className="sr-only">Consignment Details</DialogTitle>
+      <DialogDescription className="sr-only">View detailed information about this shipment</DialogDescription>
+      <DialogContent className="sm:max-w-4xl p-0 overflow-auto max-h-[80vh] rounded-xl">
         {/* Header section with color based on status */}
         <div className={`px-6 py-5 border-b ${
           consignment.status === "Delivered" ? 'bg-green-50 border-green-100' : 
