@@ -27,7 +27,7 @@ import { getUser, logout } from "@/lib/auth";
 const filterSchema = z.object({
   pickupDateFrom: z.string(),
   pickupDateTo: z.string(),
-  deliveryEmail: z.string().email().optional(),
+  deliveryEmail: z.string().email().optional().or(z.literal("")),
   customerName: z.string().optional(),
   importToDatabase: z.boolean().default(true),
   refreshExisting: z.boolean().default(false),
