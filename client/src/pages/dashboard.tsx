@@ -2,13 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import ConsignmentCard from "@/components/consignment-card";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import { getUser, logout } from "@/lib/auth";
@@ -16,6 +10,7 @@ import { Consignment, temperatureZones } from "@shared/schema";
 
 export default function Dashboard() {
   const [selectedTempZone, setSelectedTempZone] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const user = getUser();
 
@@ -23,9 +18,13 @@ export default function Dashboard() {
     queryKey: ["/api/consignments"],
   });
 
-  const filteredConsignments = selectedTempZone === "all" 
-    ? consignments 
-    : consignments.filter(c => c.temperatureZone === selectedTempZone);
+  const filteredConsignments = consignments.filter(c => {
+    // Filter by search term if provided
+    if (searchTerm.trim() !== "") {
+      return c.consignmentNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    }
+    return true;
+  });
 
   const handleTempZoneChange = (value: string) => {
     setSelectedTempZone(value);
@@ -135,105 +134,120 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Temperature Zone Filter */}
+        {/* Search Filter */}
         <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative w-full md:w-96">
               <div className="flex items-center gap-2 mb-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-                  <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path>
+                  <path d="m21 21-6-6m2-5a7.001 7.001 0 0 1-11.095 5.679A7 7 0 1 1 17 10z"></path>
                 </svg>
-                <label htmlFor="temperature-filter" className="text-sm font-medium text-neutral-700">
-                  Filter by Temperature Zone
+                <label htmlFor="reference-search" className="text-sm font-medium text-neutral-700">
+                  Search by Reference Number
                 </label>
               </div>
-              <Select value={selectedTempZone} onValueChange={handleTempZoneChange}>
-                <SelectTrigger className="w-full border border-neutral-200 rounded-lg focus:ring-primary">
-                  <SelectValue placeholder="All Temperature Zones" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Temperature Zones</SelectItem>
-                  {temperatureZones.map((zone) => (
-                    <SelectItem key={zone} value={zone}>
-                      {zone}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="reference-search"
+                placeholder="Enter consignment reference number..."
+                className="w-full border border-neutral-200 rounded-lg focus:ring-primary"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             
             <div className="flex items-center bg-neutral-50 rounded-full px-4 py-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500 mr-2">
-                <path d="m21 21-6-6m2-5a7.001 7.001 0 0 1-11.095 5.679A7 7 0 1 1 17 10z"></path>
+                <path d="M21 9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10"></path>
+                <line x1="16" y1="5" x2="22" y2="5"></line>
+                <line x1="19" y1="2" x2="19" y2="8"></line>
+                <circle cx="9" cy="9" r="2"></circle>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
               </svg>
               <span className="text-sm font-medium text-neutral-700">{filteredConsignments.length}</span>
               <span className="text-sm text-neutral-500 ml-1">consignments found</span>
             </div>
           </div>
-          
-          {/* Temperature Zone Legend */}
-          <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-neutral-100">
-            {temperatureZones.map((zone, index) => {
-              const zoneKey = zone.split(" ")[0].toLowerCase();
-              return (
-                <div 
-                  key={index} 
-                  className={`text-xs flex items-center rounded-full px-2 py-1 ${
-                    selectedTempZone === zone ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-700'
-                  } cursor-pointer`}
-                  onClick={() => handleTempZoneChange(zone)}
-                >
-                  <span className={`inline-block w-2 h-2 rounded-full bg-temp-${zoneKey} mr-1`}></span>
-                  {zone}
-                </div>
-              );
-            })}
-            <div 
-              className={`text-xs flex items-center rounded-full px-2 py-1 ${
-                selectedTempZone === 'all' ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-700'
-              } cursor-pointer`}
-              onClick={() => handleTempZoneChange('all')}
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-neutral-400 mr-1"></span>
-              Show All
-            </div>
-          </div>
         </div>
         
-        {/* Consignments Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden border border-neutral-200 p-5">
-                <Skeleton className="h-6 w-32 mb-3" />
-                <Skeleton className="h-4 w-48 mb-4" />
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
+        {/* Consignments List */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-7 bg-neutral-50 border-b border-neutral-200 p-4 font-medium text-neutral-700 text-sm">
+            <div className="col-span-1">Reference #</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-1">Customer</div>
+            <div className="col-span-1">From</div>
+            <div className="col-span-1">To</div>
+            <div className="col-span-1">Temperature</div>
+            <div className="col-span-1 text-center">Action</div>
+          </div>
+          
+          {isLoading ? (
+            /* Loading skeletons */
+            <>
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="grid grid-cols-7 p-4 border-b border-neutral-100 items-center">
+                  <div className="col-span-1"><Skeleton className="h-5 w-28" /></div>
+                  <div className="col-span-1"><Skeleton className="h-5 w-20" /></div>
+                  <div className="col-span-1"><Skeleton className="h-5 w-24" /></div>
+                  <div className="col-span-1"><Skeleton className="h-5 w-20" /></div>
+                  <div className="col-span-1"><Skeleton className="h-5 w-20" /></div>
+                  <div className="col-span-1"><Skeleton className="h-5 w-16" /></div>
+                  <div className="col-span-1 text-center"><Skeleton className="h-9 w-24 mx-auto" /></div>
                 </div>
-                <Skeleton className="h-9 w-full" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredConsignments.length > 0 ? (
-              filteredConsignments.map((consignment) => (
-                <ConsignmentCard 
-                  key={consignment.id}
-                  consignment={consignment}
-                  onViewDetails={() => handleViewDetails(consignment)}
-                />
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8">
-                <p className="text-neutral-500">No consignments found with the selected filter.</p>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </>
+          ) : filteredConsignments.length > 0 ? (
+            /* Consignment list items */
+            <>
+              {filteredConsignments.map((consignment) => (
+                <div key={consignment.id} className="grid grid-cols-7 p-4 border-b border-neutral-100 items-center hover:bg-neutral-50 transition-colors">
+                  <div className="col-span-1 font-mono font-medium text-primary">{consignment.consignmentNumber}</div>
+                  <div className="col-span-1">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                      consignment.status === "In Transit" ? "bg-status-transit" : 
+                      consignment.status === "Delivered" ? "bg-status-delivered" : 
+                      "bg-status-awaiting"
+                    }`}>
+                      {consignment.status}
+                    </span>
+                  </div>
+                  <div className="col-span-1 truncate text-sm">{consignment.customerName}</div>
+                  <div className="col-span-1 truncate text-sm">{consignment.pickupAddress}</div>
+                  <div className="col-span-1 truncate text-sm">{consignment.deliveryAddress}</div>
+                  <div className="col-span-1">
+                    <div className="flex items-center text-xs">
+                      <span className={`inline-block w-2 h-2 rounded-full ${
+                        consignment.temperatureZone.includes("Dry") ? "bg-temp-dry" :
+                        consignment.temperatureZone.includes("Chiller") ? "bg-temp-chiller" :
+                        consignment.temperatureZone.includes("Freezer") ? "bg-temp-freezer" :
+                        consignment.temperatureZone.includes("Wine") ? "bg-temp-wine" :
+                        consignment.temperatureZone.includes("Confectionery") ? "bg-temp-confectionery" :
+                        consignment.temperatureZone.includes("Pharma") ? "bg-temp-pharma" :
+                        "bg-neutral-400"
+                      } mr-1`}></span>
+                      <span className="truncate">{consignment.temperatureZone}</span>
+                    </div>
+                  </div>
+                  <div className="col-span-1 text-center">
+                    <Button 
+                      onClick={() => handleViewDetails(consignment)}
+                      variant="outline" 
+                      className="text-xs h-8 px-3 border-primary text-primary hover:bg-primary/5"
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            /* No consignments found */
+            <div className="text-center py-12">
+              <p className="text-neutral-500">No consignments found matching your search criteria.</p>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Detail Modal */}
