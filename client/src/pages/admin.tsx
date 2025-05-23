@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +20,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { getUser, logout } from "@/lib/auth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Create a schema for the filter form
 const filterSchema = z.object({
@@ -38,6 +39,11 @@ type FilterFormValues = z.infer<typeof filterSchema>;
 export default function AdminPage() {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importCsvToDb, setImportCsvToDb] = useState(true);
+  const [updateExisting, setUpdateExisting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<null | {
     fetched: number;
     imported: number;
@@ -63,6 +69,74 @@ export default function AdminPage() {
       refreshExisting: false
     }
   });
+
+  // Handle CSV file selection
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === "text/csv") {
+      setSelectedFile(file);
+    } else if (file) {
+      toast({
+        title: "Invalid file format",
+        description: "Please upload a CSV file.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Process and import CSV file
+  const handleCsvImport = async () => {
+    if (!selectedFile) return;
+    
+    try {
+      setIsImportingCsv(true);
+      setImportResults(null);
+      
+      // Create FormData to send the file
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("importToDatabase", importCsvToDb.toString());
+      formData.append("updateExisting", updateExisting.toString());
+      
+      // Send to API
+      const response = await fetch("/api/admin/import", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Import failed with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      setImportResults(result);
+      
+      // Invalidate consignments query to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/consignments"] });
+      
+      toast({
+        title: "CSV Import Completed",
+        description: `Successfully processed ${result.fetched} records and imported ${result.imported} consignments.`,
+        variant: "default"
+      });
+      
+      // Reset file selection after successful import
+      setSelectedFile(null);
+    } catch (error) {
+      console.error("CSV Import failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast({
+        title: "CSV Import Failed",
+        description: `There was an error importing the CSV file: ${errorMessage}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsImportingCsv(false);
+    }
+  };
 
   async function onSubmit(values: FilterFormValues) {
     try {
@@ -177,137 +251,239 @@ export default function AdminPage() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Import Filters</CardTitle>
+                <CardTitle>Import Consignments</CardTitle>
               </CardHeader>
               <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="pickupDateFrom"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Pickup/Delivery Date From</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="pickupDateTo"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Pickup/Delivery Date To</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="deliveryEmail"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Delivery Email (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="customer@example.com (leave blank for all)" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Filter consignments by delivery email address or leave blank to import all
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="customerName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Customer Name (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Customer name" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Filter consignments by customer name
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="importToDatabase"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Import to Database</FormLabel>
-                              <FormDescription>
-                                Save fetched consignments to the database
-                              </FormDescription>
+                <Tabs defaultValue="api" className="w-full">
+                  <TabsList className="w-full grid grid-cols-2 mb-6">
+                    <TabsTrigger value="api">API Import</TabsTrigger>
+                    <TabsTrigger value="csv">CSV Upload</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="api">
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="pickupDateFrom"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Pickup/Delivery Date From</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="pickupDateTo"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Pickup/Delivery Date To</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="deliveryEmail"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Delivery Email (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="customer@example.com (leave blank for all)" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Filter consignments by delivery email address or leave blank to import all
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="customerName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Customer Name (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Customer name" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Filter consignments by customer name
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="importToDatabase"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel>Import to Database</FormLabel>
+                                  <FormDescription>
+                                    Save fetched consignments to the database
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="refreshExisting"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel>Refresh Existing</FormLabel>
+                                  <FormDescription>
+                                    Update existing consignments with latest data
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-primary hover:bg-primary-dark text-white" 
+                          disabled={isImporting}
+                        >
+                          {isImporting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Importing...
+                            </>
+                          ) : (
+                            "Import Consignments"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                  </TabsContent>
+                  
+                  <TabsContent value="csv">
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">CSV Import</h3>
+                        <p className="text-sm text-neutral-500 mb-4">
+                          Upload a CSV file with consignment data to import into the system. 
+                          The file should follow the ChillTrack format with required fields.
+                        </p>
+                        
+                        <div className="border-2 border-dashed border-neutral-200 rounded-lg p-8 text-center mb-4">
+                          <input
+                            type="file"
+                            id="csv-upload"
+                            className="hidden"
+                            accept=".csv"
+                            onChange={handleCsvFileChange}
+                            ref={fileInputRef}
+                          />
+                          
+                          {selectedFile ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-center">
+                                <div className="bg-green-100 text-green-700 p-2 rounded-full">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                  </svg>
+                                </div>
+                              </div>
+                              <p className="text-sm font-medium">{selectedFile.name}</p>
+                              <p className="text-xs text-neutral-500">
+                                {(selectedFile.size / 1024).toFixed(2)} KB
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => setSelectedFile(null)}
+                              >
+                                Remove File
+                              </Button>
                             </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="refreshExisting"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Refresh Existing</FormLabel>
-                              <FormDescription>
-                                Update existing consignments with latest data
-                              </FormDescription>
+                          ) : (
+                            <div 
+                              className="flex flex-col items-center justify-center cursor-pointer py-8"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <Upload className="h-10 w-10 text-neutral-300 mb-2" />
+                              <p className="text-sm font-medium mb-1">Click to upload CSV file</p>
+                              <p className="text-xs text-neutral-500">or drag and drop</p>
                             </div>
-                          </FormItem>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col md:flex-row gap-3 justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              id="import-to-db" 
+                              checked={importCsvToDb}
+                              onCheckedChange={setImportCsvToDb}
+                            />
+                            <Label htmlFor="import-to-db">Import to database</Label>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              id="update-existing" 
+                              checked={updateExisting}
+                              onCheckedChange={setUpdateExisting}
+                            />
+                            <Label htmlFor="update-existing">Update existing entries</Label>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Button 
+                        className="w-full bg-primary hover:bg-primary-dark text-white" 
+                        disabled={!selectedFile || isImportingCsv}
+                        onClick={handleCsvImport}
+                      >
+                        {isImportingCsv ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          "Import CSV File"
                         )}
-                      />
+                      </Button>
                     </div>
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-primary hover:bg-primary-dark text-white" 
-                      disabled={isImporting}
-                    >
-                      {isImporting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Importing...
-                        </>
-                      ) : (
-                        "Import Consignments"
-                      )}
-                    </Button>
-                  </form>
-                </Form>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </div>
