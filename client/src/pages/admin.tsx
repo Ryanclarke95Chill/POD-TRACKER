@@ -75,6 +75,7 @@ export default function AdminPage() {
     const file = e.target.files?.[0];
     if (file && file.type === "text/csv") {
       setSelectedFile(file);
+      processCsvFile(file);
     } else if (file) {
       toast({
         title: "Invalid file format",
@@ -84,9 +85,109 @@ export default function AdminPage() {
     }
   };
   
-  // Process and import CSV file
+  // State for CSV mapping
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [mappingRequired, setMappingRequired] = useState(false);
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
+  const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+  
+  // Process CSV file and detect headers
+  const processCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n');
+        
+        if (lines.length > 0) {
+          // Extract headers
+          const headers = lines[0].split(',').map(h => h.trim());
+          setCsvHeaders(headers);
+          
+          // Set up initial field mapping with smart detection
+          const initialMapping: Record<string, string> = {};
+          
+          // Mapping definitions with potential CSV field names
+          const fieldMappingDefinitions: Record<string, string[]> = {
+            "consignmentNumber": ["consignment", "reference", "order", "id", "orderid", "shipment", "ORDERREFERENCE", "linked order id"],
+            "customerName": ["customer", "client", "recipient", "CUSTOMERCOMPANYNAME", "CUSTOMERCONTACTNAME", "ACCOUNTNAME"],
+            "pickupAddress": ["pickup", "collection", "origin", "location street", "location city", "location country"],
+            "deliveryAddress": ["delivery", "destination", "receiver", "location street", "location city", "location country"],
+            "status": ["status", "state", "condition"],
+            "estimatedDeliveryDate": ["estimated", "ETA", "date", "arrival", "timewindows", "TIME_WINDOWS_V2"],
+            "temperatureZone": ["temperature", "temp", "zone", "DEFAULT TEMPERATURE", "description"],
+            "lastKnownLocation": ["location", "position", "current", "tracking", "TASK ID"]
+          };
+          
+          // Auto-detect and suggest mappings
+          headers.forEach(header => {
+            const lowerHeader = header.toLowerCase();
+            
+            // Find the best match for each header
+            let bestMatch: string | null = null;
+            let highestScore = 0;
+            
+            Object.entries(fieldMappingDefinitions).forEach(([fieldName, keywords]) => {
+              keywords.forEach(keyword => {
+                if (lowerHeader.includes(keyword.toLowerCase())) {
+                  const score = keyword.length / header.length;
+                  if (score > highestScore) {
+                    highestScore = score;
+                    bestMatch = fieldName;
+                  }
+                }
+              });
+            });
+            
+            if (bestMatch) {
+              initialMapping[header] = bestMatch;
+            } else {
+              initialMapping[header] = "";
+            }
+          });
+          
+          setFieldMapping(initialMapping);
+          
+          // Create preview data (up to 5 rows)
+          const previewLines = lines.slice(1, 6).map(line => line.split(',').map(cell => cell.trim()));
+          setCsvPreview(previewLines);
+          
+          // Show mapping interface if fields don't match exactly
+          setMappingRequired(true);
+        }
+      } catch (error) {
+        console.error("Error processing CSV:", error);
+        toast({
+          title: "CSV Processing Error",
+          description: "Failed to process the CSV file. Please check the format.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+  
+  // Update field mapping
+  const updateFieldMapping = (csvField: string, appField: string) => {
+    setFieldMapping(prev => ({
+      ...prev,
+      [csvField]: appField
+    }));
+  };
+  
+  // Process and import CSV file with mapping
   const handleCsvImport = async () => {
     if (!selectedFile) return;
+    
+    if (mappingRequired && Object.values(fieldMapping).some(value => !value)) {
+      toast({
+        title: "Mapping Required",
+        description: "Please map all required fields before importing.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsImportingCsv(true);
@@ -97,6 +198,7 @@ export default function AdminPage() {
       formData.append("file", selectedFile);
       formData.append("importToDatabase", importCsvToDb.toString());
       formData.append("updateExisting", updateExisting.toString());
+      formData.append("fieldMapping", JSON.stringify(fieldMapping));
       
       // Send to API
       const response = await fetch("/api/admin/import", {
@@ -123,8 +225,11 @@ export default function AdminPage() {
         variant: "default"
       });
       
-      // Reset file selection after successful import
+      // Reset state after successful import
       setSelectedFile(null);
+      setMappingRequired(false);
+      setCsvHeaders([]);
+      setCsvPreview([]);
     } catch (error) {
       console.error("CSV Import failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -397,7 +502,7 @@ export default function AdminPage() {
                         <h3 className="text-lg font-medium mb-2">CSV Import</h3>
                         <p className="text-sm text-neutral-500 mb-4">
                           Upload a CSV file with consignment data to import into the system. 
-                          The file should follow the ChillTrack format with required fields.
+                          Any CSV format is supported - you can map fields to match our system.
                         </p>
                         
                         <div className="border-2 border-dashed border-neutral-200 rounded-lg p-8 text-center mb-4">
@@ -429,7 +534,12 @@ export default function AdminPage() {
                                 variant="outline"
                                 size="sm"
                                 className="mt-2"
-                                onClick={() => setSelectedFile(null)}
+                                onClick={() => {
+                                  setSelectedFile(null);
+                                  setMappingRequired(false);
+                                  setCsvHeaders([]);
+                                  setCsvPreview([]);
+                                }}
                               >
                                 Remove File
                               </Button>
@@ -445,6 +555,78 @@ export default function AdminPage() {
                             </div>
                           )}
                         </div>
+                        
+                        {/* Field Mapping Interface */}
+                        {mappingRequired && csvHeaders.length > 0 && (
+                          <div className="mt-8 mb-6">
+                            <h4 className="text-md font-medium mb-3">Field Mapping</h4>
+                            <p className="text-sm text-neutral-500 mb-4">
+                              Map your CSV fields to our system fields. We've made our best guess, but you can adjust as needed.
+                            </p>
+                            
+                            {/* Preview Table */}
+                            <div className="border rounded-lg mb-6 overflow-hidden">
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="bg-neutral-50 border-b">
+                                      {csvHeaders.map((header, index) => (
+                                        <th key={index} className="px-4 py-3 text-left font-medium text-neutral-700">
+                                          {header}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {csvPreview.map((row, rowIndex) => (
+                                      <tr key={rowIndex} className="border-b last:border-b-0">
+                                        {row.map((cell, cellIndex) => (
+                                          <td key={cellIndex} className="px-4 py-2 text-neutral-700 truncate max-w-[200px]">
+                                            {cell}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            
+                            {/* Mapping Controls */}
+                            <div className="space-y-4">
+                              <h5 className="font-medium text-neutral-800">Assign Fields</h5>
+                              <p className="text-xs text-neutral-500 mb-4">
+                                For each CSV column, select the corresponding field in our system.
+                              </p>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {csvHeaders.map((header, index) => (
+                                  <div key={index} className="border rounded-md p-3">
+                                    <Label className="mb-1 block text-xs font-medium text-neutral-500">
+                                      CSV Field: <span className="font-bold text-neutral-700">{header}</span>
+                                    </Label>
+                                    <select
+                                      className="w-full rounded-md border border-neutral-200 p-2"
+                                      value={fieldMapping[header] || ""}
+                                      onChange={(e) => updateFieldMapping(header, e.target.value)}
+                                    >
+                                      <option value="">Select field...</option>
+                                      <option value="consignmentNumber">Consignment Number</option>
+                                      <option value="customerName">Customer Name</option>
+                                      <option value="pickupAddress">Pickup Address</option>
+                                      <option value="deliveryAddress">Delivery Address</option>
+                                      <option value="status">Status</option>
+                                      <option value="estimatedDeliveryDate">Estimated Delivery Date</option>
+                                      <option value="temperatureZone">Temperature Zone</option>
+                                      <option value="lastKnownLocation">Last Known Location</option>
+                                      <option value="ignore">Ignore this field</option>
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         <div className="flex flex-col md:flex-row gap-3 justify-between">
                           <div className="flex items-center space-x-2">
