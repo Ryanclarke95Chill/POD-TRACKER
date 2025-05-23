@@ -960,13 +960,13 @@ export default function AdminPage() {
                                     {Object.entries({
                                       "consignmentNumber": "Consignment Number",
                                       "customerName": "Customer Name",
-                                      "pickupAddress": "Pickup Address",
                                       "deliveryAddress": "Delivery Address",
-                                      "status": "Status",
                                       "estimatedDeliveryDate": "Estimated Delivery Date",
-                                      "temperatureZone": "Temperature Zone",
-                                      "lastKnownLocation": "Last Known Location"
-                                    }).map(([fieldKey, fieldLabel], index) => {
+                                      "lastKnownLocation": "Last Known Location",
+                                      "pickupAddress": "Pickup Address",
+                                      "status": "Status",
+                                      "temperatureZone": "Temperature Zone"
+                                    }).sort((a, b) => a[1].localeCompare(b[1])).map(([fieldKey, fieldLabel], index) => {
                                       // Find if any CSV header is mapped to this field
                                       const mappedHeader = Object.entries(fieldMapping).find(([_, value]) => value === fieldKey)?.[0];
                                       const isRequired = ["consignmentNumber", "customerName", "status"].includes(fieldKey);
@@ -1036,7 +1036,7 @@ export default function AdminPage() {
                                                 }}
                                               >
                                                 <option value="">Select CSV field...</option>
-                                                {csvHeaders.map((header, headerIndex) => (
+                                                {[...csvHeaders].sort((a, b) => a.localeCompare(b)).map((header, headerIndex) => (
                                                   <option key={headerIndex} value={header}>{header}</option>
                                                 ))}
                                               </select>
@@ -1101,7 +1101,7 @@ export default function AdminPage() {
                                                 <div className="text-xs font-medium mb-2">Select fields to combine:</div>
                                                 
                                                 <div className="space-y-1 max-h-40 overflow-y-auto pr-1 mb-3 border rounded-md p-2 bg-white">
-                                                  {csvHeaders.map((header) => (
+                                                  {[...csvHeaders].sort((a, b) => a.localeCompare(b)).map((header) => (
                                                     <div key={header} className="flex items-center">
                                                       <Checkbox 
                                                         id={`combine-${fieldKey}-${header}`}
