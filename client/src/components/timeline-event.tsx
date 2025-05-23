@@ -61,19 +61,20 @@ export default function TimelineEvent({ event, isLast }: TimelineEventProps) {
             aria-hidden="true"
           ></span>
         )}
-        <div className="relative flex space-x-3">
-          <div>
-            <span className={`h-8 w-8 rounded-full bg-primary flex items-center justify-center ring-8 ring-white`}>
+        <div className="relative flex items-start">
+          <div className="flex-shrink-0">
+            <span className={`h-8 w-8 rounded-full bg-primary flex items-center justify-center ring-4 ring-white`}>
               {getEventIcon(event.type)}
             </span>
           </div>
-          <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-            <div>
-              <p className="text-sm text-neutral-700">{event.description}</p>
+          <div className="ml-4 flex-grow min-w-0 flex justify-between">
+            <div className="pt-0.5">
+              <p className="text-sm font-medium text-neutral-800">{event.description}</p>
+              <p className="text-xs text-neutral-500">{event.location}</p>
             </div>
-            <div className="text-right text-sm whitespace-nowrap text-neutral-500">
-              <p>{date}</p>
-              <p>{time}</p>
+            <div className="text-right text-sm whitespace-nowrap text-neutral-500 ml-4">
+              <p className="font-medium">May {date && date.split("-")[2]},</p>
+              <p className="text-xs">{time}</p>
             </div>
           </div>
         </div>
