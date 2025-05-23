@@ -411,6 +411,9 @@ export default function AdminPage() {
       formData.append("updateExisting", updateExisting.toString());
       formData.append("fieldMapping", JSON.stringify(fieldMapping));
       
+      // Add combine fields mapping to formData
+      formData.append("combineFields", JSON.stringify(combineFields));
+      
       // Send to API
       const response = await fetch("/api/admin/import", {
         method: "POST",
