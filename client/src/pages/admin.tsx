@@ -461,12 +461,13 @@ export default function AdminPage() {
       // Add combine fields mapping to formData
       formData.append("combineFields", JSON.stringify(combineFields));
       
-      // Send to API
+      // Send to API using FormData
+      const token = localStorage.getItem("token");
       const response = await fetch("/api/admin/import", {
         method: "POST",
         body: formData,
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
+          "Authorization": `Bearer ${token}`,
         }
       });
       
@@ -826,22 +827,18 @@ export default function AdminPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             {/* Template controls */}
                             {Object.keys(savedTemplates).length > 0 && (
-                              <div className="relative inline-block">
-                                <select 
-                                  className="h-8 rounded-md border border-neutral-200 bg-white px-2 text-xs"
-                                  onChange={(e) => {
-                                    if (e.target.value) {
-                                      loadTemplate(e.target.value);
+                              <div className="relative inline-block w-40">
+                                <SearchableSelect
+                                  options={Object.keys(savedTemplates)}
+                                  value=""
+                                  onChange={(value) => {
+                                    if (value) {
+                                      loadTemplate(value);
                                     }
-                                    e.target.value = ""; // Reset after selection
                                   }}
-                                  defaultValue=""
-                                >
-                                  <option value="" disabled>Load template...</option>
-                                  {Object.keys(savedTemplates).map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                  ))}
-                                </select>
+                                  placeholder="Load template..."
+                                  className="h-8 px-2 text-xs"
+                                />
                               </div>
                             )}
                             

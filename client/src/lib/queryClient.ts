@@ -13,15 +13,17 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const token = localStorage.getItem('token');
+  const isFormData = data instanceof FormData;
+  
   const headers: Record<string, string> = {
-    ...(data ? { "Content-Type": "application/json" } : {}),
+    ...(!isFormData && data ? { "Content-Type": "application/json" } : {}),
     ...(token ? { "Authorization": `Bearer ${token}` } : {})
   };
 
   const res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body: isFormData ? data as FormData : data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
