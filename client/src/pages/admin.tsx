@@ -190,10 +190,10 @@ export default function AdminPage() {
                           <FormItem>
                             <FormLabel>Delivery Email (Optional)</FormLabel>
                             <FormControl>
-                              <Input placeholder="customer@example.com" {...field} />
+                              <Input placeholder="customer@example.com (leave blank for all)" {...field} />
                             </FormControl>
                             <FormDescription>
-                              Filter consignments by delivery email address
+                              Filter consignments by delivery email address or leave blank to import all
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

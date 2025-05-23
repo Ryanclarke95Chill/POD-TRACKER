@@ -183,12 +183,14 @@ export class AxylogAPI {
       // Apply additional filters and convert to our format
       let deliveries = response.data.deliveries;
       
-      // Filter by email if provided
-      if (filters.deliveryEmail) {
+      // Filter by email if provided and not empty
+      if (filters.deliveryEmail && filters.deliveryEmail.trim() !== '') {
         deliveries = deliveries.filter((delivery: AxylogDelivery) => 
           delivery.deliveryAddress.email?.toLowerCase() === filters.deliveryEmail?.toLowerCase()
         );
         console.log(`Filtered to ${deliveries.length} deliveries by email: ${filters.deliveryEmail}`);
+      } else {
+        console.log('No email filter applied, returning all consignments');
       }
       
       // Filter by customer name if provided
