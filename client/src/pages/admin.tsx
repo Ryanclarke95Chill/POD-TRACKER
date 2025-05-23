@@ -122,12 +122,14 @@ export default function AdminPage() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [mappingRequired, setMappingRequired] = useState(false);
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
+  const [combineFields, setCombineFields] = useState<Record<string, string[]>>({});
   const [csvPreview, setCsvPreview] = useState<string[][]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
+  const [currentlyEditingField, setCurrentlyEditingField] = useState<string | null>(null);
   
   // State for mapping templates
-  const [savedTemplates, setSavedTemplates] = useState<Record<string, Record<string, string>>>({});
+  const [savedTemplates, setSavedTemplates] = useState<Record<string, {mapping: Record<string, string>, combine: Record<string, string[]>}>>({});
   const [templateName, setTemplateName] = useState("");
   const [showSaveTemplateInput, setShowSaveTemplateInput] = useState(false);
   
@@ -230,10 +232,77 @@ export default function AdminPage() {
   
   // Update field mapping
   const updateFieldMapping = (csvField: string, appField: string) => {
+    // If switching to or from combined field, handle the combineFields state
+    if (appField === "combine") {
+      // Initialize combined fields if not already set
+      if (!combineFields[csvField]) {
+        setCombineFields(prev => ({
+          ...prev,
+          [csvField]: []
+        }));
+      }
+    } else if (fieldMapping[csvField] === "combine") {
+      // Remove from combined fields if changing from combine to something else
+      setCombineFields(prev => {
+        const newCombine = { ...prev };
+        delete newCombine[csvField];
+        return newCombine;
+      });
+    }
+    
+    // Update the field mapping
     setFieldMapping(prev => ({
       ...prev,
       [csvField]: appField
     }));
+  };
+  
+  // Add a field to combine with another
+  const addCombineField = (targetField: string, fieldToAdd: string) => {
+    setCombineFields(prev => {
+      // If this field is already in another combination, remove it
+      const newCombine = { ...prev };
+      
+      // Find if the field is already used in another combination
+      Object.keys(newCombine).forEach(key => {
+        if (key !== targetField && newCombine[key].includes(fieldToAdd)) {
+          newCombine[key] = newCombine[key].filter(f => f !== fieldToAdd);
+        }
+      });
+      
+      // Add to the target combination if not already there
+      if (!newCombine[targetField]?.includes(fieldToAdd)) {
+        newCombine[targetField] = [...(newCombine[targetField] || []), fieldToAdd];
+      }
+      
+      return newCombine;
+    });
+  };
+  
+  // Remove a field from combination
+  const removeCombineField = (targetField: string, fieldToRemove: string) => {
+    setCombineFields(prev => {
+      if (!prev[targetField]) return prev;
+      
+      return {
+        ...prev,
+        [targetField]: prev[targetField].filter(f => f !== fieldToRemove)
+      };
+    });
+  };
+  
+  // Get combined preview for display
+  const getCombinedPreview = (field: string, rowIndex: number = 0): string => {
+    if (!combineFields[field] || combineFields[field].length === 0) return "";
+    
+    // Get all the fields that are combined and their values from the preview
+    const combinedValues = combineFields[field].map(header => {
+      const headerIndex = csvHeaders.indexOf(header);
+      return headerIndex >= 0 && csvPreview[rowIndex]?.[headerIndex] || "";
+    }).filter(Boolean);
+    
+    // Join with commas and spaces appropriately
+    return combinedValues.join(", ");
   };
   
   // Save current mapping as a template
@@ -249,7 +318,10 @@ export default function AdminPage() {
     
     setSavedTemplates(prev => ({
       ...prev,
-      [name]: { ...fieldMapping }
+      [name]: { 
+        mapping: { ...fieldMapping },
+        combine: { ...combineFields }
+      }
     }));
     
     setTemplateName("");
@@ -266,7 +338,7 @@ export default function AdminPage() {
   const loadTemplate = (name: string) => {
     if (savedTemplates[name]) {
       // First, check if the template headers match current CSV headers
-      const templateFields = Object.keys(savedTemplates[name]);
+      const templateFields = Object.keys(savedTemplates[name].mapping);
       const matchingHeaderCount = templateFields.filter(field => csvHeaders.includes(field)).length;
       const matchPercentage = (matchingHeaderCount / templateFields.length) * 100;
       
@@ -281,14 +353,31 @@ export default function AdminPage() {
       // Apply the template where headers match
       const newMapping: Record<string, string> = {};
       csvHeaders.forEach(header => {
-        if (savedTemplates[name][header]) {
-          newMapping[header] = savedTemplates[name][header];
+        if (savedTemplates[name].mapping[header]) {
+          newMapping[header] = savedTemplates[name].mapping[header];
         } else {
           newMapping[header] = "";
         }
       });
       
+      // Apply combined fields
+      const newCombineFields: Record<string, string[]> = {};
+      const templateCombine = savedTemplates[name].combine || {};
+      Object.keys(templateCombine).forEach(key => {
+        if (csvHeaders.includes(key)) {
+          // Only include fields that exist in the current CSV
+          const validCombinedFields = templateCombine[key].filter(
+            field => csvHeaders.includes(field)
+          );
+          
+          if (validCombinedFields.length > 0) {
+            newCombineFields[key] = validCombinedFields;
+          }
+        }
+      });
+      
       setFieldMapping(newMapping);
+      setCombineFields(newCombineFields);
       
       toast({
         title: "Template Applied",
@@ -947,14 +1036,23 @@ export default function AdminPage() {
                                     <div className="bg-neutral-100 rounded-lg p-4 mb-3">
                                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                         {csvHeaders.filter(header => !fieldMapping[header] || fieldMapping[header] === "ignore").map((header, index) => (
-                                          <div key={index} className="bg-white border rounded-md p-2 text-sm flex flex-col space-y-1">
+                                          <div key={index} className={`bg-white border rounded-md p-2 text-sm flex flex-col space-y-1 
+                                            ${currentlyEditingField === header ? 'ring-2 ring-primary-light' : ''}`}
+                                          >
                                             <span className="truncate font-medium text-xs">{header}</span>
                                             <select
                                               className="text-xs border rounded p-1"
                                               value={fieldMapping[header] || ""}
-                                              onChange={(e) => updateFieldMapping(header, e.target.value)}
+                                              onChange={(e) => {
+                                                updateFieldMapping(header, e.target.value);
+                                                if (e.target.value === "combine") {
+                                                  setCurrentlyEditingField(header);
+                                                }
+                                              }}
                                             >
                                               <option value="">Map...</option>
+                                              <option value="combine">Combine Multiple Fields</option>
+                                              <optgroup label="──────────"></optgroup>
                                               <option value="consignmentNumber">Consignment Number</option>
                                               <option value="customerName">Customer Name</option>
                                               <option value="pickupAddress">Pickup Address</option>
@@ -965,6 +1063,51 @@ export default function AdminPage() {
                                               <option value="lastKnownLocation">Last Known Location</option>
                                               <option value="ignore">Ignore</option>
                                             </select>
+                                            
+                                            {/* Field combination UI */}
+                                            {fieldMapping[header] === "combine" && currentlyEditingField === header && (
+                                              <div className="mt-2 border rounded-md p-2 bg-gray-50">
+                                                <div className="text-xs font-medium mb-2">Select fields to combine:</div>
+                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                  {csvHeaders.filter(h => h !== header).map((otherHeader) => (
+                                                    <button
+                                                      key={`combine-${otherHeader}`}
+                                                      onClick={() => {
+                                                        if (combineFields[header]?.includes(otherHeader)) {
+                                                          removeCombineField(header, otherHeader);
+                                                        } else {
+                                                          addCombineField(header, otherHeader);
+                                                        }
+                                                      }}
+                                                      className={`text-xs py-1 px-2 rounded 
+                                                        ${combineFields[header]?.includes(otherHeader) 
+                                                          ? 'bg-primary-light text-white' 
+                                                          : 'bg-white border'}`}
+                                                    >
+                                                      {otherHeader}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                                
+                                                {combineFields[header]?.length > 0 && (
+                                                  <div className="mt-2 text-xs">
+                                                    <div className="font-medium">Preview:</div>
+                                                    <div className="p-1 bg-white border rounded mt-1 font-mono">
+                                                      {getCombinedPreview(header, 0)}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                                
+                                                <div className="flex justify-end mt-2">
+                                                  <button 
+                                                    onClick={() => setCurrentlyEditingField(null)}
+                                                    className="text-xs text-primary underline"
+                                                  >
+                                                    Done
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
