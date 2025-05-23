@@ -1005,28 +1005,122 @@ export default function AdminPage() {
                                           <p className="text-xs text-neutral-500 mt-1 mb-2">System field</p>
                                           
                                           <div className="mt-2">
-                                            <select
-                                              className={`w-full rounded-md border border-neutral-200 p-2 bg-white
-                                                ${mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'bg-gray-50 text-gray-400' : ''}
-                                              `}
-                                              value={mappedHeader || ""}
-                                              onChange={(e) => {
-                                                // Clear previous mapping for this CSV header if exists
-                                                if (mappedHeader) {
-                                                  updateFieldMapping(mappedHeader, "");
-                                                }
+                                            <div className="flex items-center space-x-2">
+                                              <select
+                                                className={`w-full rounded-md border border-neutral-200 p-2 bg-white
+                                                  ${mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'bg-gray-50 text-gray-400' : ''}
+                                                `}
+                                                value={mappedHeader || ""}
+                                                onChange={(e) => {
+                                                  // Clear previous mapping for this CSV header if exists
+                                                  if (mappedHeader) {
+                                                    updateFieldMapping(mappedHeader, "");
+                                                  }
+                                                  
+                                                  // Set new mapping if a header is selected
+                                                  if (e.target.value) {
+                                                    updateFieldMapping(e.target.value, fieldKey);
+                                                  }
+                                                }}
+                                              >
+                                                <option value="">Select CSV field...</option>
+                                                {csvHeaders.map((header, headerIndex) => (
+                                                  <option key={headerIndex} value={header}>{header}</option>
+                                                ))}
+                                              </select>
+                                              
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCurrentlyEditingField(fieldKey);
+                                                }}
+                                                className="flex-shrink-0 w-8 h-8 rounded-md border border-neutral-200 bg-white flex items-center justify-center hover:bg-neutral-50"
+                                                title="Add more fields to combine"
+                                              >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-neutral-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                  <path d="M12 5v14M5 12h14" />
+                                                </svg>
+                                              </button>
+                                            </div>
+                                            
+                                            {/* Field combination dialog */}
+                                            {currentlyEditingField === fieldKey && (
+                                              <div className="mt-3 border rounded-md p-3 bg-neutral-50">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <span className="text-sm font-medium">Combine Fields</span>
+                                                  <button 
+                                                    onClick={() => setCurrentlyEditingField(null)}
+                                                    className="h-5 w-5 rounded-full bg-neutral-200 flex items-center justify-center"
+                                                  >
+                                                    <X className="h-3 w-3" />
+                                                  </button>
+                                                </div>
                                                 
-                                                // Set new mapping if a header is selected
-                                                if (e.target.value) {
-                                                  updateFieldMapping(e.target.value, fieldKey);
-                                                }
-                                              }}
-                                            >
-                                              <option value="">Select CSV field...</option>
-                                              {csvHeaders.map((header, headerIndex) => (
-                                                <option key={headerIndex} value={header}>{header}</option>
-                                              ))}
-                                            </select>
+                                                <p className="text-xs text-neutral-500 mb-3">
+                                                  Select additional CSV fields to combine with the primary field.
+                                                </p>
+                                                
+                                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                                  {csvHeaders.filter(h => h !== mappedHeader).map((header) => (
+                                                    <div key={header} className="flex items-center">
+                                                      <Checkbox 
+                                                        id={`combine-${fieldKey}-${header}`}
+                                                        checked={combineFields[fieldKey]?.includes(header) || false}
+                                                        onCheckedChange={(checked) => {
+                                                          if (checked) {
+                                                            // Initialize combineFields for this field if it doesn't exist
+                                                            if (!combineFields[fieldKey]) {
+                                                              setCombineFields(prev => ({
+                                                                ...prev,
+                                                                [fieldKey]: [header]
+                                                              }));
+                                                            } else {
+                                                              addCombineField(fieldKey, header);
+                                                            }
+                                                          } else {
+                                                            removeCombineField(fieldKey, header);
+                                                          }
+                                                        }}
+                                                        className="mr-2"
+                                                      />
+                                                      <label 
+                                                        htmlFor={`combine-${fieldKey}-${header}`}
+                                                        className="text-xs cursor-pointer"
+                                                      >
+                                                        {header}
+                                                      </label>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                
+                                                {combineFields[fieldKey]?.length > 0 && (
+                                                  <div className="mt-3 bg-white p-2 rounded border">
+                                                    <div className="text-xs font-medium mb-1">Preview:</div>
+                                                    <div className="text-xs font-mono bg-neutral-50 p-1 rounded">
+                                                      {mappedHeader ? csvPreview[0]?.[csvHeaders.indexOf(mappedHeader)] || "" : ""} 
+                                                      {combineFields[fieldKey]?.map(field => {
+                                                        const value = csvPreview[0]?.[csvHeaders.indexOf(field)] || "";
+                                                        return value ? `, ${value}` : "";
+                                                      }).join("")}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                            
+                                            {/* Combined fields indicators */}
+                                            {combineFields[fieldKey]?.length > 0 && currentlyEditingField !== fieldKey && (
+                                              <div className="mt-2 flex flex-wrap gap-1">
+                                                <span className="text-xs bg-primary-light/20 text-primary-dark rounded-md px-1.5 py-0.5 flex items-center">
+                                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M16 3h5v5"></path><path d="M4 20 L21 3"></path>
+                                                    <path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path>
+                                                    <path d="M4 4l6 6"></path>
+                                                  </svg>
+                                                  Combined with {combineFields[fieldKey].length} field{combineFields[fieldKey].length !== 1 ? 's' : ''}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       );
