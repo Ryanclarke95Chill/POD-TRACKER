@@ -738,19 +738,46 @@ export default function AdminPage() {
                                       
                                       return (
                                         <div key={index} className={`
-                                          p-4 border rounded-md flex flex-col
+                                          p-4 border rounded-md
                                           ${isRequired ? 'border-amber-200 bg-amber-50/30' : 'border-neutral-200'}
-                                          ${isMapped ? 'border-green-200 bg-green-50/20' : ''}
+                                          ${isMapped && (!mappedHeader || fieldMapping[mappedHeader] !== "ignore") ? 'border-green-200 bg-green-50/20' : ''}
+                                          ${mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'opacity-60 bg-gray-50' : ''}
                                         `}>
-                                          <label className="font-medium text-sm flex items-center">
-                                            {fieldLabel} {isRequired && <span className="text-amber-500 ml-1">*</span>}
-                                            {isMapped && <CheckCircle2 className="h-3 w-3 text-green-500 ml-2" />}
-                                          </label>
+                                          <div className="flex items-center justify-between mb-2">
+                                            <label className="font-medium text-sm flex items-center">
+                                              {fieldLabel} {isRequired && <span className="text-amber-500 ml-1">*</span>}
+                                              {isMapped && (!mappedHeader || fieldMapping[mappedHeader] !== "ignore") && <CheckCircle2 className="h-3 w-3 text-green-500 ml-2" />}
+                                            </label>
+                                            
+                                            {mappedHeader && !isRequired && (
+                                              <div className="flex items-center space-x-2">
+                                                <Switch 
+                                                  checked={fieldMapping[mappedHeader] !== "ignore"}
+                                                  onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                      // Restore to normal mapping
+                                                      updateFieldMapping(mappedHeader, fieldKey);
+                                                    } else {
+                                                      // Set to ignore
+                                                      updateFieldMapping(mappedHeader, "ignore");
+                                                    }
+                                                  }}
+                                                  size="sm"
+                                                />
+                                                <span className="text-xs text-neutral-500">
+                                                  {fieldMapping[mappedHeader] !== "ignore" ? "Active" : "Ignored"}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                          
                                           <p className="text-xs text-neutral-500 mt-1 mb-2">System field</p>
                                           
-                                          <div className="mt-auto pt-1">
+                                          <div className="mt-2">
                                             <select
-                                              className="w-full rounded-md border border-neutral-200 p-2 bg-white"
+                                              className={`w-full rounded-md border border-neutral-200 p-2 bg-white
+                                                ${mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'bg-gray-50 text-gray-400' : ''}
+                                              `}
                                               value={mappedHeader || ""}
                                               onChange={(e) => {
                                                 // Clear previous mapping for this CSV header if exists
