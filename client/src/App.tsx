@@ -14,14 +14,10 @@ function App() {
 
   // Redirect to login if not authenticated and not already at login
   useEffect(() => {
-    if (!isAuthenticated && location !== "/") {
+    const token = localStorage.getItem("token");
+    if (!token && location !== "/") {
       setLocation("/");
-    }
-  }, [isAuthenticated, location, setLocation]);
-
-  // Redirect to dashboard if authenticated and at login page
-  useEffect(() => {
-    if (isAuthenticated && location === "/") {
+    } else if (token && location === "/") {
       setLocation("/dashboard");
     }
   }, [isAuthenticated, location, setLocation]);
