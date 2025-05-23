@@ -82,6 +82,7 @@ export class MemStorage implements IStorage {
   }
 
   async seedDemoConsignments(userId: number): Promise<void> {
+    console.log(`Seeding demo consignments for user ID: ${userId}`);
     const today = new Date();
     
     // Demo consignment 1

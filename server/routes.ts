@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 // Always use demo data for reliability
+// Completely deactivated Axylog API
 const USE_AXYLOG_API = false;
 
 interface AuthRequest extends Request {
@@ -31,9 +32,10 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize demo user if it doesn't exist
-  const demoUser = await storage.getUserByEmail("demo@chill.com.au");
+  // Initialize demo user and ensure we have demo consignments
+  let demoUser = await storage.getUserByEmail("demo@chill.com.au");
   if (!demoUser) {
+    console.log("Creating demo user...");
     const hashedPassword = await bcrypt.hash("demo123", 10);
     await storage.createUser({
       username: "demo",
@@ -41,11 +43,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       email: "demo@chill.com.au",
       name: "Demo User",
     });
+    demoUser = await storage.getUserByEmail("demo@chill.com.au");
+  }
 
-    // Add demo consignments for the demo user
-    const user = await storage.getUserByEmail("demo@chill.com.au");
-    if (user) {
-      await storage.seedDemoConsignments(user.id);
+  // Check if demo user has consignments, if not seed them
+  if (demoUser) {
+    const existingConsignments = await storage.getConsignmentsByUserId(demoUser.id);
+    if (existingConsignments.length === 0) {
+      console.log("No consignments found for demo user. Seeding demo data...");
+      await storage.seedDemoConsignments(demoUser.id);
+    } else {
+      console.log(`Found ${existingConsignments.length} existing consignments for demo user`);
     }
   }
 
