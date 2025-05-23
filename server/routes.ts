@@ -96,10 +96,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if we should use Axylog API
-      if (USE_AXYLOG_API) {
+      if (USE_AXYLOG_API === "true") {
         // Use Axylog API to get consignments
         console.log(`Fetching consignments from Axylog API for user email: ${userEmail}`);
         
+        // First check if we have any stored consignments for this user
+        const storedConsignments = await storage.getConsignmentsByUserId(userId);
+        
+        if (storedConsignments.length > 0) {
+          console.log(`Found ${storedConsignments.length} stored consignments for user ID: ${userId}`);
+          return res.json(storedConsignments);
+        }
+        
+        // If no stored consignments, fetch from Axylog API
         const consignments = await axylogAPI.getDeliveries(userEmail);
         
         // Update user ID for each consignment
@@ -147,6 +156,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching consignment:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Admin route to import consignments from Axylog
+  app.post("/api/admin/import", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Extract filter parameters from request body
+      const { 
+        pickupDateFrom, 
+        pickupDateTo, 
+        deliveryEmail, 
+        customerName,
+        importToDatabase,
+        refreshExisting 
+      } = req.body;
+      
+      if (!pickupDateFrom || !pickupDateTo) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+      
+      // Check if Axylog API is enabled
+      if (USE_AXYLOG_API !== "true") {
+        return res.status(400).json({ 
+          message: "Axylog API is not enabled. Please enable it in environment variables." 
+        });
+      }
+      
+      console.log(`Admin importing consignments with filters:`, {
+        pickupDateFrom,
+        pickupDateTo,
+        deliveryEmail: deliveryEmail || "Any",
+        customerName: customerName || "Any"
+      });
+      
+      // Fetch consignments from Axylog with filters
+      const consignments = await axylogAPI.getConsignmentsWithFilters({
+        pickupDateFrom,
+        pickupDateTo,
+        deliveryEmail,
+        customerName
+      });
+      
+      // Import to database if requested
+      let importedCount = 0;
+      let errors = 0;
+      
+      if (importToDatabase && consignments.length > 0) {
+        for (const consignment of consignments) {
+          try {
+            // Check if consignment already exists
+            const existingConsignment = await storage.getConsignmentByNumber(
+              consignment.consignmentNumber
+            );
+            
+            if (existingConsignment) {
+              if (refreshExisting) {
+                // Update existing consignment
+                await storage.updateConsignment({
+                  ...consignment,
+                  id: existingConsignment.id,
+                  userId // Ensure user ID is set correctly
+                });
+                importedCount++;
+              }
+            } else {
+              // Add new consignment
+              await storage.createConsignment({
+                ...consignment,
+                userId // Ensure user ID is set correctly
+              });
+              importedCount++;
+            }
+          } catch (error) {
+            console.error(`Error importing consignment ${consignment.consignmentNumber}:`, error);
+            errors++;
+          }
+        }
+      }
+      
+      res.json({
+        fetched: consignments.length,
+        imported: importedCount,
+        errors
+      });
+    } catch (error) {
+      console.error("Error during admin import:", error);
+      res.status(500).json({ message: "Import failed", error: String(error) });
     }
   });
 

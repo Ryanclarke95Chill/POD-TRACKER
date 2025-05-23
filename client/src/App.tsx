@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
@@ -33,6 +34,7 @@ function App() {
           <Switch>
             <Route path="/" component={Login} />
             <Route path="/dashboard" component={Dashboard} />
+            <Route path="/admin" component={AdminPage} />
             <Route component={NotFound} />
           </Switch>
         </div>

@@ -112,8 +112,36 @@ export class AxylogAPI {
     }
   }
 
-  // Get deliveries (consignments) from Axylog
+  // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Consignment[]> {
+    try {
+      // Prepare date range for last 6 months to future 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const sixMonthsAhead = new Date();
+      sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
+
+      const filters = {
+        pickupDateFrom: sixMonthsAgo.toISOString(),
+        pickupDateTo: sixMonthsAhead.toISOString(),
+        deliveryEmail: userEmail
+      };
+
+      return this.getConsignmentsWithFilters(filters);
+    } catch (error) {
+      console.error("Failed to get deliveries from Axylog API:", error);
+      return [];
+    }
+  }
+
+  // Get consignments with custom filters
+  async getConsignmentsWithFilters(filters: {
+    pickupDateFrom: string;
+    pickupDateTo: string;
+    deliveryEmail?: string;
+    customerName?: string;
+  }): Promise<Consignment[]> {
     try {
       // Authenticate if needed
       if (!this.credentials && !(await this.authenticate())) {
@@ -121,12 +149,7 @@ export class AxylogAPI {
         return [];
       }
 
-      // Prepare date range for last 6 months to future 6 months
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const sixMonthsAhead = new Date();
-      sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
+      console.log("Fetching consignments from Axylog with filters:", filters);
 
       // Make request to get deliveries
       const response = await axios.post(DELIVERIES_URL, {
@@ -135,8 +158,9 @@ export class AxylogAPI {
           pageSize: 100
         },
         filters: {
-          pickUp_Delivery_From: sixMonthsAgo.toISOString(),
-          pickUp_Delivery_To: sixMonthsAhead.toISOString()
+          pickUp_Delivery_From: filters.pickupDateFrom,
+          pickUp_Delivery_To: filters.pickupDateTo,
+          // Add any other Axylog specific filters here
         }
       }, {
         headers: {
@@ -149,8 +173,34 @@ export class AxylogAPI {
         }
       });
 
-      // Filter deliveries by user email and convert to our Consignment format
-      return this.convertAndFilterDeliveries(response.data.deliveries, userEmail);
+      if (!response.data || !response.data.deliveries) {
+        console.warn("No deliveries found in Axylog response");
+        return [];
+      }
+      
+      console.log(`Received ${response.data.deliveries.length} deliveries from Axylog API`);
+
+      // Apply additional filters and convert to our format
+      let deliveries = response.data.deliveries;
+      
+      // Filter by email if provided
+      if (filters.deliveryEmail) {
+        deliveries = deliveries.filter((delivery: AxylogDelivery) => 
+          delivery.deliveryAddress.email?.toLowerCase() === filters.deliveryEmail?.toLowerCase()
+        );
+        console.log(`Filtered to ${deliveries.length} deliveries by email: ${filters.deliveryEmail}`);
+      }
+      
+      // Filter by customer name if provided
+      if (filters.customerName) {
+        deliveries = deliveries.filter((delivery: AxylogDelivery) => 
+          delivery.receiverCompanyName?.toLowerCase().includes(filters.customerName?.toLowerCase() || '')
+        );
+        console.log(`Filtered to ${deliveries.length} deliveries by customer name: ${filters.customerName}`);
+      }
+
+      // Convert to our format
+      return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
     } catch (error) {
       console.error("Failed to get deliveries from Axylog API:", error);
       return [];

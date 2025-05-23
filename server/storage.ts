@@ -8,6 +8,9 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getConsignmentsByUserId(userId: number): Promise<Consignment[]>;
   getConsignmentById(id: number): Promise<Consignment | undefined>;
+  getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined>;
+  createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
+  updateConsignment(consignment: Consignment): Promise<Consignment>;
   seedDemoConsignments(userId: number): Promise<void>;
 }
 
@@ -57,11 +60,32 @@ export class MemStorage implements IStorage {
     return this.consignments.get(id);
   }
 
+  async getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined> {
+    return Array.from(this.consignments.values()).find(
+      (consignment) => consignment.consignmentNumber === consignmentNumber,
+    );
+  }
+
+  async createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment> {
+    const id = this.consignmentIdCounter++;
+    const newConsignment: Consignment = { ...consignment, id } as Consignment;
+    this.consignments.set(id, newConsignment);
+    return newConsignment;
+  }
+
+  async updateConsignment(consignment: Consignment): Promise<Consignment> {
+    if (!this.consignments.has(consignment.id)) {
+      throw new Error(`Consignment with ID ${consignment.id} not found`);
+    }
+    this.consignments.set(consignment.id, { ...consignment });
+    return consignment;
+  }
+
   async seedDemoConsignments(userId: number): Promise<void> {
     const today = new Date();
     
     // Demo consignment 1
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052478",
       userId,
       customerName: "Fresh Produce Co.",
@@ -100,7 +124,7 @@ export class MemStorage implements IStorage {
     });
 
     // Demo consignment 2
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052485",
       userId,
       customerName: "Frozen Foods Ltd",
@@ -151,7 +175,7 @@ export class MemStorage implements IStorage {
     });
 
     // Demo consignment 3
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052492",
       userId,
       customerName: "Premium Wines Australia",
@@ -178,7 +202,7 @@ export class MemStorage implements IStorage {
     });
 
     // Demo consignment 4
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052503",
       userId,
       customerName: "MediPharm Solutions",
@@ -217,7 +241,7 @@ export class MemStorage implements IStorage {
     });
 
     // Demo consignment 5
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052515",
       userId,
       customerName: "Sweet Treats Co.",
@@ -256,7 +280,7 @@ export class MemStorage implements IStorage {
     });
 
     // Demo consignment 6
-    this.createConsignment({
+    await this.createConsignment({
       consignmentNumber: "CON-10052521",
       userId,
       customerName: "General Cargo Pty Ltd",
@@ -281,13 +305,6 @@ export class MemStorage implements IStorage {
         }
       ]
     });
-  }
-
-  private createConsignment(consignment: InsertConsignment): Consignment {
-    const id = this.consignmentIdCounter++;
-    const newConsignment: Consignment = { ...consignment, id };
-    this.consignments.set(id, newConsignment);
-    return newConsignment;
   }
 }
 
