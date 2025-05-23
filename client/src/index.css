@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 20 14.3% 4.1%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  --primary: 215 80% 40%; /* #0F52BA */
+  --primary-dark: 215 85% 30%; /* #0A3A8C */
+  --primary-light: 215 70% 53%; /* #3373D9 */
+  --primary-foreground: 211 100% 99%;
+  --secondary: 60 4.8% 95.9%;
+  --secondary-foreground: 24 9.8% 10%;
+  --accent: 60 4.8% 95.9%;
+  --accent-foreground: 24 9.8% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 9.1% 97.8%;
+  --ring: 215 80% 40%;
+  --radius: 0.5rem;
+  
+  /* Status colors */
+  --success: 142 70% 45%; /* #22C55E */
+  --warning: 38 92% 50%; /* #F59E0B */
+  --danger: 0 84% 60%; /* #EF4444 */
+  --info: 217 91% 60%; /* #3B82F6 */
+  
+  /* Temperature zone colors */
+  --temp-dry: 220 8% 65%; /* #9CA3AF */
+  --temp-chiller: 214 95% 78%; /* #93C5FD */
+  --temp-freezer: 183 100% 81%; /* #A5F3FC */
+  --temp-wine: 270 94% 75%; /* #C084FC */
+  --temp-confectionery: 47 96% 65%; /* #FCD34D */
+  --temp-pharma: 152 81% 80%; /* #A7F3D0 */
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --primary: 215 80% 40%;
+  --primary-dark: 215 85% 30%;
+  --primary-light: 215 70% 53%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 240 4.9% 83.9%;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-neutral-100 text-foreground;
+  }
+}
+
+.consignment-number {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+}
+
+/* Temperature zone colors */
+.bg-temp-dry {
+  background-color: hsl(var(--temp-dry));
+}
+
+.bg-temp-chiller {
+  background-color: hsl(var(--temp-chiller));
+}
+
+.bg-temp-freezer {
+  background-color: hsl(var(--temp-freezer));
+}
+
+.bg-temp-wine {
+  background-color: hsl(var(--temp-wine));
+}
+
+.bg-temp-confectionery {
+  background-color: hsl(var(--temp-confectionery));
+}
+
+.bg-temp-pharma {
+  background-color: hsl(var(--temp-pharma));
+}
+
+/* Status colors */
+.bg-status-transit {
+  background-color: hsl(var(--warning));
+}
+
+.bg-status-delivered {
+  background-color: hsl(var(--success));
+}
+
+.bg-status-awaiting {
+  background-color: hsl(220 8% 58%);
+}
