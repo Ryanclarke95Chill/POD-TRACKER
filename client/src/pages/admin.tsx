@@ -123,6 +123,7 @@ export default function AdminPage() {
   const [mappingRequired, setMappingRequired] = useState(false);
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [combineFields, setCombineFields] = useState<Record<string, string[]>>({});
+  const [fieldDelimiters, setFieldDelimiters] = useState<Record<string, string>>({});
   const [csvPreview, setCsvPreview] = useState<string[][]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
@@ -295,14 +296,25 @@ export default function AdminPage() {
   const getCombinedPreview = (field: string, rowIndex: number = 0): string => {
     if (!combineFields[field] || combineFields[field].length === 0) return "";
     
+    // Get the delimiter for this field or use default
+    const delimiter = fieldDelimiters[field] || ", ";
+    
     // Get all the fields that are combined and their values from the preview
     const combinedValues = combineFields[field].map(header => {
       const headerIndex = csvHeaders.indexOf(header);
       return headerIndex >= 0 && csvPreview[rowIndex]?.[headerIndex] || "";
     }).filter(Boolean);
     
-    // Join with commas and spaces appropriately
-    return combinedValues.join(", ");
+    // Join with the specified delimiter
+    return combinedValues.join(delimiter);
+  };
+  
+  // Update delimiter for a field
+  const updateDelimiter = (field: string, delimiter: string) => {
+    setFieldDelimiters(prev => ({
+      ...prev,
+      [field]: delimiter
+    }));
   };
   
   // Save current mapping as a template
@@ -1060,13 +1072,44 @@ export default function AdminPage() {
                                                   Select additional CSV fields to combine with the primary field.
                                                 </p>
                                                 
-                                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                                  {csvHeaders.filter(h => h !== mappedHeader).map((header) => (
+                                                <div className="mb-3">
+                                                  <div className="text-xs font-medium mb-1">Select delimiter:</div>
+                                                  <div className="flex flex-wrap gap-2">
+                                                    {[
+                                                      { label: "Comma (,)", value: ", " },
+                                                      { label: "Space", value: " " },
+                                                      { label: "Hyphen (-)", value: " - " },
+                                                      { label: "Newline", value: "\n" },
+                                                      { label: "Nothing", value: "" }
+                                                    ].map((delimiterOption) => (
+                                                      <button
+                                                        key={delimiterOption.value}
+                                                        type="button"
+                                                        onClick={() => updateDelimiter(fieldKey, delimiterOption.value)}
+                                                        className={`text-xs py-1 px-2 rounded-md border
+                                                          ${(fieldDelimiters[fieldKey] || ", ") === delimiterOption.value 
+                                                            ? 'bg-primary text-white border-primary' 
+                                                            : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                                                          }`}
+                                                      >
+                                                        {delimiterOption.label}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                                
+                                                <div className="text-xs font-medium mb-2">Select fields to combine:</div>
+                                                
+                                                <div className="space-y-1 max-h-40 overflow-y-auto pr-1 mb-3 border rounded-md p-2 bg-white">
+                                                  {csvHeaders.map((header) => (
                                                     <div key={header} className="flex items-center">
                                                       <Checkbox 
                                                         id={`combine-${fieldKey}-${header}`}
-                                                        checked={combineFields[fieldKey]?.includes(header) || false}
+                                                        checked={header === mappedHeader || combineFields[fieldKey]?.includes(header) || false}
+                                                        disabled={header === mappedHeader} // Primary field is always selected
                                                         onCheckedChange={(checked) => {
+                                                          if (header === mappedHeader) return; // Skip the primary field
+                                                          
                                                           if (checked) {
                                                             // Initialize combineFields for this field if it doesn't exist
                                                             if (!combineFields[fieldKey]) {
@@ -1085,26 +1128,52 @@ export default function AdminPage() {
                                                       />
                                                       <label 
                                                         htmlFor={`combine-${fieldKey}-${header}`}
-                                                        className="text-xs cursor-pointer"
+                                                        className={`text-xs cursor-pointer ${header === mappedHeader ? 'font-semibold' : ''}`}
                                                       >
-                                                        {header}
+                                                        {header} {header === mappedHeader && <span className="text-primary-dark">(primary)</span>}
                                                       </label>
                                                     </div>
                                                   ))}
                                                 </div>
                                                 
-                                                {combineFields[fieldKey]?.length > 0 && (
-                                                  <div className="mt-3 bg-white p-2 rounded border">
-                                                    <div className="text-xs font-medium mb-1">Preview:</div>
-                                                    <div className="text-xs font-mono bg-neutral-50 p-1 rounded">
-                                                      {mappedHeader ? csvPreview[0]?.[csvHeaders.indexOf(mappedHeader)] || "" : ""} 
-                                                      {combineFields[fieldKey]?.map(field => {
-                                                        const value = csvPreview[0]?.[csvHeaders.indexOf(field)] || "";
-                                                        return value ? `, ${value}` : "";
-                                                      }).join("")}
-                                                    </div>
+                                                <div className="mt-3 bg-white p-2 rounded border">
+                                                  <div className="flex justify-between items-center">
+                                                    <div className="text-xs font-medium">Preview:</div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        // Show a different row in the preview
+                                                        // You could implement this to cycle through rows
+                                                        toast({
+                                                          title: "Preview Feature",
+                                                          description: "In a full implementation, this would let you cycle through data rows",
+                                                          duration: 2000
+                                                        });
+                                                      }}
+                                                      className="text-xs text-primary"
+                                                    >
+                                                      Next Row
+                                                    </button>
                                                   </div>
-                                                )}
+                                                  
+                                                  <div className="text-xs font-mono bg-neutral-50 p-2 rounded mt-1 break-all border">
+                                                    {mappedHeader && (
+                                                      <span className="font-semibold">{csvPreview[0]?.[csvHeaders.indexOf(mappedHeader)] || ""}</span>
+                                                    )}
+                                                    
+                                                    {combineFields[fieldKey]?.map((field, i) => {
+                                                      const value = csvPreview[0]?.[csvHeaders.indexOf(field)] || "";
+                                                      if (!value) return null;
+                                                      
+                                                      return (
+                                                        <span key={field}>
+                                                          <span className="text-neutral-400">{fieldDelimiters[fieldKey] || ", "}</span>
+                                                          {value}
+                                                        </span>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
                                               </div>
                                             )}
                                             
