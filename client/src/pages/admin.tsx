@@ -749,23 +749,30 @@ export default function AdminPage() {
                                               {isMapped && (!mappedHeader || fieldMapping[mappedHeader] !== "ignore") && <CheckCircle2 className="h-3 w-3 text-green-500 ml-2" />}
                                             </label>
                                             
-                                            {mappedHeader && !isRequired && (
+                                            {mappedHeader && (
                                               <div className="flex items-center space-x-2">
-                                                <Switch 
-                                                  checked={fieldMapping[mappedHeader] !== "ignore"}
-                                                  onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                      // Restore to normal mapping
-                                                      updateFieldMapping(mappedHeader, fieldKey);
-                                                    } else {
-                                                      // Set to ignore
-                                                      updateFieldMapping(mappedHeader, "ignore");
-                                                    }
-                                                  }}
-                                                  size="sm"
-                                                />
+                                                <div className={`${isRequired ? 'opacity-50' : ''}`}>
+                                                  <Switch 
+                                                    checked={fieldMapping[mappedHeader] !== "ignore"}
+                                                    onCheckedChange={(checked) => {
+                                                      if (checked) {
+                                                        // Restore to normal mapping
+                                                        updateFieldMapping(mappedHeader, fieldKey);
+                                                      } else {
+                                                        // Set to ignore
+                                                        updateFieldMapping(mappedHeader, "ignore");
+                                                      }
+                                                    }}
+                                                    disabled={isRequired}
+                                                  />
+                                                </div>
                                                 <span className="text-xs text-neutral-500">
-                                                  {fieldMapping[mappedHeader] !== "ignore" ? "Active" : "Ignored"}
+                                                  {isRequired 
+                                                    ? "Required" 
+                                                    : fieldMapping[mappedHeader] !== "ignore" 
+                                                      ? "Active" 
+                                                      : "Ignored"
+                                                  }
                                                 </span>
                                               </div>
                                             )}
@@ -849,31 +856,50 @@ export default function AdminPage() {
                               <Button variant="outline" onClick={() => setShowMappingDialog(false)}>
                                 Cancel
                               </Button>
-                              <Button onClick={() => {
-                                // Check if required fields are mapped
+                              
+                              {/* Check if required fields are mapped properly */}
+                              {(() => {
                                 const requiredFields = ["consignmentNumber", "customerName", "status"];
                                 const missingRequired = requiredFields.filter(field => 
                                   !Object.values(fieldMapping).includes(field)
                                 );
                                 
-                                if (missingRequired.length > 0) {
-                                  toast({
-                                    title: "Missing Required Fields",
-                                    description: `Please map the following required fields: ${missingRequired.join(", ")}`,
-                                    variant: "destructive"
-                                  });
-                                  return;
-                                }
+                                const allRequiredMapped = missingRequired.length === 0;
                                 
-                                setShowMappingDialog(false);
-                                toast({
-                                  title: "Field Mapping Saved",
-                                  description: "Your field mapping has been saved. Ready to import.",
-                                  variant: "default"
+                                // Also check that fields marked as required aren't set to "ignore"
+                                const requiredMappedCorrectly = Object.entries(fieldMapping).every(([header, value]) => {
+                                  return !requiredFields.includes(value) || value !== "ignore";
                                 });
-                              }}>
-                                Save Mapping
-                              </Button>
+                                
+                                const canSave = allRequiredMapped && requiredMappedCorrectly;
+                                
+                                return (
+                                  <div className="flex flex-col items-end">
+                                    {!canSave && (
+                                      <p className="text-xs text-red-500 mb-1">
+                                        {missingRequired.length > 0 
+                                          ? `Required fields must be mapped: ${missingRequired.join(", ")}`
+                                          : "Required fields cannot be ignored"
+                                        }
+                                      </p>
+                                    )}
+                                    
+                                    <Button 
+                                      onClick={() => {
+                                        setShowMappingDialog(false);
+                                        toast({
+                                          title: "Field Mapping Saved",
+                                          description: "Your field mapping has been saved. Ready to import.",
+                                          variant: "default"
+                                        });
+                                      }}
+                                      disabled={!canSave}
+                                    >
+                                      Save Mapping
+                                    </Button>
+                                  </div>
+                                );
+                              })()}
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
