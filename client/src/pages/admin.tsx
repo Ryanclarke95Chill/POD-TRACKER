@@ -634,8 +634,8 @@ export default function AdminPage() {
                         
                         {/* Field Mapping Dialog */}
                         <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
-                          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-                            <DialogHeader className="p-6 pb-2 sticky top-0 bg-white z-10">
+                          <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col">
+                            <DialogHeader className="p-6 pb-2 sticky top-0 bg-white z-10 border-b">
                               <DialogTitle className="flex items-center text-xl">
                                 <Table className="h-5 w-5 mr-2 text-primary" />
                                 Map CSV Fields
@@ -645,92 +645,112 @@ export default function AdminPage() {
                               </DialogDescription>
                             </DialogHeader>
                             
-                            <div className="p-6 pt-2">
-                              {/* Data Preview Section */}
-                              <div className="mb-6">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-sm font-medium text-neutral-800">Data Preview</h4>
-                                  <p className="text-xs text-neutral-500">Showing first 5 rows</p>
+                            <div className="flex-grow overflow-y-auto p-0">
+                              {/* Tab navigation for better organization */}
+                              <Tabs defaultValue="preview" className="w-full">
+                                <div className="px-6 border-b">
+                                  <TabsList className="grid grid-cols-2">
+                                    <TabsTrigger value="preview">1. Data Preview</TabsTrigger>
+                                    <TabsTrigger value="mapping">2. Field Mapping</TabsTrigger>
+                                  </TabsList>
                                 </div>
-                                <div className="border rounded-lg overflow-hidden">
-                                  <div className="overflow-x-auto">
-                                    <table className="w-full text-sm border-collapse">
-                                      <thead>
-                                        <tr className="bg-neutral-50">
-                                          {csvHeaders.map((header, index) => (
-                                            <th key={index} className="px-4 py-3 text-left font-medium text-neutral-700 border-b">
-                                              {header}
-                                            </th>
-                                          ))}
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {csvPreview.map((row, rowIndex) => (
-                                          <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
-                                            {row.map((cell, cellIndex) => (
-                                              <td key={cellIndex} className="px-4 py-2 text-neutral-700 truncate max-w-[200px] border-t">
-                                                {cell}
-                                              </td>
+                                
+                                <TabsContent value="preview" className="px-6 py-4 mb-0">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-base font-medium text-neutral-800">CSV Data Preview</h4>
+                                    <p className="text-xs text-neutral-500">Showing first 5 rows</p>
+                                  </div>
+                                  
+                                  <div className="border rounded-lg overflow-hidden">
+                                    <div className="overflow-x-auto" style={{ maxHeight: '400px' }}>
+                                      <table className="w-full text-sm border-collapse">
+                                        <thead className="sticky top-0 z-10">
+                                          <tr className="bg-primary/10">
+                                            {csvHeaders.map((header, index) => (
+                                              <th key={index} className="px-3 py-3 text-left font-medium text-neutral-700 border-b whitespace-nowrap">
+                                                {header}
+                                              </th>
                                             ))}
                                           </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
+                                        </thead>
+                                        <tbody>
+                                          {csvPreview.map((row, rowIndex) => (
+                                            <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                                              {row.map((cell, cellIndex) => (
+                                                <td key={cellIndex} className="px-3 py-2 text-neutral-700 border-t whitespace-nowrap">
+                                                  {cell?.length > 20 ? `${cell.substring(0, 20)}...` : cell}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
                                   </div>
-                                </div>
-                              </div>
-                              
-                              {/* Field Mapping Section */}
-                              <div className="mb-6">
-                                <div className="flex justify-between items-center mb-3">
-                                  <h4 className="text-sm font-medium text-neutral-800">Field Mapping</h4>
-                                  <div className="text-xs text-neutral-500 italic">
-                                    <span className="inline-flex items-center mr-3">
-                                      <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" /> Auto-matched
-                                    </span>
-                                    <span className="inline-flex items-center">
-                                      <span className="h-2 w-2 bg-amber-400 rounded-full mr-1"></span> Required fields
-                                    </span>
+                                  
+                                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4">
+                                    <p className="text-sm text-blue-700 flex items-start">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2 flex-shrink-0">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M12 16v-4"></path>
+                                        <path d="M12 8h.01"></path>
+                                      </svg>
+                                      <span>This preview shows the raw data from your CSV file. Click on "Field Mapping" to connect these columns to our system fields.</span>
+                                    </p>
                                   </div>
-                                </div>
+                                </TabsContent>
                                 
-                                <div className="bg-neutral-50 p-4 mb-6 rounded-lg">
-                                  <p className="text-sm">
-                                    The system has automatically matched fields from your CSV to our system. 
-                                    Please review and adjust if necessary. All required fields must be mapped.
-                                  </p>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  {Object.entries({
-                                    "consignmentNumber": "Consignment Number",
-                                    "customerName": "Customer Name",
-                                    "pickupAddress": "Pickup Address",
-                                    "deliveryAddress": "Delivery Address",
-                                    "status": "Status",
-                                    "estimatedDeliveryDate": "Estimated Delivery Date",
-                                    "temperatureZone": "Temperature Zone",
-                                    "lastKnownLocation": "Last Known Location"
-                                  }).map(([fieldKey, fieldLabel], index) => {
-                                    // Find if any CSV header is mapped to this field
-                                    const mappedHeader = Object.entries(fieldMapping).find(([_, value]) => value === fieldKey)?.[0];
-                                    const isRequired = ["consignmentNumber", "customerName", "status"].includes(fieldKey);
-                                    
-                                    return (
-                                      <div key={index} className={`p-4 border rounded-md ${isRequired ? 'border-amber-200 bg-amber-50/30' : 'border-neutral-200'}`}>
-                                        <div className="flex items-center justify-between">
-                                          <div>
-                                            <Label className="font-medium">
-                                              {fieldLabel} {isRequired && <span className="text-amber-500">*</span>}
-                                            </Label>
-                                            <p className="text-xs text-neutral-500 mt-1">System field</p>
-                                          </div>
+                                <TabsContent value="mapping" className="px-6 py-4 mb-0">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <h4 className="text-base font-medium text-neutral-800">Field Mapping</h4>
+                                    <div className="text-xs text-neutral-500 italic">
+                                      <span className="inline-flex items-center mr-3 bg-white px-2 py-1 rounded-md border">
+                                        <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" /> Auto-matched fields
+                                      </span>
+                                      <span className="inline-flex items-center bg-white px-2 py-1 rounded-md border">
+                                        <span className="h-2 w-2 bg-amber-400 rounded-full mr-1"></span> Required fields
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="bg-neutral-50 p-4 mb-4 rounded-lg">
+                                    <p className="text-sm">
+                                      The system has automatically matched fields from your CSV to our system. 
+                                      Please review and adjust if necessary. All required fields must be mapped.
+                                    </p>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {Object.entries({
+                                      "consignmentNumber": "Consignment Number",
+                                      "customerName": "Customer Name",
+                                      "pickupAddress": "Pickup Address",
+                                      "deliveryAddress": "Delivery Address",
+                                      "status": "Status",
+                                      "estimatedDeliveryDate": "Estimated Delivery Date",
+                                      "temperatureZone": "Temperature Zone",
+                                      "lastKnownLocation": "Last Known Location"
+                                    }).map(([fieldKey, fieldLabel], index) => {
+                                      // Find if any CSV header is mapped to this field
+                                      const mappedHeader = Object.entries(fieldMapping).find(([_, value]) => value === fieldKey)?.[0];
+                                      const isRequired = ["consignmentNumber", "customerName", "status"].includes(fieldKey);
+                                      const isMapped = !!mappedHeader;
+                                      
+                                      return (
+                                        <div key={index} className={`
+                                          p-4 border rounded-md flex flex-col
+                                          ${isRequired ? 'border-amber-200 bg-amber-50/30' : 'border-neutral-200'}
+                                          ${isMapped ? 'border-green-200 bg-green-50/20' : ''}
+                                        `}>
+                                          <label className="font-medium text-sm flex items-center">
+                                            {fieldLabel} {isRequired && <span className="text-amber-500 ml-1">*</span>}
+                                            {isMapped && <CheckCircle2 className="h-3 w-3 text-green-500 ml-2" />}
+                                          </label>
+                                          <p className="text-xs text-neutral-500 mt-1 mb-2">System field</p>
                                           
-                                          <div className="flex items-center">
-                                            <ArrowRight className="mx-2 h-4 w-4 text-neutral-400" />
-                                            
+                                          <div className="mt-auto pt-1">
                                             <select
-                                              className="min-w-[200px] rounded-md border border-neutral-200 p-2 bg-white"
+                                              className="w-full rounded-md border border-neutral-200 p-2 bg-white"
                                               value={mappedHeader || ""}
                                               onChange={(e) => {
                                                 // Clear previous mapping for this CSV header if exists
@@ -749,55 +769,56 @@ export default function AdminPage() {
                                                 <option key={headerIndex} value={header}>{header}</option>
                                               ))}
                                             </select>
-                                            
-                                            {mappedHeader && (
-                                              <button
-                                                className="ml-2 text-neutral-400 hover:text-neutral-600"
-                                                onClick={() => updateFieldMapping(mappedHeader, "")}
-                                              >
-                                                <X className="h-4 w-4" />
-                                              </button>
-                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                              
-                              {/* Unmapped Fields Section */}
-                              <div>
-                                <h4 className="text-sm font-medium text-neutral-800 mb-3">Unmapped CSV Fields</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                  {csvHeaders.filter(header => !fieldMapping[header] || fieldMapping[header] === "ignore").map((header, index) => (
-                                    <div key={index} className="border rounded p-2 text-sm flex items-center justify-between">
-                                      <span className="truncate">{header}</span>
-                                      <div className="flex items-center">
-                                        <select
-                                          className="ml-2 text-xs border rounded p-1"
-                                          value={fieldMapping[header] || ""}
-                                          onChange={(e) => updateFieldMapping(header, e.target.value)}
-                                        >
-                                          <option value="">Map...</option>
-                                          <option value="consignmentNumber">Consignment Number</option>
-                                          <option value="customerName">Customer Name</option>
-                                          <option value="pickupAddress">Pickup Address</option>
-                                          <option value="deliveryAddress">Delivery Address</option>
-                                          <option value="status">Status</option>
-                                          <option value="estimatedDeliveryDate">Estimated Delivery Date</option>
-                                          <option value="temperatureZone">Temperature Zone</option>
-                                          <option value="lastKnownLocation">Last Known Location</option>
-                                          <option value="ignore">Ignore</option>
-                                        </select>
+                                      );
+                                    })}
+                                  </div>
+                                  
+                                  {/* Unmapped Fields Section */}
+                                  <div className="mt-6">
+                                    <h4 className="text-sm font-medium text-neutral-800 mb-3">Unmapped CSV Fields</h4>
+                                    <div className="bg-neutral-100 rounded-lg p-4 mb-3">
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                        {csvHeaders.filter(header => !fieldMapping[header] || fieldMapping[header] === "ignore").map((header, index) => (
+                                          <div key={index} className="bg-white border rounded-md p-2 text-sm flex flex-col space-y-1">
+                                            <span className="truncate font-medium text-xs">{header}</span>
+                                            <select
+                                              className="text-xs border rounded p-1"
+                                              value={fieldMapping[header] || ""}
+                                              onChange={(e) => updateFieldMapping(header, e.target.value)}
+                                            >
+                                              <option value="">Map...</option>
+                                              <option value="consignmentNumber">Consignment Number</option>
+                                              <option value="customerName">Customer Name</option>
+                                              <option value="pickupAddress">Pickup Address</option>
+                                              <option value="deliveryAddress">Delivery Address</option>
+                                              <option value="status">Status</option>
+                                              <option value="estimatedDeliveryDate">Estimated Delivery Date</option>
+                                              <option value="temperatureZone">Temperature Zone</option>
+                                              <option value="lastKnownLocation">Last Known Location</option>
+                                              <option value="ignore">Ignore</option>
+                                            </select>
+                                          </div>
+                                        ))}
                                       </div>
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
+                                  </div>
+                                  
+                                  <div className="mb-4 mt-6 bg-primary/10 border border-primary/20 rounded-lg p-4">
+                                    <p className="text-sm text-primary-dark flex items-start">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2 flex-shrink-0 text-primary">
+                                        <path d="m9 12 2 2 4-4"></path>
+                                        <path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9-9 9-9-1.8-9-9 1.8-9 9-9Z"></path>
+                                      </svg>
+                                      <span>All mapped fields will be used to import consignments. Be sure to map at least the required fields.</span>
+                                    </p>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
                             </div>
                             
-                            <DialogFooter className="p-4 border-t bg-neutral-50 sticky bottom-0">
+                            <DialogFooter className="p-4 border-t bg-neutral-50 mt-auto">
                               <Button variant="outline" onClick={() => setShowMappingDialog(false)}>
                                 Cancel
                               </Button>
