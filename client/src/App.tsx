@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "@/pages/login";
@@ -26,16 +26,18 @@ function App() {
   }, [isAuthenticated, location, setLocation]);
 
   return (
-    <TooltipProvider>
-      <Toaster />
-      <div className="min-h-screen flex flex-col">
-        <Switch>
-          <Route path="/" component={Login} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route component={NotFound} />
-        </Switch>
-      </div>
-    </TooltipProvider>
+    <Router>
+      <TooltipProvider>
+        <Toaster />
+        <div className="min-h-screen flex flex-col">
+          <Switch>
+            <Route path="/" component={Login} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route component={NotFound} />
+          </Switch>
+        </div>
+      </TooltipProvider>
+    </Router>
   );
 }
 
