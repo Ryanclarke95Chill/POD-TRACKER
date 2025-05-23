@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { Loader2, Upload, X, ArrowRight, CheckCircle2, Table, FileSpreadsheet } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
 import { getToken, getUser, logout } from "@/lib/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -985,31 +986,23 @@ export default function AdminPage() {
                                     
                                     <div className="flex items-center space-x-2">
                                       <div className="w-full relative">
-                                        <select
-                                          className={`w-full rounded-md border border-neutral-200 p-2 bg-white
-                                            ${mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'bg-gray-50 text-gray-400' : ''}
-                                          `}
+                                        <SearchableSelect
+                                          options={csvHeaders}
                                           value={mappedHeader || ""}
-                                          onChange={(e) => {
+                                          onChange={(value) => {
                                             // Clear previous mapping for this CSV header if exists
                                             if (mappedHeader) {
                                               updateFieldMapping(mappedHeader, "");
                                             }
                                             
                                             // Set new mapping if a header is selected
-                                            if (e.target.value) {
-                                              updateFieldMapping(e.target.value, fieldKey);
+                                            if (value) {
+                                              updateFieldMapping(value, fieldKey);
                                             }
                                           }}
-                                        >
-                                          <option value="">Select CSV field...</option>
-                                          {[...csvHeaders]
-                                            .filter(header => !csvSearch || header.toLowerCase().includes(csvSearch.toLowerCase()))
-                                            .sort((a, b) => a.localeCompare(b))
-                                            .map((header, headerIndex) => (
-                                              <option key={headerIndex} value={header}>{header}</option>
-                                            ))}
-                                        </select>
+                                          placeholder="Select CSV field..."
+                                          className={mappedHeader && fieldMapping[mappedHeader] === "ignore" ? 'bg-gray-50 text-gray-400' : ''}
+                                        />
                                       </div>
                                       
                                       <button
