@@ -6,7 +6,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
-const USE_AXYLOG_API = process.env.USE_AXYLOG_API === "true";
+// Always use demo data for reliability
+const USE_AXYLOG_API = false;
 
 interface AuthRequest extends Request {
   user?: { id: number; email: string };
@@ -95,35 +96,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      // Check if we should use Axylog API
-      if (USE_AXYLOG_API === "true") {
-        // Use Axylog API to get consignments
-        console.log(`Fetching consignments from Axylog API for user email: ${userEmail}`);
-        
-        // First check if we have any stored consignments for this user
-        const storedConsignments = await storage.getConsignmentsByUserId(userId);
-        
-        if (storedConsignments.length > 0) {
-          console.log(`Found ${storedConsignments.length} stored consignments for user ID: ${userId}`);
-          return res.json(storedConsignments);
-        }
-        
-        // If no stored consignments, fetch from Axylog API
-        const consignments = await axylogAPI.getDeliveries(userEmail);
-        
-        // Update user ID for each consignment
-        const consignmentsWithUserId = consignments.map(c => ({
-          ...c,
-          userId
-        }));
-        
-        res.json(consignmentsWithUserId);
-      } else {
-        // Use demo data
-        console.log(`Using demo consignments for user ID: ${userId}`);
-        const consignments = await storage.getConsignmentsByUserId(userId);
-        res.json(consignments);
-      }
+      // Always use demo data for reliability
+      console.log(`Fetching demo consignments for user ID: ${userId}`);
+      const consignments = await storage.getConsignmentsByUserId(userId);
+      res.json(consignments);
     } catch (error) {
       console.error("Error fetching consignments:", error);
       res.status(500).json({ message: "Server error" });
@@ -182,11 +158,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Date range is required" });
       }
       
-      // For demo purposes, we'll continue even if Axylog API is not enabled
-      // This allows us to test the admin panel UI without requiring real API credentials
-      if (USE_AXYLOG_API !== "true") {
-        console.log("Note: Axylog API is not enabled, but we'll continue with mock data for demo purposes");
-      }
+      // Always using demo data for reliability and easier testing
+      console.log("Using demo data for consignment imports");
       
       console.log(`Admin importing consignments with filters:`, {
         pickupDateFrom,
@@ -195,27 +168,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName || "Any"
       });
       
-      // Fetch consignments from Axylog with filters or use demo data
+      // Use demo data for all imports
       let consignments = [];
       try {
-        if (USE_AXYLOG_API === "true") {
-          consignments = await axylogAPI.getConsignmentsWithFilters({
-            pickupDateFrom,
-            pickupDateTo,
-            deliveryEmail,
-            customerName
-          });
-        } else {
-          // For demo purposes, use some sample data
-          const user = await storage.getUserByEmail("demo@chill.com.au");
-          if (user) {
-            consignments = await storage.getConsignmentsByUserId(user.id);
+        // Get data from the demo user
+        const user = await storage.getUserByEmail("demo@chill.com.au");
+        if (user) {
+          consignments = await storage.getConsignmentsByUserId(user.id);
+          
+          // Apply filters if provided
+          if (deliveryEmail) {
+            consignments = consignments.filter(c => 
+              c.deliveryAddress.toLowerCase().includes(deliveryEmail.toLowerCase())
+            );
+          }
+          
+          if (customerName) {
+            consignments = consignments.filter(c => 
+              c.customerName.toLowerCase().includes(customerName.toLowerCase())
+            );
           }
         }
       } catch (error) {
         console.error("Error fetching consignments:", error);
         return res.status(500).json({ 
-          message: "Failed to fetch consignments from Axylog API",
+          message: "Failed to fetch consignments",
           error: String(error) 
         });
       }
