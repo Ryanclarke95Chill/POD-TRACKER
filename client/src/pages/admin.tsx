@@ -126,6 +126,11 @@ export default function AdminPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   
+  // State for mapping templates
+  const [savedTemplates, setSavedTemplates] = useState<Record<string, Record<string, string>>>({});
+  const [templateName, setTemplateName] = useState("");
+  const [showSaveTemplateInput, setShowSaveTemplateInput] = useState(false);
+  
   // Process CSV file and detect headers
   const processCsvFile = (file: File) => {
     const reader = new FileReader();
@@ -229,6 +234,68 @@ export default function AdminPage() {
       ...prev,
       [csvField]: appField
     }));
+  };
+  
+  // Save current mapping as a template
+  const saveAsTemplate = (name: string) => {
+    if (!name.trim()) {
+      toast({
+        title: "Template Name Required",
+        description: "Please provide a name for your template.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSavedTemplates(prev => ({
+      ...prev,
+      [name]: { ...fieldMapping }
+    }));
+    
+    setTemplateName("");
+    setShowSaveTemplateInput(false);
+    
+    toast({
+      title: "Template Saved",
+      description: `Field mapping template "${name}" has been saved for future use.`,
+      variant: "default"
+    });
+  };
+  
+  // Load a saved template
+  const loadTemplate = (name: string) => {
+    if (savedTemplates[name]) {
+      // First, check if the template headers match current CSV headers
+      const templateFields = Object.keys(savedTemplates[name]);
+      const matchingHeaderCount = templateFields.filter(field => csvHeaders.includes(field)).length;
+      const matchPercentage = (matchingHeaderCount / templateFields.length) * 100;
+      
+      if (matchPercentage < 70) {
+        toast({
+          title: "Template Mismatch",
+          description: `This template only matches ${matchPercentage.toFixed(0)}% of your CSV headers. You may need to adjust mappings manually.`,
+          variant: "destructive"
+        });
+      }
+      
+      // Apply the template where headers match
+      const newMapping: Record<string, string> = {};
+      csvHeaders.forEach(header => {
+        if (savedTemplates[name][header]) {
+          newMapping[header] = savedTemplates[name][header];
+        } else {
+          newMapping[header] = "";
+        }
+      });
+      
+      setFieldMapping(newMapping);
+      
+      toast({
+        title: "Template Applied",
+        description: `Field mapping template "${name}" has been applied.`,
+        variant: "default"
+      });
+    }
   };
   
   // Process and import CSV file with mapping
@@ -701,15 +768,80 @@ export default function AdminPage() {
                                 </TabsContent>
                                 
                                 <TabsContent value="mapping" className="px-6 py-4 mb-0">
-                                  <div className="flex justify-between items-center mb-3">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
                                     <h4 className="text-base font-medium text-neutral-800">Field Mapping</h4>
-                                    <div className="text-xs text-neutral-500 italic">
-                                      <span className="inline-flex items-center mr-3 bg-white px-2 py-1 rounded-md border">
-                                        <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" /> Auto-matched fields
-                                      </span>
-                                      <span className="inline-flex items-center bg-white px-2 py-1 rounded-md border">
-                                        <span className="h-2 w-2 bg-amber-400 rounded-full mr-1"></span> Required fields
-                                      </span>
+                                    
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {/* Template controls */}
+                                      {Object.keys(savedTemplates).length > 0 && (
+                                        <div className="relative inline-block">
+                                          <select 
+                                            className="h-8 rounded-md border border-neutral-200 bg-white px-2 text-xs"
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                loadTemplate(e.target.value);
+                                              }
+                                              e.target.value = ""; // Reset after selection
+                                            }}
+                                            defaultValue=""
+                                          >
+                                            <option value="" disabled>Load template...</option>
+                                            {Object.keys(savedTemplates).map((name) => (
+                                              <option key={name} value={name}>{name}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Template save button or input */}
+                                      {showSaveTemplateInput ? (
+                                        <div className="relative flex items-center">
+                                          <input
+                                            type="text"
+                                            value={templateName}
+                                            onChange={(e) => setTemplateName(e.target.value)}
+                                            placeholder="Template name..."
+                                            className="h-8 text-xs rounded-l-md border border-primary-dark focus:ring-0 focus:outline-none px-2 py-1 bg-white"
+                                          />
+                                          <button
+                                            onClick={() => saveAsTemplate(templateName)}
+                                            className="h-8 rounded-r-md bg-primary text-white px-2 text-xs border border-primary-dark"
+                                          >
+                                            Save
+                                          </button>
+                                          <button 
+                                            onClick={() => {
+                                              setShowSaveTemplateInput(false);
+                                              setTemplateName("");
+                                            }}
+                                            className="absolute right-0 -top-2 -mr-2 -mt-1 h-5 w-5 rounded-full bg-neutral-500 text-white flex items-center justify-center"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setShowSaveTemplateInput(true)}
+                                          className="h-8 rounded-md border border-neutral-200 bg-white text-xs px-2 py-1 flex items-center hover:bg-gray-50 transition-colors"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                            <polyline points="7 3 7 8 15 8"></polyline>
+                                          </svg>
+                                          Save as Template
+                                        </button>
+                                      )}
+                                      
+                                      {/* Legend */}
+                                      <div className="text-xs text-neutral-500 italic flex gap-2 flex-wrap">
+                                        <span className="inline-flex items-center bg-white px-2 py-1 rounded-md border">
+                                          <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" /> Auto-matched
+                                        </span>
+                                        <span className="inline-flex items-center bg-white px-2 py-1 rounded-md border">
+                                          <span className="h-2 w-2 bg-amber-400 rounded-full mr-1"></span> Required
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                   
