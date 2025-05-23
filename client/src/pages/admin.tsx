@@ -143,6 +143,9 @@ export default function AdminPage() {
   const [templateName, setTemplateName] = useState("");
   const [showSaveTemplateInput, setShowSaveTemplateInput] = useState(false);
   
+  // State for CSV field dropdown
+  const [csvFieldFilter, setCsvFieldFilter] = useState("");
+  
   // Process CSV file and detect headers
   const processCsvFile = (file: File) => {
     const reader = new FileReader();
