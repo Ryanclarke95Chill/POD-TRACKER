@@ -113,24 +113,53 @@ export default function AdminPage() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+      <header className="bg-gradient-to-r from-primary-dark via-primary to-primary-light text-white shadow-md z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-primary">ChillTrack</h1>
-            <span className="mx-2 text-neutral-300">|</span>
-            <span className="text-neutral-600">Admin</span>
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <div className="flex items-center ml-3">
+              <span className="mx-2 text-white/30">|</span>
+              <div className="flex items-center bg-white/20 rounded-full px-3 py-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <span className="text-sm font-medium">Admin Panel</span>
+              </div>
+            </div>
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="outline" className="text-neutral-600" onClick={() => window.location.href = '/dashboard'}>
+            <div className="hidden md:flex items-center px-3 py-1 bg-white/20 rounded-full text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span className="text-sm">{user?.email}</span>
+            </div>
+            <Button 
+              variant="secondary" 
+              className="bg-white text-primary hover:bg-white/90 transition-all shadow-sm"
+              onClick={() => window.location.href = '/dashboard'}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
               Dashboard
             </Button>
-            <span className="text-neutral-600 hidden sm:inline-block">{user?.email}</span>
             <Button 
-              variant="ghost" 
-              className="text-neutral-600 hover:text-neutral-900"
+              variant="outline" 
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border h-10 px-4 py-2 border-white/30 hover:bg-white/10 hover:text-white text-[000] bg-[#1ebaed]"
               onClick={logout}
             >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
               Logout
             </Button>
           </div>
@@ -140,8 +169,8 @@ export default function AdminPage() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-neutral-800">Axylog Data Admin</h2>
-          <p className="text-neutral-500 mt-1">Import consignments from the Axylog API</p>
+          <h2 className="text-3xl font-bold text-neutral-800">Data Management</h2>
+          <p className="text-neutral-500 mt-1">Import and manage your shipment consignments</p>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -332,12 +361,12 @@ export default function AdminPage() {
                 <CardContent>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-neutral-600">Axylog API:</span>
-                      <span className="text-sm font-medium px-2 py-1 bg-green-100 text-green-800 rounded">Connected</span>
+                      <span className="text-sm text-neutral-600">Data Mode:</span>
+                      <span className="text-sm font-medium px-2 py-1 bg-amber-100 text-amber-800 rounded">Demo Data</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-neutral-600">Use API Data:</span>
-                      <span className="text-sm font-medium px-2 py-1 bg-blue-100 text-blue-800 rounded">Enabled</span>
+                      <span className="text-sm text-neutral-600">Status:</span>
+                      <span className="text-sm font-medium px-2 py-1 bg-green-100 text-green-800 rounded">Ready</span>
                     </div>
                   </div>
                 </CardContent>
