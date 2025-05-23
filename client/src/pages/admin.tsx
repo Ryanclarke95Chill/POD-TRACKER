@@ -99,9 +99,10 @@ export default function AdminPage() {
       });
     } catch (error) {
       console.error("Import failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Import Failed",
-        description: "There was an error importing consignments from Axylog API.",
+        description: `There was an error importing consignments: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {

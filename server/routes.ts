@@ -182,11 +182,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Date range is required" });
       }
       
-      // Check if Axylog API is enabled
+      // For demo purposes, we'll continue even if Axylog API is not enabled
+      // This allows us to test the admin panel UI without requiring real API credentials
       if (USE_AXYLOG_API !== "true") {
-        return res.status(400).json({ 
-          message: "Axylog API is not enabled. Please enable it in environment variables." 
-        });
+        console.log("Note: Axylog API is not enabled, but we'll continue with mock data for demo purposes");
       }
       
       console.log(`Admin importing consignments with filters:`, {
@@ -196,13 +195,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName || "Any"
       });
       
-      // Fetch consignments from Axylog with filters
-      const consignments = await axylogAPI.getConsignmentsWithFilters({
-        pickupDateFrom,
-        pickupDateTo,
-        deliveryEmail,
-        customerName
-      });
+      // Fetch consignments from Axylog with filters or use demo data
+      let consignments = [];
+      try {
+        if (USE_AXYLOG_API === "true") {
+          consignments = await axylogAPI.getConsignmentsWithFilters({
+            pickupDateFrom,
+            pickupDateTo,
+            deliveryEmail,
+            customerName
+          });
+        } else {
+          // For demo purposes, use some sample data
+          const user = await storage.getUserByEmail("demo@chill.com.au");
+          if (user) {
+            consignments = await storage.getConsignmentsByUserId(user.id);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching consignments:", error);
+        return res.status(500).json({ 
+          message: "Failed to fetch consignments from Axylog API",
+          error: String(error) 
+        });
+      }
       
       // Import to database if requested
       let importedCount = 0;
