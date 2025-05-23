@@ -51,6 +51,13 @@ export default function Dashboard() {
           <div className="flex items-center space-x-4">
             <span className="text-neutral-600 hidden sm:inline-block">{user?.email}</span>
             <Button 
+              variant="outline" 
+              className="text-neutral-600"
+              onClick={() => window.location.href = '/admin'}
+            >
+              Admin
+            </Button>
+            <Button 
               variant="ghost" 
               className="text-neutral-600 hover:text-neutral-900"
               onClick={logout}
