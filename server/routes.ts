@@ -1,10 +1,12 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { axylogAPI } from "./axylog";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
+const USE_AXYLOG_API = process.env.USE_AXYLOG_API === "true";
 
 interface AuthRequest extends Request {
   user?: { id: number; email: string };
@@ -87,12 +89,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.user?.id;
-      if (!userId) {
+      const userEmail = req.user?.email;
+      
+      if (!userId || !userEmail) {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      const consignments = await storage.getConsignmentsByUserId(userId);
-      res.json(consignments);
+      // Check if we should use Axylog API
+      if (USE_AXYLOG_API) {
+        // Use Axylog API to get consignments
+        console.log(`Fetching consignments from Axylog API for user email: ${userEmail}`);
+        
+        const consignments = await axylogAPI.getDeliveries(userEmail);
+        
+        // Update user ID for each consignment
+        const consignmentsWithUserId = consignments.map(c => ({
+          ...c,
+          userId
+        }));
+        
+        res.json(consignmentsWithUserId);
+      } else {
+        // Use demo data
+        console.log(`Using demo consignments for user ID: ${userId}`);
+        const consignments = await storage.getConsignmentsByUserId(userId);
+        res.json(consignments);
+      }
     } catch (error) {
       console.error("Error fetching consignments:", error);
       res.status(500).json({ message: "Server error" });
@@ -109,6 +131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
+      // For now, we're only using demo data for individual consignment details
+      // as the Axylog API may not provide individual consignment retrieval
       const consignment = await storage.getConsignmentById(consignmentId);
       
       if (!consignment) {
@@ -124,6 +148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching consignment:", error);
       res.status(500).json({ message: "Server error" });
     }
+  });
+
+  // Error handling middleware
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Unhandled error:", err);
+    res.status(500).json({ message: "Something went wrong" });
   });
 
   const httpServer = createServer(app);

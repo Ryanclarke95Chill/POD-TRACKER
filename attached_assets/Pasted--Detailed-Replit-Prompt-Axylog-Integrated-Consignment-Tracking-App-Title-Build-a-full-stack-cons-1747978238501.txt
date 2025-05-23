@@ -1,0 +1,144 @@
+✅ Detailed Replit Prompt – Axylog-Integrated Consignment Tracking App
+Title:
+Build a full-stack consignment tracking app for an Australian transport company integrated with Axylog
+
+📌 Overview:
+Create a customer-facing web application where users can log in and view only their own consignments. Consignments are pulled from the Axylog API, using the delivery address email to match users to their shipments.
+
+Use Australian locations and include filters for temperature-controlled freight types: Dry, Chiller (0–4°C), Freezer (-20°C), Wine (14°C), Confectionery (15–20°C), Pharma (2–8°C).
+
+🧩 Tech Stack
+Frontend: React + TailwindCSS
+
+Backend: Node.js + Express
+
+Auth: Email-based login using demo credentials
+
+API: Integrate Axylog API for live consignment data
+
+Data Matching: Match consignments using the delivery address email to user login
+
+🔐 Axylog Integration Instructions
+🔑 Step 1: Get Axylog API Credentials
+Ask your Axylog support contact to provide:
+
+Username & Password (for API service login)
+
+Company ID
+
+Context Owner ID
+
+User ID
+These can be extracted from the /authentication/service response.
+
+✉️ Step 2: Authentication Request
+Use the /authentication/service POST endpoint:
+
+json
+Copy
+Edit
+POST https://api.axylog.com/authentication/service
+Headers:
+  Content-Type: application/json
+Body:
+{
+  "username": "your-axylog-username",
+  "password": "your-axylog-password"
+}
+This returns a JSON with:
+
+token
+
+userTree.userId
+
+userTree.companiesOwners[0].company
+
+userTree.companiesOwners[0].contextOwners[0].contextOwner
+
+Save these values as environment variables or in your session.
+
+📦 Step 3: Get Deliveries (Consignments)
+Use the /Deliveries?v=2 endpoint with POST:
+
+yaml
+Copy
+Edit
+POST https://api.axylog.com/Deliveries?v=2
+Headers:
+  Authorization: Bearer <token>
+  ContextOwner: <contextOwnerId>
+  User: <userId>
+  Company: <companyId>
+  SourceDeviceType: 3
+  Content-Type: application/json
+Body:
+{
+  "pagination": {
+    "skip": 0,
+    "pageSize": 50
+  },
+  "filters": {
+    "pickUp_Delivery_From": "2024-01-01T22:00:00.000Z",
+    "pickUp_Delivery_To": "2024-12-31T21:59:00.000Z"
+  }
+}
+🔒 Access Control Logic
+When a user logs in:
+
+Use their email as the key.
+
+Only show consignments where the delivery email matches the user's login email.
+
+📋 App Features
+User Interface
+Login page
+
+Dashboard showing matched consignments
+
+Filters by:
+
+Temperature range
+
+Delivery status
+
+City/state
+
+Consignment Card
+Consignment number
+
+Pickup & delivery addresses
+
+Last known location
+
+Status (e.g., "In Transit")
+
+ETA
+
+Temperature range
+
+🛠 Replit Project Setup Summary
+Node.js Backend
+
+Create /api/login to simulate login (matches email to known demo users).
+
+Create /api/consignments to call Axylog and filter by email.
+
+React Frontend
+
+Build login flow and dashboard.
+
+Fetch consignments using fetch('/api/consignments?email=user@email').
+
+Display cards and filters.
+
+Config
+
+Store Axylog credentials as .env variables in Replit.
+
+⚠️ Security Note
+Use a secure method (e.g., encrypted .env or Secrets in Replit) to store:
+
+API credentials
+
+Tokens
+
