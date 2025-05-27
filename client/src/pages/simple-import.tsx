@@ -223,15 +223,30 @@ export default function SimpleImport() {
                     </div>
                     <div className="flex-1">
                       <Select
-                        value={fieldMapping[header] || ""}
+                        value={fieldMapping[header] || "ignore"}
                         onValueChange={(value) => updateFieldMapping(header, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select system field..." />
                         </SelectTrigger>
                         <SelectContent>
+                          <div className="p-2 border-b">
+                            <input
+                              type="text"
+                              placeholder="Search fields..."
+                              className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              onChange={(e) => {
+                                const searchTerm = e.target.value.toLowerCase();
+                                const items = document.querySelectorAll('[data-field-item]');
+                                items.forEach((item: any) => {
+                                  const text = item.textContent?.toLowerCase() || '';
+                                  item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+                                });
+                              }}
+                            />
+                          </div>
                           {SYSTEM_FIELDS.map((field) => (
-                            <SelectItem key={field.value} value={field.value}>
+                            <SelectItem key={field.value} value={field.value} data-field-item>
                               {field.label}
                             </SelectItem>
                           ))}
