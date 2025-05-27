@@ -990,14 +990,14 @@ export default function AdminPage() {
                           <p className="text-xs text-neutral-500">Showing first 5 rows</p>
                         </div>
                         
-                        <div className="border rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '400px' }}>
-                            <table className="text-sm border-collapse" style={{ minWidth: '100%', width: 'max-content' }}>
-                              <thead className="sticky top-0 z-10">
-                                <tr className="bg-primary/10">
+                        <div className="border rounded-lg overflow-hidden bg-white">
+                          <div className="overflow-auto" style={{ maxHeight: '400px', minHeight: '200px' }}>
+                            <table className="table-auto border-collapse w-full">
+                              <thead className="sticky top-0 bg-gray-50 z-10">
+                                <tr>
                                   {csvHeaders.map((header, index) => (
-                                    <th key={index} className="px-4 py-3 text-left font-medium text-neutral-700 border-b whitespace-nowrap min-w-32">
-                                      <div className="max-w-48 truncate" title={header}>
+                                    <th key={index} className="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b border-gray-200 whitespace-nowrap">
+                                      <div className="min-w-24 max-w-40" title={header}>
                                         {header}
                                       </div>
                                     </th>
@@ -1006,10 +1006,10 @@ export default function AdminPage() {
                               </thead>
                               <tbody>
                                 {csvPreview.map((row, rowIndex) => (
-                                  <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                                  <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                     {row.map((cell, cellIndex) => (
-                                      <td key={cellIndex} className="px-4 py-2 text-neutral-700 border-t whitespace-nowrap min-w-32">
-                                        <div className="max-w-48 truncate" title={cell || ''}>
+                                      <td key={cellIndex} className="px-3 py-2 text-xs text-gray-600 border-b border-gray-100 whitespace-nowrap">
+                                        <div className="min-w-24 max-w-40 truncate" title={cell || ''}>
                                           {cell || '-'}
                                         </div>
                                       </td>
