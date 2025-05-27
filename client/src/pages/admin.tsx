@@ -188,16 +188,41 @@ export default function AdminPage() {
     reader.onload = (e) => {
       if (e.target?.result) {
         const content = e.target.result as string;
-        // Simple tab-delimited parsing for your ConsignmentReport format
+        // Parse CSV with proper handling of quoted fields containing commas
+        const parseCSVRow = (row: string) => {
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            
+            if (char === '"') {
+              if (inQuotes && row[i + 1] === '"') {
+                // Escaped quote
+                current += '"';
+                i++; // Skip next quote
+              } else {
+                // Toggle quote state
+                inQuotes = !inQuotes;
+              }
+            } else if (char === ',' && !inQuotes) {
+              // Comma outside of quotes - field separator
+              result.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          
+          // Add the last field
+          result.push(current.trim());
+          return result;
+        };
+        
         const rows = content.split('\n')
           .filter(line => line.trim())
-          .map(line => {
-            // Split on tabs and clean up each cell
-            return line.split('\t').map(cell => {
-              // Remove surrounding quotes if present and trim
-              return cell.trim().replace(/^"(.*)"$/, '$1');
-            });
-          });
+          .map(line => parseCSVRow(line));
         
         // Remove any empty rows
         const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
