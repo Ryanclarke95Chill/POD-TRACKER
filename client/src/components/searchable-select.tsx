@@ -110,9 +110,9 @@ export function SearchableSelect({
               </div>
             )}
             
-            {filteredOptions.map((option, index) => (
+            {filteredOptions.map((option) => (
               <div 
-                key={index} 
+                key={option} 
                 className={`p-2 hover:bg-neutral-100 cursor-pointer ${value === option ? "bg-blue-50 text-blue-700" : ""}`}
                 onClick={() => {
                   onChange(option);
@@ -120,7 +120,7 @@ export function SearchableSelect({
                   setSearchTerm("");
                 }}
               >
-                {option}
+                {option === "ignore" ? "Don't import" : option}
               </div>
             ))}
             
