@@ -350,13 +350,16 @@ export default function AdminPage() {
     const files = e.dataTransfer.files;
     if (files.length) {
       const file = files[0];
-      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      if (file.type === 'text/csv' || file.name.endsWith('.csv') || 
+          file.name.toLowerCase().endsWith('.xlsx') || 
+          file.name.toLowerCase().endsWith('.xls') ||
+          file.type.includes('spreadsheet')) {
         setSelectedFile(file);
         processCsvFile(file);
       } else {
         toast({
           title: "Invalid file type",
-          description: "Please upload a CSV file",
+          description: "Please upload a CSV or Excel file",
           variant: "destructive"
         });
       }
