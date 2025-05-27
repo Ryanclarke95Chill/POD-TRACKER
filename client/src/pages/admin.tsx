@@ -306,12 +306,11 @@ export default function AdminPage() {
     setFieldMapping(initialMapping);
     setAutoMappedFields(autoMapped);
     
-    // If there are unmapped required fields, show mapping dialog
-    const mappedRequiredFields = Object.values(initialMapping).filter(value => 
-      requiredFields.includes(value)
-    );
+    // For delivery data, we don't need all the strict consignment requirements
+    // Just check if we have at least some fields mapped
+    const hasMappedFields = Object.keys(initialMapping).length > 0;
     
-    setMappingRequired(mappedRequiredFields.length < requiredFields.length);
+    setMappingRequired(!hasMappedFields);
     
     // Show mapping dialog to let user confirm/adjust mappings
     setShowMappingDialog(true);
@@ -1188,7 +1187,8 @@ export default function AdminPage() {
                           }).sort((a, b) => a[1].localeCompare(b[1])).map(([fieldKey, fieldLabel], index) => {
                             // Find if any CSV header is mapped to this field
                             const mappedHeader = Object.entries(fieldMapping).find(([_, value]) => value === fieldKey)?.[0];
-                            const isRequired = ["consignmentNumber", "customerName", "status"].includes(fieldKey);
+                            // For delivery data, make requirements more flexible
+                            const isRequired = false; // No strictly required fields for delivery imports
                             const isMapped = !!mappedHeader;
                             
                             return (
