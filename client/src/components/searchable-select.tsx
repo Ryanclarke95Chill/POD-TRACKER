@@ -115,7 +115,6 @@ export function SearchableSelect({
                 key={option} 
                 className={`p-2 hover:bg-neutral-100 cursor-pointer ${value === option ? "bg-blue-50 text-blue-700" : ""}`}
                 onClick={() => {
-                  console.log('Clicked option:', option);
                   onChange(option);
                   setIsOpen(false);
                   setSearchTerm("");
