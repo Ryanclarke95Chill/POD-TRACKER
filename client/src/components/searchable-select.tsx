@@ -94,22 +94,24 @@ export function SearchableSelect({
           </div>
           
           {/* Options list */}
-          <div>
-            <div 
-              className="p-2 hover:bg-neutral-100 cursor-pointer"
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-                setSearchTerm("");
-              }}
-            >
-              {placeholder}
-            </div>
+          <div className="max-h-48 overflow-y-auto">
+            {!searchTerm && (
+              <div 
+                className="p-2 hover:bg-neutral-100 cursor-pointer text-neutral-500"
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {placeholder}
+              </div>
+            )}
             
             {filteredOptions.map((option, index) => (
               <div 
                 key={index} 
-                className={`p-2 hover:bg-neutral-100 cursor-pointer ${value === option ? "bg-neutral-100" : ""}`}
+                className={`p-2 hover:bg-neutral-100 cursor-pointer ${value === option ? "bg-blue-50 text-blue-700" : ""}`}
                 onClick={() => {
                   onChange(option);
                   setIsOpen(false);
@@ -120,9 +122,9 @@ export function SearchableSelect({
               </div>
             ))}
             
-            {filteredOptions.length === 0 && (
+            {searchTerm && filteredOptions.length === 0 && (
               <div className="p-2 text-neutral-500 text-sm italic">
-                No matching options
+                No matching options found
               </div>
             )}
           </div>
