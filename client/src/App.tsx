@@ -32,7 +32,7 @@ function App() {
           <Switch>
             <Route path="/" component={Login} />
             <Route path="/dashboard" component={Dashboard} />
-            <Route path="/admin" component={AdminPage} />
+
             <Route path="/simple-import" component={SimpleImport} />
             <Route path="/analytics" component={Analytics} />
             <Route component={NotFound} />
