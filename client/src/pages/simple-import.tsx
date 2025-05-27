@@ -387,6 +387,7 @@ export default function SimpleImport() {
                 {SYSTEM_FIELDS.filter(field => field.value !== "ignore").map((systemField, index) => {
                   // Find which CSV header is mapped to this system field
                   const mappedCsvHeader = Object.entries(fieldMapping).find(([_, value]) => value === systemField.value)?.[0];
+                  console.log('System field:', systemField.value, 'mapped to CSV header:', mappedCsvHeader);
                   
                   return (
                     <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
