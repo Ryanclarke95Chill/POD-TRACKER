@@ -393,36 +393,29 @@ export default function SimpleImport() {
                         <p className="text-xs text-gray-500">System field</p>
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <SearchableSelect
-                            options={["ignore", ...headers]}
-                            value={mappedCsvHeader || "ignore"}
-                            onChange={(value) => {
-                              // Clear previous mapping for this system field
-                              if (mappedCsvHeader) {
-                                setFieldMapping(prev => ({
-                                  ...prev,
-                                  [mappedCsvHeader]: "ignore"
-                                }));
-                              }
-                              
-                              // Set new mapping if a CSV header is selected
-                              if (value !== "ignore" && value !== "") {
-                                setFieldMapping(prev => ({
-                                  ...prev,
-                                  [value]: systemField.value
-                                }));
-                              }
-                            }}
-                            placeholder="Select your column..."
-                            className="flex-1"
-                          />
-                          {mappedCsvHeader && mappedCsvHeader !== "ignore" && (
-                            <div className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border">
-                              Column {headers.indexOf(mappedCsvHeader)}
-                            </div>
-                          )}
-                        </div>
+                        <SearchableSelect
+                          options={["ignore", ...headers]}
+                          value={mappedCsvHeader || "ignore"}
+                          onChange={(value) => {
+                            // Clear previous mapping for this system field
+                            if (mappedCsvHeader) {
+                              setFieldMapping(prev => ({
+                                ...prev,
+                                [mappedCsvHeader]: "ignore"
+                              }));
+                            }
+                            
+                            // Set new mapping if a CSV header is selected
+                            if (value !== "ignore" && value !== "") {
+                              setFieldMapping(prev => ({
+                                ...prev,
+                                [value]: systemField.value
+                              }));
+                            }
+                          }}
+                          placeholder="Select your column..."
+                          className="w-full"
+                        />
                       </div>
                       <div className="w-8 flex justify-center">
                         {mappedCsvHeader ? (
