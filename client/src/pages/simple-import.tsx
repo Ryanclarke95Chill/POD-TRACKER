@@ -394,8 +394,8 @@ export default function SimpleImport() {
                       </div>
                       <div className="flex-1">
                         <SearchableSelect
-                          options={["ignore", ...headers]}
-                          value={mappedCsvHeader || "ignore"}
+                          options={["ignore", ...headers.map((header, index) => `Column ${index}: ${header || 'Unnamed'}`)]}
+                          value={mappedCsvHeader ? `Column ${headers.indexOf(mappedCsvHeader)}: ${mappedCsvHeader || 'Unnamed'}` : "ignore"}
                           onChange={(value) => {
                             // Clear previous mapping for this system field
                             if (mappedCsvHeader) {
@@ -405,11 +405,13 @@ export default function SimpleImport() {
                               }));
                             }
                             
-                            // Set new mapping if a CSV header is selected
+                            // Extract the actual header value from the display value
                             if (value !== "ignore" && value !== "") {
+                              const headerIndex = parseInt(value.split(':')[0].replace('Column ', ''));
+                              const actualHeader = headers[headerIndex];
                               setFieldMapping(prev => ({
                                 ...prev,
-                                [value]: systemField.value
+                                [actualHeader]: systemField.value
                               }));
                             }
                           }}
