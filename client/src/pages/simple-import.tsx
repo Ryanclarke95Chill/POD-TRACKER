@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 
 const SYSTEM_FIELDS = [
   { value: "ignore", label: "Don't import" },
+  { value: "trackingLink", label: "Tracking Link (Column D)" },
   { value: "consignmentNumber", label: "Consignment Number" },
   { value: "customerName", label: "Customer Name" },
   { value: "deliveryAddress", label: "Delivery Address" },

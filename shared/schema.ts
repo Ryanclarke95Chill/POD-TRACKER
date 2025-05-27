@@ -40,6 +40,7 @@ export const consignments = pgTable("consignments", {
   userId: integer("user_id").notNull(),
   customerName: text("customer_name").notNull(),
   consignmentReference: text("consignment_reference"),
+  trackingLink: text("tracking_link"),
   pickupAddress: text("pickup_address").notNull(),
   deliveryAddress: text("delivery_address").notNull(),
   status: text("status").notNull(),

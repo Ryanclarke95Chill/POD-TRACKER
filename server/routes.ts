@@ -169,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId,
                 consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 customerName: row.customerName || "Imported Customer", 
+                trackingLink: row.trackingLink || null,
                 deliveryAddress: row.deliveryAddress || "Unknown Address",
                 pickupAddress: row.pickupAddress || "Unknown Pickup",
                 status: row.status || "In Transit",
