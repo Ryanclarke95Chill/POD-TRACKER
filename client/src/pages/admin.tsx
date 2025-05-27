@@ -991,13 +991,15 @@ export default function AdminPage() {
                         </div>
                         
                         <div className="border rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto" style={{ maxHeight: '400px' }}>
-                            <table className="w-full text-sm border-collapse">
+                          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '400px' }}>
+                            <table className="text-sm border-collapse" style={{ minWidth: '100%', width: 'max-content' }}>
                               <thead className="sticky top-0 z-10">
                                 <tr className="bg-primary/10">
                                   {csvHeaders.map((header, index) => (
-                                    <th key={index} className="px-3 py-3 text-left font-medium text-neutral-700 border-b whitespace-nowrap">
-                                      {header}
+                                    <th key={index} className="px-4 py-3 text-left font-medium text-neutral-700 border-b whitespace-nowrap min-w-32">
+                                      <div className="max-w-48 truncate" title={header}>
+                                        {header}
+                                      </div>
                                     </th>
                                   ))}
                                 </tr>
@@ -1006,8 +1008,10 @@ export default function AdminPage() {
                                 {csvPreview.map((row, rowIndex) => (
                                   <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
                                     {row.map((cell, cellIndex) => (
-                                      <td key={cellIndex} className="px-3 py-2 text-neutral-700 border-t whitespace-nowrap">
-                                        {cell?.length > 20 ? `${cell.substring(0, 20)}...` : cell}
+                                      <td key={cellIndex} className="px-4 py-2 text-neutral-700 border-t whitespace-nowrap min-w-32">
+                                        <div className="max-w-48 truncate" title={cell || ''}>
+                                          {cell || '-'}
+                                        </div>
                                       </td>
                                     ))}
                                   </tr>
