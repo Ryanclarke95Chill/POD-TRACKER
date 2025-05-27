@@ -62,8 +62,9 @@ export default function AdminPage() {
   // Define consignment fields with categories
   const consignmentFields = {
     "Basic Info": [
-      { name: "consignmentNumber", label: "Consignment Number", required: true },
       { name: "customerName", label: "Customer Name", required: true },
+      { name: "consignmentNumber", label: "Consignment Number", required: true },
+      { name: "consignmentReference", label: "Consignment Reference", required: false },
     ],
     "Locations": [
       { name: "pickupAddress", label: "Pickup Address", required: false },
@@ -75,6 +76,7 @@ export default function AdminPage() {
       { name: "estimatedDeliveryDate", label: "Estimated Delivery Date", required: false },
       { name: "deliveryDate", label: "Delivery Date", required: false },
       { name: "dateDelivered", label: "Date Delivered", required: false },
+      { name: "consignmentRequiredDeliveryDate", label: "Consignment Required Delivery Date", required: false },
     ],
     "Properties": [
       { name: "temperatureZone", label: "Temperature Zone", required: false },
@@ -150,16 +152,18 @@ export default function AdminPage() {
   const [savedTemplates, setSavedTemplates] = useState<Record<string, {mapping: Record<string, string>, combine: Record<string, string[]>}>>({
     "ConsignmentReport Template": {
       mapping: {
+        "Customer Name": "customerName",
+        "Consignment Reference": "consignmentReference",
         "Delivery Address": "deliveryAddress",
         "Delivery Date": "deliveryDate", 
-        "Consignment": "consignmentNumber",
-        "Delivery Run": "deliveryRun",
         "Date Delivered": "dateDelivered",
+        "Delivery Run": "deliveryRun",
         "Quantity": "quantity",
         "Pallets": "pallets",
         "Spaces": "spaces",
         "Cubic (m3)": "cubicMeters",
-        "Weight (kg)": "weightKg"
+        "Weight (kg)": "weightKg",
+        "Consignment Required Delivery Date": "consignmentRequiredDeliveryDate"
       },
       combine: {}
     }
