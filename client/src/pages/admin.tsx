@@ -166,6 +166,23 @@ export default function AdminPage() {
         "Consignment Required Delivery Date": "consignmentRequiredDeliveryDate"
       },
       combine: {}
+    },
+    "Delivery Report Template": {
+      mapping: {
+        "Customer Name": "customerName",
+        "Consignment Reference": "consignmentNumber",
+        "Delivery Address": "deliveryAddress",
+        "Delivery Run Date": "deliveryDate",
+        "Date Delivered": "dateDelivered",
+        "Delivery Run": "deliveryRun",
+        "Quantity": "quantity",
+        "Pallets": "pallets",
+        "Spaces": "spaces",
+        "Cubic (m³)": "cubicMeters",
+        "Weight (kg)": "weightKg",
+        "Consignment Required Delivery Date": "consignmentRequiredDeliveryDate"
+      },
+      combine: {}
     }
   });
   const [templateName, setTemplateName] = useState("");
