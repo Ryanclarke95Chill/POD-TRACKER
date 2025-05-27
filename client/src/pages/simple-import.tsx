@@ -399,8 +399,12 @@ export default function SimpleImport() {
                           options={["ignore", ...headers]}
                           value={mappedCsvHeader || "ignore"}
                           onChange={(value) => {
+                            console.log('onChange called with:', value, 'for system field:', systemField.value);
+                            console.log('Current mappedCsvHeader:', mappedCsvHeader);
+                            
                             // Clear previous mapping for this system field
                             if (mappedCsvHeader) {
+                              console.log('Clearing mapping for:', mappedCsvHeader);
                               setFieldMapping(prev => ({
                                 ...prev,
                                 [mappedCsvHeader]: "ignore"
@@ -409,6 +413,7 @@ export default function SimpleImport() {
                             
                             // Set new mapping if a CSV header is selected
                             if (value !== "ignore" && value !== "") {
+                              console.log('Setting new mapping:', value, '->', systemField.value);
                               setFieldMapping(prev => ({
                                 ...prev,
                                 [value]: systemField.value
