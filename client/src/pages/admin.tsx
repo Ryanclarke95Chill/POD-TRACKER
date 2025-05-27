@@ -188,17 +188,42 @@ export default function AdminPage() {
     reader.onload = (e) => {
       if (e.target?.result) {
         const content = e.target.result as string;
-        // Auto-detect delimiter
-        const firstLine = content.split('\n')[0];
-        let delimiter = ',';
-        if (firstLine.includes('\t')) {
-          delimiter = '\t';
-        } else if (firstLine.includes(';')) {
-          delimiter = ';';
-        }
+        // Proper CSV parsing that handles quoted fields
+        const parseCSVLine = (line: string) => {
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+            
+            if (char === '"') {
+              if (inQuotes && nextChar === '"') {
+                // Handle escaped quotes
+                current += '"';
+                i++; // Skip next quote
+              } else {
+                // Toggle quote state
+                inQuotes = !inQuotes;
+              }
+            } else if (char === '\t' && !inQuotes) {
+              // Tab delimiter outside quotes
+              result.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          
+          // Add the last field
+          result.push(current.trim());
+          return result.map(cell => cell.replace(/^"(.*)"$/, '$1'));
+        };
         
         const rows = content.split('\n')
-          .map(row => row.split(delimiter).map(cell => cell.trim().replace(/^"(.*)"$/, '$1')));
+          .filter(line => line.trim())
+          .map(line => parseCSVLine(line));
         
         // Remove any empty rows
         const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
