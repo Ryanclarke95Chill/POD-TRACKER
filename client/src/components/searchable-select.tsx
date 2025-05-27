@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface SearchableSelectProps {
   options: string[];
@@ -19,6 +19,16 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 10);
+    }
+  }, [isOpen]);
   
   const filteredOptions = options
     .filter(option => option.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -45,12 +55,14 @@ export function SearchableSelect({
           {/* Search input */}
           <div className="sticky top-0 bg-white border-b border-neutral-100 p-2">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full p-1 text-sm border border-neutral-200 rounded-md"
-              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
+              className="w-full p-1 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           

@@ -40,83 +40,88 @@ export default function SimpleImport() {
       return 'trackingLink';
     }
     
-    // Header content analysis with priority scoring
+    // Header content analysis with comprehensive pattern matching
     const suggestions = [
-      // Tracking links (highest priority for Column D)
-      { field: 'trackingLink', score: header.includes('tracking') ? 100 : header.includes('track') ? 90 : header.includes('link') ? 80 : header.includes('url') ? 70 : 0 },
+      // Tracking links - very broad pattern matching
+      { field: 'trackingLink', score: 
+        header.includes('tracking') || header.includes('track') ? 100 :
+        header.includes('link') || header.includes('url') || header.includes('reference') ? 90 :
+        header.includes('ref') || header.includes('trace') ? 80 : 0 },
       
-      // Consignment references
+      // Consignment references - catch many variations
       { field: 'consignmentNumber', score: 
-        header === 'consignment number' || header === 'consignment_number' ? 100 :
-        header === 'ref' || header === 'reference' ? 90 :
-        header.includes('consign') && header.includes('num') ? 85 :
-        header.includes('order') && header.includes('num') ? 75 : 0 },
+        header.includes('consign') ? 100 :
+        header.includes('order') || header.includes('job') ? 90 :
+        header.includes('number') || header.includes('num') || header.includes('#') ? 80 :
+        header.includes('id') || header.includes('code') ? 75 : 0 },
       
-      // Customer information
+      // Customer information - very broad
       { field: 'customerName', score:
-        header === 'customer' || header === 'customer name' ? 100 :
-        header === 'client' || header === 'company' ? 90 :
-        header.includes('customer') ? 85 :
-        header.includes('client') || header.includes('receiver') ? 75 : 0 },
+        header.includes('customer') || header.includes('client') ? 100 :
+        header.includes('company') || header.includes('business') ? 95 :
+        header.includes('name') || header.includes('receiver') ? 85 :
+        header.includes('vendor') || header.includes('supplier') ? 80 : 0 },
       
-      // Addresses
+      // Delivery addresses - catch many formats
       { field: 'deliveryAddress', score:
-        header === 'delivery address' || header === 'delivery_address' ? 100 :
-        header === 'destination' || header === 'to' ? 90 :
-        header.includes('deliver') && header.includes('addr') ? 85 :
-        header.includes('destination') ? 75 : 0 },
+        header.includes('deliver') && header.includes('addr') ? 100 :
+        header.includes('deliver') || header.includes('destination') ? 95 :
+        header.includes('to') || header.includes('ship') ? 90 :
+        header.includes('address') && !header.includes('pickup') && !header.includes('from') ? 85 : 0 },
       
+      // Pickup addresses
       { field: 'pickupAddress', score:
-        header === 'pickup address' || header === 'pickup_address' ? 100 :
-        header === 'origin' || header === 'from' ? 90 :
-        header.includes('pickup') || header.includes('collect') ? 85 :
-        header.includes('origin') ? 75 : 0 },
+        header.includes('pickup') || header.includes('collect') ? 100 :
+        header.includes('origin') || header.includes('from') ? 95 :
+        header.includes('source') || header.includes('start') ? 90 : 0 },
       
-      // Status and dates
+      // Status - broad matching
       { field: 'status', score:
-        header === 'status' || header === 'state' ? 100 :
-        header === 'delivery status' ? 95 :
-        header.includes('status') ? 80 : 0 },
+        header.includes('status') || header.includes('state') ? 100 :
+        header.includes('condition') || header.includes('progress') ? 90 : 0 },
       
+      // Dates - very broad patterns
       { field: 'estimatedDeliveryDate', score:
         header.includes('deliver') && header.includes('date') ? 100 :
-        header.includes('eta') || header.includes('estimated') ? 90 :
-        header.includes('due') && header.includes('date') ? 85 : 0 },
+        header.includes('eta') || header.includes('estimated') ? 95 :
+        header.includes('due') || header.includes('expected') ? 90 :
+        header.includes('date') && header.includes('delivery') ? 85 : 0 },
       
-      // Quantities and logistics
+      // Quantities - catch variations
       { field: 'quantity', score:
-        header === 'quantity' || header === 'qty' ? 100 :
-        header === 'count' || header === 'amount' ? 90 :
-        header.includes('qty') || header.includes('units') ? 85 : 0 },
+        header.includes('quantity') || header.includes('qty') ? 100 :
+        header.includes('count') || header.includes('amount') ? 95 :
+        header.includes('units') || header.includes('pieces') ? 90 :
+        header.includes('items') || header.includes('total') ? 85 : 0 },
       
+      // Pallets
       { field: 'pallets', score:
-        header === 'pallets' || header === 'pallet' ? 100 :
-        header === 'pallet count' ? 95 :
-        header.includes('pallet') ? 80 : 0 },
+        header.includes('pallet') ? 100 :
+        header.includes('skid') ? 90 : 0 },
       
+      // Spaces
       { field: 'spaces', score:
-        header === 'spaces' || header === 'space' ? 100 :
-        header === 'space count' ? 95 :
-        header.includes('space') ? 80 : 0 },
+        header.includes('space') ? 100 :
+        header.includes('slot') || header.includes('position') ? 90 : 0 },
       
-      // Temperature and location
+      // Temperature zones
       { field: 'temperatureZone', score:
-        header.includes('temp') && header.includes('zone') ? 100 :
-        header.includes('temperature') ? 90 :
-        header.includes('temp') || header.includes('zone') ? 75 :
-        header.includes('storage') ? 60 : 0 },
+        header.includes('temp') || header.includes('temperature') ? 100 :
+        header.includes('zone') || header.includes('storage') ? 90 :
+        header.includes('cold') || header.includes('frozen') ? 85 : 0 },
       
+      // Location
       { field: 'lastKnownLocation', score:
-        header.includes('location') && header.includes('current') ? 100 :
-        header.includes('last') && header.includes('location') ? 95 :
-        header.includes('location') || header.includes('where') ? 80 : 0 }
+        header.includes('location') ? 100 :
+        header.includes('where') || header.includes('current') ? 90 :
+        header.includes('last') || header.includes('position') ? 85 : 0 }
     ];
     
     // Find the highest scoring suggestion
     const bestMatch = suggestions.reduce((best, current) => 
       current.score > best.score ? current : best, { field: 'ignore', score: 0 });
     
-    return bestMatch.score > 50 ? bestMatch.field : 'ignore';
+    return bestMatch.score > 20 ? bestMatch.field : 'ignore';
   };
 
   // Apply smart suggestions automatically when file is loaded
