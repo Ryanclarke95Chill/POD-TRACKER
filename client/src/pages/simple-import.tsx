@@ -257,58 +257,82 @@ export default function SimpleImport() {
             <CardHeader>
               <CardTitle>Map Your Columns</CardTitle>
               <p className="text-sm text-gray-600">
-                Select which system field each of your columns should map to
+                For each system field, select which column from your file contains that data
               </p>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {headers.map((header, index) => (
-                  <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <label className="font-medium text-sm">{header}</label>
-                      <p className="text-xs text-gray-500">Your column</p>
-                    </div>
-                    <div className="flex-1">
-                      <Select
-                        value={fieldMapping[header] || "ignore"}
-                        onValueChange={(value) => updateFieldMapping(header, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select system field..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="p-2 border-b">
-                            <input
-                              type="text"
-                              placeholder="Search fields..."
-                              className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              onChange={(e) => {
-                                const searchTerm = e.target.value.toLowerCase();
-                                const items = document.querySelectorAll('[data-field-item]');
-                                items.forEach((item: any) => {
-                                  const text = item.textContent?.toLowerCase() || '';
-                                  item.style.display = text.includes(searchTerm) ? 'block' : 'none';
-                                });
-                              }}
-                            />
-                          </div>
-                          {SYSTEM_FIELDS.map((field) => (
-                            <SelectItem key={field.value} value={field.value} data-field-item>
-                              {field.label}
+                {SYSTEM_FIELDS.filter(field => field.value !== "ignore").map((systemField, index) => {
+                  // Find which CSV header is mapped to this system field
+                  const mappedCsvHeader = Object.entries(fieldMapping).find(([_, value]) => value === systemField.value)?.[0];
+                  
+                  return (
+                    <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <label className="font-medium text-sm">{systemField.label}</label>
+                        <p className="text-xs text-gray-500">System field</p>
+                      </div>
+                      <div className="flex-1">
+                        <Select
+                          value={mappedCsvHeader || "ignore"}
+                          onValueChange={(value) => {
+                            // Clear previous mapping for this system field
+                            if (mappedCsvHeader) {
+                              setFieldMapping(prev => ({
+                                ...prev,
+                                [mappedCsvHeader]: "ignore"
+                              }));
+                            }
+                            
+                            // Set new mapping if a CSV header is selected
+                            if (value !== "ignore") {
+                              setFieldMapping(prev => ({
+                                ...prev,
+                                [value]: systemField.value
+                              }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your column..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2 border-b">
+                              <input
+                                type="text"
+                                placeholder="Search your columns..."
+                                className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onChange={(e) => {
+                                  const searchTerm = e.target.value.toLowerCase();
+                                  const items = document.querySelectorAll('[data-csv-item]');
+                                  items.forEach((item: any) => {
+                                    const text = item.textContent?.toLowerCase() || '';
+                                    item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+                                  });
+                                }}
+                              />
+                            </div>
+                            <SelectItem value="ignore" data-csv-item>
+                              Don't map
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            {headers.map((header) => (
+                              <SelectItem key={header} value={header} data-csv-item>
+                                {header}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-8 flex justify-center">
+                        {mappedCsvHeader ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <X className="h-4 w-4 text-gray-300" />
+                        )}
+                      </div>
                     </div>
-                    <div className="w-8 flex justify-center">
-                      {fieldMapping[header] && fieldMapping[header] !== "ignore" ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <X className="h-4 w-4 text-gray-300" />
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
