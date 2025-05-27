@@ -20,6 +20,7 @@ export function SearchableSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-focus search input when dropdown opens
   useEffect(() => {
@@ -29,17 +30,44 @@ export function SearchableSelect({
       }, 10);
     }
   }, [isOpen]);
+
+  // Handle clicks outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
   
   const filteredOptions = options
     .filter(option => option.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => a.localeCompare(b));
   
+  const handleToggle = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+      if (!isOpen) {
+        setSearchTerm("");
+      }
+    }
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       {/* Selection display */}
       <div 
         className={`flex items-center justify-between w-full rounded-md border border-neutral-200 p-2 bg-white cursor-pointer ${className}`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
       >
         <div className="truncate">
           {value || placeholder}
@@ -60,9 +88,8 @@ export function SearchableSelect({
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onMouseDown={(e) => e.stopPropagation()}
-              onFocus={(e) => e.stopPropagation()}
               className="w-full p-1 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              autoComplete="off"
             />
           </div>
           
