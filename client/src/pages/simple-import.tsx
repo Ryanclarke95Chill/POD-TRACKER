@@ -31,6 +31,110 @@ export default function SimpleImport() {
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [showPreview, setShowPreview] = useState(false);
 
+  // Smart mapping suggestions based on column headers, position, and common patterns
+  const suggestMapping = (columnHeader: string, columnIndex: number): string => {
+    const header = columnHeader.toLowerCase().trim();
+    
+    // Position-based suggestions (Column D = index 3 for tracking links)
+    if (columnIndex === 3 && (header.includes('track') || header.includes('link') || header.includes('url') || header.includes('reference'))) {
+      return 'trackingLink';
+    }
+    
+    // Header content analysis with priority scoring
+    const suggestions = [
+      // Tracking links (highest priority for Column D)
+      { field: 'trackingLink', score: header.includes('tracking') ? 100 : header.includes('track') ? 90 : header.includes('link') ? 80 : header.includes('url') ? 70 : 0 },
+      
+      // Consignment references
+      { field: 'consignmentNumber', score: 
+        header === 'consignment number' || header === 'consignment_number' ? 100 :
+        header === 'ref' || header === 'reference' ? 90 :
+        header.includes('consign') && header.includes('num') ? 85 :
+        header.includes('order') && header.includes('num') ? 75 : 0 },
+      
+      // Customer information
+      { field: 'customerName', score:
+        header === 'customer' || header === 'customer name' ? 100 :
+        header === 'client' || header === 'company' ? 90 :
+        header.includes('customer') ? 85 :
+        header.includes('client') || header.includes('receiver') ? 75 : 0 },
+      
+      // Addresses
+      { field: 'deliveryAddress', score:
+        header === 'delivery address' || header === 'delivery_address' ? 100 :
+        header === 'destination' || header === 'to' ? 90 :
+        header.includes('deliver') && header.includes('addr') ? 85 :
+        header.includes('destination') ? 75 : 0 },
+      
+      { field: 'pickupAddress', score:
+        header === 'pickup address' || header === 'pickup_address' ? 100 :
+        header === 'origin' || header === 'from' ? 90 :
+        header.includes('pickup') || header.includes('collect') ? 85 :
+        header.includes('origin') ? 75 : 0 },
+      
+      // Status and dates
+      { field: 'status', score:
+        header === 'status' || header === 'state' ? 100 :
+        header === 'delivery status' ? 95 :
+        header.includes('status') ? 80 : 0 },
+      
+      { field: 'estimatedDeliveryDate', score:
+        header.includes('deliver') && header.includes('date') ? 100 :
+        header.includes('eta') || header.includes('estimated') ? 90 :
+        header.includes('due') && header.includes('date') ? 85 : 0 },
+      
+      // Quantities and logistics
+      { field: 'quantity', score:
+        header === 'quantity' || header === 'qty' ? 100 :
+        header === 'count' || header === 'amount' ? 90 :
+        header.includes('qty') || header.includes('units') ? 85 : 0 },
+      
+      { field: 'pallets', score:
+        header === 'pallets' || header === 'pallet' ? 100 :
+        header === 'pallet count' ? 95 :
+        header.includes('pallet') ? 80 : 0 },
+      
+      { field: 'spaces', score:
+        header === 'spaces' || header === 'space' ? 100 :
+        header === 'space count' ? 95 :
+        header.includes('space') ? 80 : 0 },
+      
+      // Temperature and location
+      { field: 'temperatureZone', score:
+        header.includes('temp') && header.includes('zone') ? 100 :
+        header.includes('temperature') ? 90 :
+        header.includes('temp') || header.includes('zone') ? 75 :
+        header.includes('storage') ? 60 : 0 },
+      
+      { field: 'lastKnownLocation', score:
+        header.includes('location') && header.includes('current') ? 100 :
+        header.includes('last') && header.includes('location') ? 95 :
+        header.includes('location') || header.includes('where') ? 80 : 0 }
+    ];
+    
+    // Find the highest scoring suggestion
+    const bestMatch = suggestions.reduce((best, current) => 
+      current.score > best.score ? current : best, { field: 'ignore', score: 0 });
+    
+    return bestMatch.score > 50 ? bestMatch.field : 'ignore';
+  };
+
+  // Apply smart suggestions automatically when file is loaded
+  const applySuggestedMappings = (headersList: string[]) => {
+    const suggestedMappings: Record<string, string> = {};
+    headersList.forEach((header, index) => {
+      const suggestion = suggestMapping(header, index);
+      suggestedMappings[index.toString()] = suggestion;
+    });
+    setFieldMapping(suggestedMappings);
+    
+    const mappedCount = Object.values(suggestedMappings).filter(val => val !== 'ignore').length;
+    toast({
+      title: "Smart mapping applied!",
+      description: `Automatically mapped ${mappedCount} of ${headersList.length} columns. Column D prioritized for tracking links.`,
+    });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -55,20 +159,17 @@ export default function SimpleImport() {
             ).filter(row => row.some(cell => cell.trim() !== ''));
             
             if (rows.length > 0) {
-              setHeaders(rows[0]);
+              const headersList = rows[0];
+              setHeaders(headersList);
               setFileData(rows);
               setShowPreview(true);
               
-              // Initialize field mapping
-              const initialMapping: Record<string, string> = {};
-              rows[0].forEach((header: string) => {
-                initialMapping[header] = "ignore";
-              });
-              setFieldMapping(initialMapping);
+              // Apply smart mapping suggestions automatically
+              applySuggestedMappings(headersList);
               
               toast({
                 title: "Excel file loaded successfully",
-                description: `Found ${rows.length - 1} data rows with ${rows[0].length} columns`
+                description: `Found ${rows.length - 1} data rows with ${headersList.length} columns`
               });
             }
           } catch (error) {
@@ -92,20 +193,17 @@ export default function SimpleImport() {
             .map(line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
           
           if (rows.length > 0) {
-            setHeaders(rows[0]);
+            const headersList = rows[0];
+            setHeaders(headersList);
             setFileData(rows);
             setShowPreview(true);
             
-            // Initialize field mapping
-            const initialMapping: Record<string, string> = {};
-            rows[0].forEach((header: string) => {
-              initialMapping[header] = "ignore";
-            });
-            setFieldMapping(initialMapping);
+            // Apply smart mapping suggestions automatically
+            applySuggestedMappings(headersList);
             
             toast({
               title: "CSV file loaded successfully",
-              description: `Found ${rows.length - 1} data rows with ${rows[0].length} columns`
+              description: `Found ${rows.length - 1} data rows with ${headersList.length} columns`
             });
           }
         }
@@ -256,10 +354,25 @@ export default function SimpleImport() {
           {/* Field Mapping */}
           <Card>
             <CardHeader>
-              <CardTitle>Map Your Columns</CardTitle>
-              <p className="text-sm text-gray-600">
-                For each system field, select which column from your file contains that data
-              </p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Map Your Columns</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    For each system field, select which column from your file contains that data
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applySuggestedMappings(headers)}
+                  className="flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                  Smart Mapping
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
