@@ -130,7 +130,9 @@ export default function SimpleImport() {
     const suggestedMappings: Record<string, string> = {};
     headersList.forEach((header, index) => {
       const suggestion = suggestMapping(header, index);
-      suggestedMappings[index.toString()] = suggestion;
+      if (suggestion !== 'ignore') {
+        suggestedMappings[header] = suggestion;
+      }
     });
     setFieldMapping(suggestedMappings);
     
@@ -166,7 +168,6 @@ export default function SimpleImport() {
             
             if (rows.length > 0) {
               const headersList = rows[0].map(header => header || `Column ${rows[0].indexOf(header)}`);
-              console.log('Headers loaded:', headersList);
               setHeaders(headersList);
               setFileData(rows);
               setShowPreview(true);
@@ -398,9 +399,6 @@ export default function SimpleImport() {
                           options={["ignore", ...headers]}
                           value={mappedCsvHeader || "ignore"}
                           onChange={(value) => {
-                            console.log('Selected value:', value);
-                            console.log('Current mappedCsvHeader:', mappedCsvHeader);
-                            
                             // Clear previous mapping for this system field
                             if (mappedCsvHeader) {
                               setFieldMapping(prev => ({
