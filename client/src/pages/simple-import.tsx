@@ -165,7 +165,8 @@ export default function SimpleImport() {
             ).filter(row => row.some(cell => cell.trim() !== ''));
             
             if (rows.length > 0) {
-              const headersList = rows[0];
+              const headersList = rows[0].map(header => header || `Column ${rows[0].indexOf(header)}`);
+              console.log('Headers loaded:', headersList);
               setHeaders(headersList);
               setFileData(rows);
               setShowPreview(true);
