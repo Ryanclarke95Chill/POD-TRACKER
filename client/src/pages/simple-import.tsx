@@ -396,8 +396,8 @@ export default function SimpleImport() {
                         <SearchableSelect
                           options={["ignore", ...headers.map((header, index) => `Column ${index}: ${header || 'Unnamed'}`)]}
                           value={mappedCsvHeader && mappedCsvHeader !== "ignore" ? 
-                                `Column ${headers.indexOf(mappedCsvHeader)}: ${mappedCsvHeader}` : 
-                                mappedCsvHeader || "ignore"}
+                                headers.map((header, index) => `Column ${index}: ${header || 'Unnamed'}`).find(option => option.includes(mappedCsvHeader)) || "ignore" : 
+                                "ignore"}
                           onChange={(value) => {
                             // Clear previous mapping for this system field
                             if (mappedCsvHeader) {
@@ -409,7 +409,7 @@ export default function SimpleImport() {
                             
                             // Extract the actual header value from the display value
                             if (value !== "ignore" && value !== "") {
-                              const actualHeader = value.includes(':') ? 
+                              const actualHeader = value.includes(': ') ? 
                                 value.split(': ')[1] : value;
                               setFieldMapping(prev => ({
                                 ...prev,
