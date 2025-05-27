@@ -172,8 +172,7 @@ export default function SimpleImport() {
               setFileData(rows);
               setShowPreview(true);
               
-              // Apply smart mapping suggestions automatically
-              applySuggestedMappings(headersList);
+              // Skip auto-mapping - let user manually select
               
               toast({
                 title: "Excel file loaded successfully",
@@ -206,8 +205,7 @@ export default function SimpleImport() {
             setFileData(rows);
             setShowPreview(true);
             
-            // Apply smart mapping suggestions automatically
-            applySuggestedMappings(headersList);
+            // Skip auto-mapping - let user manually select
             
             toast({
               title: "CSV file loaded successfully",
@@ -369,17 +367,7 @@ export default function SimpleImport() {
                     For each system field, select which column from your file contains that data
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applySuggestedMappings(headers)}
-                  className="flex items-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                  </svg>
-                  Smart Mapping
-                </Button>
+
               </div>
             </CardHeader>
             <CardContent>
@@ -387,7 +375,6 @@ export default function SimpleImport() {
                 {SYSTEM_FIELDS.filter(field => field.value !== "ignore").map((systemField, index) => {
                   // Find which CSV header is mapped to this system field
                   const mappedCsvHeader = Object.entries(fieldMapping).find(([_, value]) => value === systemField.value)?.[0];
-                  console.log('System field:', systemField.value, 'mapped to CSV header:', mappedCsvHeader);
                   
                   return (
                     <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
@@ -400,26 +387,30 @@ export default function SimpleImport() {
                           options={["ignore", ...headers]}
                           value={mappedCsvHeader || "ignore"}
                           onChange={(value) => {
-                            console.log('onChange called with:', value, 'for system field:', systemField.value);
-                            console.log('Current mappedCsvHeader:', mappedCsvHeader);
-                            
-                            // Clear previous mapping for this system field
-                            if (mappedCsvHeader) {
-                              console.log('Clearing mapping for:', mappedCsvHeader);
-                              setFieldMapping(prev => ({
-                                ...prev,
-                                [mappedCsvHeader]: "ignore"
-                              }));
-                            }
-                            
-                            // Set new mapping if a CSV header is selected
-                            if (value !== "ignore" && value !== "") {
-                              console.log('Setting new mapping:', value, '->', systemField.value);
-                              setFieldMapping(prev => ({
-                                ...prev,
-                                [value]: systemField.value
-                              }));
-                            }
+                            setFieldMapping(prev => {
+                              const newMapping = { ...prev };
+                              
+                              // Clear any existing mapping for this system field
+                              Object.keys(newMapping).forEach(key => {
+                                if (newMapping[key] === systemField.value) {
+                                  delete newMapping[key];
+                                }
+                              });
+                              
+                              // Clear any existing mapping for this CSV header (avoid conflicts)
+                              if (value !== "ignore" && value !== "") {
+                                Object.keys(newMapping).forEach(key => {
+                                  if (key === value) {
+                                    delete newMapping[key];
+                                  }
+                                });
+                                
+                                // Set new mapping
+                                newMapping[value] = systemField.value;
+                              }
+                              
+                              return newMapping;
+                            });
                           }}
                           placeholder="Select your column..."
                           className="w-full"
