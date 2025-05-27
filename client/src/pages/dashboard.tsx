@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin } from "lucide-react";
 import ConsignmentCard from "@/components/consignment-card";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import { getUser, logout } from "@/lib/auth";
@@ -41,42 +42,36 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-primary text-white shadow-md z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+      <header className="gradient-primary shadow-header z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-white">ChillTrack</h1>
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-3 text-blue-100 text-sm">Professional Logistics Dashboard</span>
           </div>
           
           <div className="flex items-center space-x-3">
-            <div className="hidden md:flex items-center text-white/80 text-sm mr-2">
+            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
               <span>{user?.email}</span>
             </div>
             <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/analytics'}
             >
+              <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
             </Button>
             <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/simple-import'}
             >
+              <Upload className="h-4 w-4 mr-2" />
               Import Data
             </Button>
             <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
-              onClick={() => window.location.href = '/admin'}
-            >
-              Admin
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              className="gradient-accent hover:opacity-90 text-white border-0"
               onClick={logout}
             >
+              <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
           </div>
