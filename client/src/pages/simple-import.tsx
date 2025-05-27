@@ -190,11 +190,39 @@ export default function SimpleImport() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Simple Data Import</h1>
-        <p className="text-gray-600">Upload your file and map columns to system fields</p>
-      </div>
+    <div className="flex-1 flex flex-col">
+      {/* Header */}
+      <header className="bg-primary text-white shadow-md z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-4 text-white/80">Import Data</span>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <Button 
+              variant="ghost" 
+              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              onClick={() => window.location.href = '/dashboard'}
+            >
+              Dashboard
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              onClick={() => window.location.href = '/admin'}
+            >
+              Admin
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Simple Data Import</h1>
+          <p className="text-gray-600">Upload your file and map columns to system fields</p>
+        </div>
 
       {!showPreview ? (
         <Card>
@@ -343,6 +371,7 @@ export default function SimpleImport() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
