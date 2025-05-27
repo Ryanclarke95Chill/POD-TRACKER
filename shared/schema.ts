@@ -43,8 +43,16 @@ export const consignments = pgTable("consignments", {
   deliveryAddress: text("delivery_address").notNull(),
   status: text("status").notNull(),
   estimatedDeliveryDate: text("estimated_delivery_date").notNull(),
+  deliveryDate: text("delivery_date"),
+  dateDelivered: text("date_delivered"),
   temperatureZone: text("temperature_zone").notNull(),
   lastKnownLocation: text("last_known_location").notNull(),
+  deliveryRun: text("delivery_run"),
+  quantity: integer("quantity"),
+  pallets: integer("pallets"),
+  spaces: integer("spaces"),
+  cubicMeters: text("cubic_meters"),
+  weightKg: text("weight_kg"),
   events: json("events").notNull().$type<ConsignmentEvent[]>(),
 });
 

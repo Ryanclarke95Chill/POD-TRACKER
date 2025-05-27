@@ -1,0 +1,478 @@
+"Delivery Address ID","Delivery Address","Consignment Reference","Delivery Run Date","Date Delivered","Delivery Run",Quantity,Pallets,Spaces,"Cubic (m³)","Weight (kg)"
+24024,"Petbarn Arundel, , 1 Telford Place, Arundel, , ",,2025-05-12,"2025-05-12 15:55:37","GOLD COAST",1,0,0,0.017,7
+26041,"Chill Qld, , 24 Octal Street, YATALA, , ",0121BBQLD,2025-05-16,"2025-05-16 09:23:35","Warehouse Outbound",0,1,0,2.053,500
+25404,"Dnata Brisbane, , 9 Gahnia St Brisbane Airport, BRISBANE AIRPORT, , ",03-25001002,2025-05-16,"2025-05-16 16:14:53","METRO 1",0,1,0,2,700
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","09.05.2025 pickup",2025-05-12,"2025-05-12 08:13:45","METRO 2",0,8,0,6.711,3800
+26543,"South Bank Cultural Forecourt, , Melbourne Street, SOUTH BRISBANE, , ","11/05 COCOBELLA MDC Sampling",2025-05-11,"2025-05-12 08:23:27","METRO 1",0,4,4,7.058,1081
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","12.05.2025 pickup",2025-05-13,"2025-05-13 07:27:04","METRO 2",0,8,0,2.018,2200
+24151,"Made Group, , 3a/3b 38 Eastern Services Road, STAPYLTON, , ","12/05 RETURN COCOBELLA MDC leftovers + collat",2025-05-12,"2025-05-12 07:07:47","METRO 2",0,2,2,3.529,300
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","13.05.2025 pickup",2025-05-14,"2025-05-14 07:11:47","METRO 2",0,5,0,0.988,1050
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",13864141,2025-05-16,"2025-05-16 11:17:37","METRO 1",4,1,0,1.764,62
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","14.05.2025 pickup",2025-05-14,"2025-05-15 06:55:13","METRO 2",0,4,0,7.058,679
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","14/05/25 Collection pickup",2025-05-14,"2025-05-14 10:37:39","METRO 2",0,2,0,3.529,215
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","16.05.2025 pickup",2025-05-16,"2025-05-19 11:14:04","METRO 2",0,6,0,4.755,2606
+344,"Chill Nsw, , 128 Old Pittwater Road, BROOKVALE, , ","16/05 2 X COCOBELLA Pushcarts to NSW",2025-05-16,"2025-05-19 07:50:39","QLD to NSW Shuttle",0,1,1,1.764,150
+25236,"Rener Health Products, , 4 / 7-13 Bell Street, CANNING VALE, , ",1754648,2025-05-08,"2025-05-13 07:16:37",WA,14,1,0,0.581,120
+26179,"Herbal Wisdom, , 64 Byron St, BANGALOW, , ",2200,2025-05-16,"2025-05-16 14:19:37","NORTHERN RIVERS",3,0,0,0.04,10
+26180,"Organika, , Unit 2, 3 Gibson Rd, NOOSAVILLE, , ",2209,2025-05-15,"2025-05-15 12:07:49","SUNSHINE COAST",1,0,0,0.02,4
+25848,"Virgin Australia Lounge, , Terminal Drive, BILINGA, , ",2230293401,2025-05-13,"2025-05-13 11:07:49","GOLD COAST",15,0,0,0,150
+26048,"Virgin Australia Lounge Brisbane, , Bribie Way, BRISBANE AIRPORT, , ",2230293898,2025-05-13,"2025-05-13 09:40:06","METRO 1",18,0,0,0,180
+26048,"Virgin Australia Lounge Brisbane, , Bribie Way, BRISBANE AIRPORT, , ",2230293898/1,2025-05-16,"2025-05-16 14:07:41","METRO 1",0,1,0,1.764,540
+25848,"Virgin Australia Lounge, , Terminal Drive, BILINGA, , ",2230294045,2025-05-16,"2025-05-16 13:23:58","GOLD COAST",14,0,0,0,140
+26568,"Vip-cap Coast Rural (the Green Shed) (c1067001), , 47 Tanby Road, YEPPOON, , ",2508770,2025-05-12,"2025-05-14 06:03:13",ROCKHAMPTON,0,1,0,1.764,25.48
+24616,"Pet Superstore (c6026001), , 100/400 Stafford Rd, STAFFORD, , ",2509101,2025-05-14,"2025-05-14 13:35:48","METRO 1",1,0,0,0.024,12
+26019,"Pet City - Mt Gravatt (c1058001), , 224 Wishart Road, MOUNT GRAVATT, , ",2509358,2025-05-16,"2025-05-16 14:15:37","METRO 1",1,0,0,0.014,6.49
+23791,"Chill Transport - Petbarn Brisbane Dc 27858, , 24 Octal St, YATALA, , ",27858-POR2041717,2025-05-14,"2025-05-15 06:55:13","Warehouse Inbound",0,1,1,2.049,480
+26149,"Dnata Catering Brisbane, , 9 Gahnia Street, BRISBANE AIRPORT, , ","282572 - 282574",2025-05-16,"2025-05-16 16:14:19","METRO 1",0,1,0,0.432,100
+25035,"Petstock Cannonvale, , 8 Galbraith Park Drive, CANNONVALE, , ",2840163,2025-05-12,"2025-05-14 06:03:13","AIRLIE BEACH",1,0,0,0.034,14
+24073,"Petstock West Ipswich, , 339 Brisbane Street, WEST IPSWICH, , ",2842631,2025-05-14,"2025-05-14 15:07:38","METRO 2",5,0,0,0.145,82.5
+23836,"Petstock Ashmore, Petstock, 345 Southport Nerang Road, 6, ASHMORE, , ",2843643,2025-05-14,"2025-05-14 15:57:42","GOLD COAST",5,0,0,0.145,82.5
+12027,"Petstock Maroochydore, , 5/72 Maroochydore Rd, MAROOCHYDORE, , ",2843645,2025-05-15,"2025-05-15 10:43:37","SUNSHINE COAST",5,0,0,0.145,82.5
+11641,"Petstock North Lakes, , Shop T5, NORTH LAKES, , ",2843647,2025-05-15,"2025-05-15 12:11:45","METRO 2",5,0,0,0.145,82.5
+11641,"Petstock North Lakes, , Shop T5, NORTH LAKES, , ",2844116,2025-05-15,"2025-05-15 12:09:43","METRO 2",7,0,0,0.203,115.5
+26471,"Lucy Morris, , 1 Leopard Street, KANGAROO POINT, , ",3801,2025-05-08,"2025-05-15 10:50:59","METRO 1",1,0,0,0.012,5
+26579,"Erin Oflaherty, , 3 Nirimba Court, BILAMBIL HEIGHTS, , ",3814,2025-05-16,"2025-05-16 17:09:36","NORTHERN RIVERS",1,0,0,0.02,5
+26580,"Kate Fleiter, , 58 Carlyle Street, BYRON BAY, , ",3822,2025-05-16,"2025-05-16 09:49:46","NORTHERN RIVERS",1,0,0,0.02,5
+26626,"Chill Qld, , 24 Octal Street, YATALA, , ","3x MegaBin Lids & 1x MegaBin to QLD - Interstate",2025-05-16,"2025-05-19 11:14:05","Warehouse Inbound",1,1,0,1.764,20
+26577,"Moco Food, , 75 Ebbern St, DARRA, , ",408072,2025-05-14,"2025-05-14 15:11:01","METRO 1",0,4,3,2,2100
+26566,"Happy Paws Pet Food, , 1/52 Siganto Dve, HELENSVALE, , ",4268,2025-05-12,"2025-05-12 08:19:50","GOLD COAST",0,2,0,2.347,1304
+24984,"Uncle Toms Pet & Poultry, , 2/34 Brendan Drive, NERANG, , ",4269,2025-05-12,"2025-05-12 09:15:46","GOLD COAST",0,1,0,0.597,316
+25270,"Aussie Pooch Nutrition & Wellbeing, , C/o Neil Mansell Transport, 325 Orchard Road, RICHLANDS, , ",4270,2025-05-12,"2025-05-12 13:44:43","METRO 1",0,1,0,1.647,892
+25268,"Currumbin Creek Stockfeeds, , 68 Currumbin Creek Rd, CURRUMBIN, , ",4271,2025-05-12,"2025-05-12 11:19:38","GOLD COAST",0,1,0,0.782,442
+26567,"Pets Wonderland, , 1/109 Currumbin Creek Rd, CURRUMBIN WATERS, , ",4272,2025-05-12,"2025-05-12 11:21:44","GOLD COAST",0,1,0,1.338,731
+25445,"Oxenford Stockfeeds, , Shop1, 141 Old Pacific Highway, OXENFORD, , ",4273,2025-05-12,"2025-05-13 05:15:38","GOLD COAST",10,0,0,0.206,108
+25310,"Caloundra Produce & Landscape Supplies, , 51 Pierce Ave, LITTLE MOUNTAIN, , ",4274,2025-05-13,"2025-05-13 10:41:54","SUNSHINE COAST",0,1,0,1.256,662
+24879,"Feed & Fodder, , 31 Moroney Place, BEERWAH, , ",4275,2025-05-13,"2025-05-13 09:41:41","SUNSHINE COAST",19,0,0,0.391,218
+26571,"Greenpet, , 244 Verrierdale Rd, VERRIERDALE, , ",4276,2025-05-13,"2025-05-13 14:07:44","SUNSHINE COAST",0,1,0,0.762,420
+26253,"Doggyland, , Unit 2/16 Hideaway St, BIRTINYA, , ",4277,2025-05-13,"2025-05-13 11:11:40","SUNSHINE COAST",17,0,0,0.35,194
+25567,"Park Ridge Produce, , 3688 Mt Lindsay Highway, PARK RIDGE, , ",4283,2025-05-14,"2025-05-14 11:09:37","METRO 2",0,1,0,0.453,257
+25694,"Bongaree Pet Food, , Shop 2, 75 Cotterill Ave, BRIBIE ISLAND, , ",4286,2025-05-13,"2025-05-13 12:21:42","SUNSHINE COAST",15,0,0,0.309,152
+24994,"Redlands Produce, , 87 Boundary Rd, THORNLANDS, , ",4288,2025-05-13,"2025-05-13 15:33:38",BAYSIDE,17,0,0,0.35,190
+25274,"Capalaba Produce, , 3247 Old Cleveland Road, CHANDLER, , ",4289,2025-05-13,"2025-05-13 14:11:40",BAYSIDE,13,0,0,0.268,150
+24910,"Buckhams Produce, , Cnr Mt Lindsay Hwy & St Aldwyn Rd, NORTH MACLEAN, , ",4290,2025-05-14,"2025-05-14 11:45:37","METRO 2",0,1,0,0.535,317
+25771,"Gleneagle Produce, , 6457 Mt Lindsay Hwy, GLENEAGLE, , ",4291,2025-05-14,"2025-05-14 12:19:39","METRO 3",6,0,0,0.124,77
+25295,"Marsden Pet & Produce, , 11 Chambers Flat Road, LOGANLEA, , ",4292,2025-05-14,"2025-05-14 10:33:39","METRO 2",13,0,0,0.268,157
+25623,"Pets Of Sandgate, , 76 Louden St, SANDGATE, , ",4295,2025-05-13,"2025-05-13 13:35:47","METRO 2",19,0,0,0.391,214
+25351,"Gold Coast Pet Centre, , 4/110 Kortum Dve, BURLEIGH HEADS, , ",4296,2025-05-14,"2025-05-14 14:19:39","GOLD COAST",13,0,0,0.268,136
+25016,"Pets Unleashed, , 630 Wynnum Rd, MORNINGSIDE, , ",4297,2025-05-14,"2025-05-14 15:57:38","METRO 1",9,0,0,0.185,101
+25271,"K9 Tales, , 127 Mooloolah Meadows Drive, DIAMOND VALLEY (MOOLOOLAH VALLEY), , ",4298,2025-05-15,"2025-05-15 10:07:39","SUNSHINE COAST",19,0,0,0.391,228
+25017,"Jimboomba Produce, , 11 Euphemia St, JIMBOOMBA, , ",4300,2025-05-15,"2025-05-15 15:17:39","METRO 2",11,0,0,0.227,135
+25247,"Whiskey River Animal Health, , 262 Boyds Lane, DULGUIGAN, , ",4301,2025-05-16,"2025-05-16 16:09:36","NORTHERN RIVERS",15,0,0,0.309,172
+25163,"Acacia Pet Supplies & Produce, , 96 Sherbrooke Road, WILLAWONG, , ",4302,2025-05-15,"2025-05-15 10:45:39","METRO 1",12,0,0,0.247,144
+22171,"Markris Whole Food, , 81 Rene St., NOOSAVILLE, , ",44066,2025-05-12,"2025-05-12 08:07:46","SUNSHINE COAST",0,1,1,1,700
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","45790 pickup",2025-05-13,"2025-05-13 13:03:40","SUNSHINE COAST",0,1,0,1.764,113
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","45792 - 2 pickup",2025-05-15,"2025-05-15 15:25:39","SUNSHINE COAST",3,0,0,0,30
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","45792 - 3 pickup",2025-05-15,"2025-05-15 15:25:37","SUNSHINE COAST",2,0,0,0,20
+26413,"Fresh & Save Hervey Bay, , 6 Central Ave, PIALBA, , ",530258,2025-05-13,"2025-05-13 11:15:38","HERVEY BAY",0,1,0,1.764,150
+24700,"Fresh & Save Maryborough, , 270 Alice Street, 1, MARYBOROUGH, , ",530259,2025-05-13,"2025-05-13 12:25:37","HERVEY BAY",0,1,0,1.764,150
+24738,"Fresh & Save, , 100 Jessie St, ARMIDALE, , ",530260,2025-05-12,"2025-05-14 06:03:13","NORTHERN NSW",0,1,0,1.764,200
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",531456,2025-05-15,"2025-05-16 06:27:21","METRO 2",0,1,0,1.764,450
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",531457,2025-05-15,"2025-05-15 07:47:47","METRO 2",0,1,0,1.764,350
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",531462,2025-05-15,"2025-05-15 07:47:44","METRO 2",0,3,0,5.293,2500
+26421,"Fresh & Save Grafton, , 52-74 Fitzroy Street, GRAFTON, , ",531462,2025-05-16,"2025-05-16 11:15:41","NORTHERN RIVERS",0,3,0,5.293,2500
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",531609,2025-05-16,"2025-05-16 08:05:37","METRO 2",0,1,1,0.5,60
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",531610,2025-05-16,"2025-05-16 08:05:38","METRO 2",0,1,1,0.5,120
+13104,"** 7-Eleven Head Office, , 658 Church Street, Building 2, Cremorne, , ","7 Eleven NPD Slices 080525",2025-05-08,"2025-05-12 08:23:27","METRO 1",1,0,0,0,10
+4566,"Secondbite, , 93 Northern Road, HEIDELBERG WEST, , 1034030",80564624,2025-05-14,"2025-05-13 08:00:40","Warehouse Outbound",0,1,0,1.764,250
+3437,"Hoyts Qld Redcliffe 8 S, , Peninsula Fair Shopping Centre, 272 Anzac Avenue, KIPPA-RING, , 1019910",80565734,2025-05-13,"2025-05-13 10:43:38","METRO 2",9,0,0,0.135,26.488
+3449,"Hoyts Qld Stafford, , City Centre Shopping Centre, 400 Stafford Road, STAFFORD, , 1034110",80565735,2025-05-13,"2025-05-13 14:53:45","METRO 1",14,0,0,0.27,53.897
+3586,"Hoyts Qld Sunnybank, , Cnr Mains Street & Mccullough Street, SUNNYBANK, , 1034112",80565736,2025-05-13,"2025-05-13 16:15:38","METRO 1",13,0,0,0.243,49.152
+3869,"Limelight Ipswich Pty Ltd, , Crn Downs St & The Terrace, IPSWICH, , 1034346",80566023,2025-05-14,"2025-05-14 15:07:42","METRO 2",7,0,0,0.189,39.342
+3423,"Hoyts Qld Tweed Heads, , Tweed City Shopping Centre, 54 Minijumbal Drive, TWEED HEADS SOUTH, , 1034244",80566558,2025-05-16,"2025-05-16 15:11:37","NORTHERN RIVERS",8,0,0,0.216,44.087
+3586,"Hoyts Qld Sunnybank, , Cnr Mains Street & Mccullough Street, SUNNYBANK, , 1034112",80566559,2025-05-16,"2025-05-16 13:30:37","METRO 1",6,0,0,0.162,33.516
+24905,"Aussie Pooch Wllness & Wellbeing, , 38 Bishop St, WOOLNER, , ",85467,2025-05-15,"2025-05-19 11:14:06",NT,0,1,0,2.032,555
+11569,"Coffee Of Capricorn, , 57 Tanby Road, YEPPOON, , ",9278355413,2025-05-07,"2025-05-12 08:11:00",ROCKHAMPTON,0,1,0,1.764,100
+10309,"Silk Contract Logistics, , 37 Freight Street, LYTTON, , ",9278356542,2025-05-14,"2025-05-14 13:35:44","METRO 1",0,1,0,1.764,116
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",9278356565,2025-05-15,"2025-05-15 14:35:52","METRO 1",0,1,0,1.764,200
+11569,"Coffee Of Capricorn, , 57 Tanby Road, YEPPOON, , ",9278356565,2025-05-16,"2025-05-19 11:14:05",ROCKHAMPTON,0,1,0,1.764,200
+21550,"Chill Nsw, Chill Nsw, 128 Old Pittwater Road, 2, BROOKVALE, , ","ABD QLD to NSW Stock 14.05.2025",2025-05-14,"2025-05-15 05:50:36","QLD to NSW Shuttle",0,1,0,0.416,65
+25735,"*CHILL VIC, , 2/22 Assembly Drive, DANDENONG SOUTH, , ","ABD QLD to VIC Stock 14.05.2025",2025-05-14,"2025-05-15 06:55:13","QLD to NSW Shuttle",0,1,0,0.96,150
+3884,"Fridge It Logistics Sa, , 64a Ninth Avenue, WOODVILLE NORTH, , ",Acai/Adel-41,2025-05-14,"2025-05-19 11:14:32",SA,0,5,4,8.403,3025
+21552,"Chill Wa, Chill Wa, 5 Chifley Brace, JANDAKOT, , ",Acai/Per75,2025-05-15,"2025-05-21 08:49:24",WA,0,7,4,12.209,3242
+26151,"All Good Foods, , Unit 1 16-18 Towers Drive, MULLUMBIMBY, , ","All good foods 08.05 T2",2025-05-16,"2025-05-16 15:05:37","NORTHERN RIVERS",0,1,1,1.07,170
+25718,"Cannon Logistics, , 19 Trade Street, LYTTON, , ","AMRUN RETAIL AU664310 | PO3535324 | - Sodexo Order 06/05/25",2025-05-12,"2025-05-12 07:41:33","METRO 1",20,0,0,0.2,78.4
+25718,"Cannon Logistics, , 19 Trade Street, LYTTON, , ","AMRUN RETAIL AU664310 | PO3535324 | - Sodexo Order 06/05/25 T2",2025-05-15,"2025-05-15 14:17:37","METRO 1",20,0,0,0.2,78.4
+26575,"Angus Sample Boxes, , 24 Octal St, YATALA, , ","Angus Sample Boxes 13.05",2025-05-14,"2025-05-15 06:55:14","Warehouse Outbound",2,0,0,0.054,8
+26560,"Belinda & Leigh Bonello, , 12/26 Palm Avenue, SURFERS PARADISE, , ","Belinda & Leigh bonello 08.05",2025-05-09,"2025-05-12 08:22:24","GOLD COAST",2,0,0,0.02,4
+25799,"Blackbird Espresso, , 4 Newman Avenue, CAMP HILL, , ","Blackbird Espresso 14.05",2025-05-16,"2025-05-16 11:05:43","METRO 1",2,0,0,0.054,8
+21550,"Chill Nsw, Chill Nsw, 128 Old Pittwater Road, 2, BROOKVALE, , ",BLC007,2025-05-09,"2025-05-12 08:23:27","QLD to NSW Shuttle",0,2,1,3.529,650
+24741,"Brenton/chill, , 2/128 Old Pittwater Road, BROOKVALE, , ","Brisbane-Sydney -  stock transfer 14.05",2025-05-16,"2025-05-19 07:51:38","QLD to NSW Shuttle",4,0,0,0.292,72
+26627,"Chill Qld, , 24 Octal St, YATALA, , ","Broc Pasta 15.05.25",2025-05-16,"2025-05-19 11:14:05","Warehouse Inbound",0,1,0,1.75,650
+26041,"Chill Qld, , 24 Octal Street, YATALA, , ","Butterboy Wholesale QLD -  13.05.2025",2025-05-14,"2025-05-15 06:55:13","Warehouse Inbound",16,0,0,0.432,64
+26041,"Chill Qld, , 24 Octal Street, YATALA, , ","Butterboy Wholesale QLD -  15.05.25",2025-05-16,"2025-05-19 11:14:04","Warehouse Inbound",16,0,0,0.432,64
+9351,"Kunara Organic Market  Doca, , 330 Mons Road, FOREST GLEN, , ",CAFE6834,2025-05-15,"2025-05-15 15:15:40","SUNSHINE COAST",3,0,0,0,36
+25968,"Castaway Coffee Bar, , G1/84 The Esplanade, SURFERS PARADISE, , ","Castaway Coffee Bar 13.05",2025-05-14,"2025-05-14 11:05:46","GOLD COAST",1,0,0,0.027,4
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","CC144999 12/05 RETURN COCOBELLA MDC leftovers + collat",2025-05-12,"2025-05-12 08:34:59",DEFAULT,104,0,0,0,145.6
+25844,"Collingwood Black, , 35 Collingwood St, ALBION, , ","Collingwood Black 14.05",2025-05-16,"2025-05-16 14:03:38","METRO 1",2,0,0,0.054,8
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","COOMINYA Burger  - Ben McGuire VIC",2025-05-12,"2025-05-12 13:30:52",DEFAULT,10,0,0,0,0
+26562,"Ben Mcguire, , Kgf - Lot 4 Knight Ct, Kyneton Vic 3444, KYNETON, , ","COOMINYA Burger  - Ben McGuire VIC",2025-05-14,"2025-05-19 11:14:32","QLD to NSW Shuttle",10,0,0,0,0
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","COOMINYA Burger - Ben McGuire VIC T2",2025-05-13,"2025-05-13 11:17:42",DEFAULT,10,1,0,1.764,0
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","COOMINYA Burger - KGF Corbould Park",2025-05-12,"2025-05-12 13:30:49",DEFAULT,7,0,0,0,0
+26563,"Karien Mocke, , Kgf - 6/14 Fred Chaplin Circuit, CORBOULD PARK, , ","COOMINYA Burger - KGF Corbould Park",2025-05-15,"2025-05-15 12:05:46","SUNSHINE COAST",7,0,0,0,0
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","COOMINYA Burger - KGF Corbould Park T2",2025-05-13,"2025-05-13 11:15:41",DEFAULT,7,1,0,1.764,0
+26473,"Coles Local Adelaide Street, , 79 Adelaide Street, BRISBANE CITY, , ","CS ADELAIDE STREET 14-05-2025",2025-05-14,"2025-05-14 08:03:51","METRO 1",153,0,0,7.344,1181.67
+26473,"Coles Local Adelaide Street, , 79 Adelaide Street, BRISBANE CITY, , ","CS ADELAIDE STREET 16-05-2025",2025-05-16,"2025-05-16 10:27:39","METRO 1",198,0,0,9.504,551.74
+26474,"Coles Local Ascot, , 111-117 Racecourse Rd, ASCOT, , ","CS ASCOT 14-05-2025",2025-05-14,"2025-05-14 09:55:48","METRO 1",225,0,0,10.8,1248.83
+26474,"Coles Local Ascot, , 111-117 Racecourse Rd, ASCOT, , ","CS ASCOT 16-05-2025",2025-05-16,"2025-05-16 14:59:37","METRO 1",169,0,0,8.112,467.848
+26475,"Coles Coorparoo, , 252 Old Cleveland Road, COORPAROO, , ","CS COORPAROO 14-05-2025",2025-05-14,"2025-05-14 08:03:46","METRO 1",153,0,0,7.344,1174
+26475,"Coles Coorparoo, , 252 Old Cleveland Road, COORPAROO, , ","CS COORPAROO 16-05-2025",2025-05-16,"2025-05-16 15:57:39","METRO 1",249,0,0,11.952,651
+26476,"Coles Taringa, , 10 Swann Road, TARINGA, , ","CS TARINGA 14-05-2025",2025-05-14,"2025-05-14 12:15:50","METRO 1",244,0,0,11.712,1455.27
+26476,"Coles Taringa, , 10 Swann Road, TARINGA, , ","CS TARINGA 16-05-2025",2025-05-16,"2025-05-16 11:49:43","METRO 1",203,0,0,9.744,610.505
+26477,"Coles Local Woolloongabba, , Cnr Ipswich Rd & Stanley St, WOOLLOONGABBA, , ","CS WOOLLOONGABBA 14-05-2025",2025-05-14,"2025-05-14 08:55:44","METRO 1",179,0,0,8.592,1178.38
+26477,"Coles Local Woolloongabba, , Cnr Ipswich Rd & Stanley St, WOOLLOONGABBA, , ","CS WOOLLOONGABBA 16-05-2025",2025-05-16,"2025-05-16 15:57:37","METRO 1",254,0,0,12.192,690.545
+25802,"Daark Espresso, , 2/41 Musgrave Avenue, LABRADOR, , ","Daark Espresso 13.05",2025-05-14,"2025-05-14 11:05:43","GOLD COAST",2,0,0,0.054,8
+26549,"Bec Hardgrave, , 36a Coombell Street, JINDALEE, , ","Dairy Farmers Protein Smoothie 10",2025-05-12,"2025-05-12 10:47:38","METRO 1",1,0,0,0.01,2
+26550,"Claire Bates, , Unit 2/15 Neumann Road, CAPALABA, , ","Dairy Farmers Protein Smoothie 11",2025-05-12,"2025-05-12 12:37:37",BAYSIDE,1,0,0,0.01,2
+26551,"Claudia Cramer, , 42 Koel Drive, NARANGBA, , ","Dairy Farmers Protein Smoothie 12",2025-05-12,"2025-05-12 13:07:37","METRO 2",1,0,0,0.01,2
+26552,"Hanah Mils, , 1/1900 Gold Coast Hwy, BURLEIGH HEADS, , ","Dairy Farmers Protein Smoothie 13",2025-05-12,"2025-05-13 05:37:35","GOLD COAST",1,0,0,0.01,2
+26553,"Peta Carige, , 36 Henry Street, KALINGA, , ","Dairy Farmers Protein Smoothie 14",2025-05-12,"2025-05-12 14:29:36","METRO 1",1,0,0,0.01,2
+26554,"Sophie Rindfleish, , 4/303 Wynnum Road, NORMAN PARK, , ","Dairy Farmers Protein Smoothie 15",2025-05-12,"2025-05-12 15:51:36","METRO 1",1,0,0,0.01,2
+26555,"Adam Sullivan / John Williams, , 3/2 Saxonvale Terrace, MERMAID WATERS, , ","Dairy Farmers Protein Smoothie 43",2025-05-12,"2025-05-13 05:37:37","GOLD COAST",1,0,0,0.01,2
+26556,"Bec Putna, , 8/21 Burleigh Street, BURLEIGH HEADS, , ","Dairy Farmers Protein Smoothie 44",2025-05-12,"2025-05-12 13:27:45","GOLD COAST",1,0,0,0.01,2
+26557,"Erin Rummins, , Hammond Towers, Unit 24/72 Marine Parade, SOUTHPORT, , ","Dairy Farmers Protein Smoothie 45",2025-05-12,"2025-05-12 15:09:37","GOLD COAST",1,0,0,0.01,2
+26558,"Jesse Campbell, , 41306/2 Main Street, VARSITY LAKES, , ","Dairy Farmers Protein Smoothie 46",2025-05-12,"2025-05-12 10:17:47","GOLD COAST",1,0,0,0.01,2
+26559,"Jaz Hand, , 4/221 Burleigh Connection Road, BURLEIGH WATERS, , ","Dairy Farmers Protein Smoothie 50",2025-05-12,"2025-05-12 13:07:42","GOLD COAST",1,0,0,0.01,2
+26416,"Yash Solanki, , Shop 11/2120 Logan Road. Business Name: Durga's Paan & Falooda House, UPPER MOUNT GRAVATT, , ","DURGAS SHIPMENT 3",2025-05-14,"2025-05-14 15:01:53","METRO 1",3,0,0,0.146,45
+26416,"Yash Solanki, , Shop 11/2120 Logan Road. Business Name: Durga's Paan & Falooda House, UPPER MOUNT GRAVATT, , ","DURGAS SHIPMENT 4",2025-05-16,"2025-05-16 15:05:39","METRO 1",3,0,0,0.146,30
+26514,"Flannerys Benowa, , 138-162 Slatyer Ave, BENOWA, , ","FLBENOWA CHILLED - 150525",2025-05-16,"2025-05-16 09:12:08","GOLD COAST",2,0,0,0,20
+26514,"Flannerys Benowa, , 138-162 Slatyer Ave, BENOWA, , ","FLBENOWA FROZEN - 080525",2025-05-14,"2025-05-14 15:55:41","GOLD COAST",1,0,0,0,14
+23978,"Flannerys Chermiside, , 628 Rode Rd, CHERMSIDE, , ","FLCHERM CHILLED - 150525",2025-05-16,"2025-05-16 11:57:42","METRO 1",1,0,0,0,10
+23978,"Flannerys Chermiside, , 628 Rode Rd, CHERMSIDE, , ","FLCHERM FROZEN - 150525",2025-05-16,"2025-05-16 11:11:40","METRO 1",2,0,0,0,20
+24839,"Flannerys Miami, , 44 Pacific Avenue, MIAMI, , ","FLMIAMI CHILLED - 080525",2025-05-14,"2025-05-14 13:35:40","GOLD COAST",2,0,0,0,10
+24839,"Flannerys Miami, , 44 Pacific Avenue, MIAMI, , ","FLMIAMI FROZEN - 080525",2025-05-14,"2025-05-14 13:35:50","GOLD COAST",1,0,0,0,14
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","FLMONAVALE CHILLED  - 140525",2025-05-14,"2025-05-15 06:55:14","Warehouse Inbound",1,0,0,0,28
+24214,"Flannery's Mona Vale, , 12-14 Park Street, MONA VALE, , ","FLMONAVALE CHILLED  - 140525",2025-05-14,"2025-05-15 10:15:39","QLD to NSW Shuttle",1,0,0,0,28
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","FLMONAVALE FROZEN - 140525",2025-05-14,"2025-05-15 06:55:14","Warehouse Inbound",2,0,0,0,70
+24214,"Flannery's Mona Vale, , 12-14 Park Street, MONA VALE, , ","FLMONAVALE FROZEN - 140525",2025-05-14,"2025-05-15 10:14:38","QLD to NSW Shuttle",2,0,0,0,70
+23934,"Flannerys Paddington, , 219 Given Terrace, PADDINGTON, , ","FLPADD FROZEN - 080525",2025-05-14,"2025-05-14 16:49:38","METRO 1",2,0,0,0,6
+26515,"Flannerys Robina, , 42 Scotsdale Drive, ROBINA, , ","FLROBINA CHILLED - 080525",2025-05-14,"2025-05-14 15:05:37","GOLD COAST",1,0,0,0,20
+26515,"Flannerys Robina, , 42 Scotsdale Drive, ROBINA, , ","FLROBINA FROZEN - 080525",2025-05-14,"2025-05-14 15:05:42","GOLD COAST",1,0,0,0,14
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ",G-145127,2025-05-09,"2025-05-12 12:58:06","GOLD COAST",3,0,0,0,21
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",G-145438,2025-05-15,"2025-05-15 15:25:39","SUNSHINE COAST",5,0,0,0,50
+24839,"Flannerys Miami, , 44 Pacific Avenue, MIAMI, , ",G-145591,2025-05-14,"2025-05-14 13:35:50","GOLD COAST",3,0,0,0,24
+26515,"Flannerys Robina, , 42 Scotsdale Drive, ROBINA, , ",G-145592,2025-05-14,"2025-05-14 15:05:42","GOLD COAST",2,0,0,0,34
+24214,"Flannery's Mona Vale, , 12-14 Park Street, MONA VALE, , ",G-145593,2025-05-14,"2025-05-15 10:15:39","QLD to NSW Shuttle",3,0,0,0,98
+23978,"Flannerys Chermiside, , 628 Rode Rd, CHERMSIDE, , ",G-145594,2025-05-16,"2025-05-16 11:57:42","METRO 1",3,0,0,0,30
+24897,"Fundies Lismore, , 140 Keen Street, LISMORE, , ",G-145595,2025-05-16,"2025-05-16 13:28:21",LISMORE,2,0,0,0,10
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ",G-145596,2025-05-16,"2025-05-16 11:15:43","GOLD COAST",2,0,0,0,20
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ","GCOM CHILLED - 010525",2025-05-09,"2025-05-12 12:58:06","GOLD COAST",2,0,0,0,14
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ","GCOM CHL 160525",2025-05-16,"2025-05-16 11:15:43","GOLD COAST",1,0,0,0,10
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ","GCOM FROZEN - 010525",2025-05-09,"2025-05-12 12:58:06","GOLD COAST",1,0,0,0,7
+24121,"Gold Coast Organic Meats, , 64 Karbunya St, MERMAID WATERS, , ","GCOM FRZ 160525",2025-05-16,"2025-05-16 11:15:37","GOLD COAST",1,0,0,0,10
+23020,"Gold Coast Pet Centre, , Unit 4/110 Korkum Dive, BURLEIGH HEADS, , ",GCPC86140,2025-05-16,"2025-05-22 13:27:23","GOLD COAST",4,0,0,0.192,50
+22162,"Chill Qld, , 24 Octal Street, YATALA, , ","Godden Collection 130525",2025-05-13,"2025-05-13 13:39:38","GOLD COAST",0,3,0,5.293,1200
+25800,"Good Things Grocer, , 304 Toohey Rd, TARRAGINDI, , ","Good Things Grocer 14.05",2025-05-16,"2025-05-16 11:05:38","METRO 1",2,0,0,0.054,8
+24923,"Ground Grocer, , 2 Village Way, CURRUMBIN VALLEY, , ","GROUND FROZEN - 080525",2025-05-16,"2025-05-16 11:11:44","GOLD COAST",1,0,0,0,14
+1660,"Hawthorne Garage, , 285 Hawthorne Road, HAWTHORNE, , ","HAW CHL 160525",2025-05-16,"2025-05-16 11:57:38","METRO 1",3,0,0,0,15
+23974,"Hathorne Garage, , 285 Hathorne Rd, HAWTHORNE, , ","HAWTHORNE CHILLED - 010525",2025-05-08,"2025-05-12 12:58:46","METRO 1",3,0,0,0,21
+23974,"Hathorne Garage, , 285 Hathorne Rd, HAWTHORNE, , ","HAWTHORNE CHILLED - 080525",2025-05-14,"2025-05-14 15:59:40","METRO 1",2,0,0,0,21
+25925,"Hey Mr, , 1/76 Moray St, NEW FARM, , ","Hey Mr 13.05",2025-05-14,"2025-05-14 08:27:45","METRO 1",1,0,0,0.027,4
+26469,"Hudson And Rosie's Table, , 16/106 Alexander Drive, HIGHLAND PARK, , ","Hudson and Rosie's Table 13.05",2025-05-14,"2025-05-14 10:31:41","GOLD COAST",2,0,0,0.054,8
+4421,"Waynes World, , 8/1440 New Cleveland Road, CHANDLER, , ",INV-0000015267,2025-05-12,"2025-05-12 12:21:45",BAYSIDE,0,2,0,3.529,1400
+25483,"Armidale Ex Services Club, , 137 Dumaresq Street, ARMIDALE, , ",INV-00018981-FROZEN,2025-05-12,"2025-05-14 06:03:13","NORTHERN NSW",7,1,0,1.764,273
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV-00019030,2025-05-12,"2025-05-13 07:16:36","SUNSHINE COAST",7,0,0,0.165,108
+24873,"Sundaes At The Pier, , Shop 3, 577 The Esplanade, URANGAN, , ",INV-00019030,2025-05-13,"2025-05-13 10:39:39","HERVEY BAY",7,0,0,0.165,108
+24666,"Farm Shed Fruit Stall, , 27875 Bruce Highway, ISIS RIVER, , ",INV-00019031,2025-05-13,"2025-05-13 09:40:09","HERVEY BAY",3,0,0,0.165,108
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV-00019031,2025-05-12,"2025-05-13 07:16:36","SUNSHINE COAST",3,0,0,0.165,108
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV-00019060,2025-05-15,"2025-05-16 06:27:21","Warehouse Inbound",0,1,0,1.764,400
+26498,"Petbarn Mermaid Waters, , D11-q Suprcntr,cnr Market & Bermuda St, MERMAID WATERS, , ",INV-2041882,2025-05-12,"2025-05-12 14:47:46","GOLD COAST",1,0,0,0.017,7
+26508,"Petbarn Upper Coomera, , Shop 9, 1-13 Coomera Grand Drive, UPPER COOMERA, , ",INV-2041884,2025-05-12,"2025-05-12 08:17:47","GOLD COAST",1,0,0,0.017,7
+3778,"Petbarn Morayfield Supercentre, , Shop 19, 312-344 Morayfield Road, MORAYFIELD, Morayfield, ",INV-2041885,2025-05-12,"2025-05-12 12:35:57","METRO 2",2,0,0,0.034,14
+13123,"Petbarn Logan, , Shop 5 J&k Hyperdome Home Cntr, LOGANHOLME, , ",INV-2041886,2025-05-12,"2025-05-12 13:47:40","METRO 2",1,0,0,0.017,7
+13133,"Petbarn Pimpama, , Cnr Pacific Hwy & Yawalpah Rd, PIMPAMA, , 473",INV-2041887,2025-05-14,"2025-05-14 09:25:47","GOLD COAST",1,0,0,0.017,7
+13394,"Petbarn Smithfield, , Shopping Cntr, Cnr Captain Cook And Kennedy Hwys, SMITHFIELD, , ",INV-2041888,2025-05-15,"2025-05-19 11:14:32",CAIRNS,1,0,0,0.017,7
+26485,"Petbarn Cairns, , 270 Mulgrave Rd, WESTCOURT, , ",INV-2041901,2025-05-15,"2025-05-19 11:14:32",CAIRNS,1,0,0,0.017,7
+26503,"Petbarn Springfield, , 1 Main Street - Orion Central, SPRINGFIELD, , ",INV-2041902,2025-05-12,"2025-05-13 07:18:06","METRO 2",2,0,0,0.034,14
+26490,"Petbarn Gladstone, , W7/216-226 Phillip St, GLADSTONE, , ",INV-2041903,2025-05-12,"2025-05-12 12:19:43",GLADSTONE,1,0,0,0.017,7
+26500,"Petbarn North Lakes, , 55 Flinders Parade, NORTH LAKES, , ",INV-2041904,2025-05-12,"2025-05-12 13:27:40","METRO 2",1,0,0,0.034,14
+26501,"Petbarn Oxenford, , 3/4 Global Plaza, OXENFORD, , ",INV-2041905,2025-05-12,"2025-05-12 16:45:42","GOLD COAST",1,0,0,0.017,7
+26493,"Petbarn Kawana, , 1 Nicklin Way, MINYAMA, , ",INV-2041906,2025-05-12,"2025-05-12 09:47:45","SUNSHINE COAST",1,0,0,0.017,7
+26482,"Petbarn Browns Plains, , 48 Browns Plains Rd, BROWNS PLAINS, , ",INV-2041907,2025-05-12,"2025-05-13 07:18:45","METRO 2",1,0,0,0.017,7
+25030,"Petbarn Mt Gravatt, , 1290 Logan Rd, MT GRAVATT, , ",INV-2041908,2025-05-12,"2025-05-12 16:47:42","METRO 1",1,0,0,0.017,7
+26507,"Petbarn Underwood (cf), , 2946 Logan Rd, UNDERWOOD, , ",INV-2041909,2025-05-14,"2025-05-14 09:25:53","METRO 1",1,0,0,0.017,7
+26499,"Petbarn Morayfield North, , 113-137 Morayfield Rd, MORAYFIELD, , ",INV-2041910,2025-05-12,"2025-05-12 12:21:39","METRO 2",2,0,0,0.034,14
+26497,"Petbarn Maroochydore, , 68 Wises Rd, MAROOCHYDORE, , ",INV-2041912,2025-05-12,"2025-05-12 09:27:46","SUNSHINE COAST",1,0,0,0.017,7
+24825,"Petbarn Victoria Point, , 349-369 Colburn Ave, VICTORIA POINT, , ",INV-2041913,2025-05-12,"2025-05-12 13:05:44",BAYSIDE,1,0,0,0.034,14
+26506,"Petbarn Tweed Heads, , 29-41 Greenway Dr, TWEED HEADS, , ",INV-2041914,2025-05-16,"2025-05-16 15:07:40","NORTHERN RIVERS",1,0,0,0.017,7
+26491,"Petbarn Hervey Bay, , Stockland Hb, 6 Central Av, URRAWEEN, , ",INV-2041915,2025-05-13,"2025-05-13 11:11:37","HERVEY BAY",1,0,0,0.017,7
+26483,"Petbarn Bundaberg, , T5, 21 Johanna Bvd, KENSINGTON, , ",INV-2041916,2025-05-12,"2025-05-12 09:36:17",BUNDABERG,1,0,0,0.017,7
+26480,"Petbarn Bald Hills, , 1915 Gympie Rd, BALD HILLS, , ",INV-2041919,2025-05-12,"2025-05-12 16:51:57","METRO 2",1,0,0,0.017,7
+25144,"Petbarn Kenmore, , 13 Marshall Lane, KENMORE, , ",INV-2041920,2025-05-14,"2025-05-14 11:03:38","METRO 1",1,0,0,0.017,7
+26509,"Petbarn Virginia, , 4/1814 Sandgate Rd, VIRGINIA, , ",INV-2041921,2025-05-12,"2025-05-12 16:50:46","METRO 1",1,0,0,0.017,7
+26487,"Petbarn Cannon Hill, , 1881 Creek Rd, CANNON HILL, , ",INV-2041922,2025-05-12,"2025-05-12 16:49:15","METRO 1",1,0,0,0.017,7
+26502,"Petbarn Rothwell, , Unit 3/439-443 Anzac Ave, ROTHWELL, , ",INV-2041923,2025-05-12,"2025-05-12 13:47:51","METRO 2",2,0,0,0.034,14
+26495,"Petbarn Lismore, , Shop Bg3, Lismore Sq, LISMORE, , ",INV-2041924,2025-05-16,"2025-05-16 13:28:28",LISMORE,1,0,0,0.017,7
+26492,"Petbarn Ipswich, , Riverlink Sc Cnr Pine & Terrace, IPSWICH, , ",INV-2041925,2025-05-14,"2025-05-14 15:01:45","METRO 2",1,0,0,0.017,7
+26486,"Petbarn Caloundra, , 2 Sydal St, CALOUNDRA, , ",INV-2041926,2025-05-13,"2025-05-13 10:41:49","SUNSHINE COAST",1,0,0,0.017,7
+26481,"Petbarn Booval, , Shop C, Booval Fair Shop Centre, BOOVAL, , ",INV-2041927,2025-05-14,"2025-05-14 15:03:58","METRO 2",1,0,0,0.017,7
+1870,"Petbarn Lawnton, Store Manager, 640 Gympie Road,, LAWNTON, LAWNTON, ",INV-2041940,2025-05-15,"2025-05-15 12:07:43","METRO 1",1,0,0,0.017,7
+26511,"Petbarn Woolloongabba, , 114 Logan Rd, WOOLLOONGABBA, , ",INV-2042182,2025-05-16,"2025-05-16 16:05:36","METRO 1",1,0,0,0.017,7
+26496,"Petbarn Macgregor, , 1/544 Kessels Road, MACGREGOR, , ",INV-2042183,2025-05-12,"2025-05-12 16:45:53","METRO 1",1,0,0,0.017,7
+1860,"Petbarn Mitchelton, Store Manager, 45 Osborne Road,, MITCHELTON, MITCHELTON, ",INV-2042184,2025-05-15,"2025-05-15 13:37:41","METRO 1",1,0,0,0.017,7
+26494,"Petbarn Kedron, , 561 Gympie Rd, KEDRON, , ",INV-2042185,2025-05-12,"2025-05-12 16:52:57","METRO 1",1,0,0,0.017,7
+26510,"Petbarn Windsor, , 410/142 Newmarket Rd, WINDSOR, , ",INV-2042186,2025-05-13,"2025-05-13 14:11:51","METRO 1",1,0,0,0.017,7
+26484,"Petbarn Burleigh Heads, , 2/50 Kortum Dr, BURLEIGH HEADS, , ",INV-2042187,2025-05-12,"2025-05-12 12:05:41","GOLD COAST",1,0,0,0.017,7
+24820,"Petbarn Toowoomba, , 2a-a 910-932 Ruthven St, TOOWOOMBA, , ",INV-2042188,2025-05-12,"2025-05-12 12:26:47",TOOWOOMBA,1,0,0,0.017,7
+24820,"Petbarn Toowoomba, , 2a-a 910-932 Ruthven St, TOOWOOMBA, , ","INV-2042188 T2",2025-05-13,"2025-05-14 06:02:51",TOOWOOMBA,1,0,0,0.017,7
+26512,"Petbarn Wynnum, , 4/2021 Wynnum Rd, WYNNUM, , ",INV-2042189,2025-05-13,"2025-05-13 12:59:43",BAYSIDE,1,0,0,0.017,7
+1655,"Aldi, , 55 Burnside Rd, STAPYLTON, , ","INV-23866/ 8504258586 T2",2025-05-15,"2025-05-15 07:09:41","METRO 2",0,1,0,1.08,205.2
+181,"Bidfood Brisbane, , 59 Pegasus Drive, MORNINGSIDE, , Bidfood Brisbane","INV-23975/ P8337217.BRI",2025-05-15,"2025-05-15 12:49:44","METRO 1",0,1,0,1.35,297
+26546,"Moco Food Services, , 60 Parade Ground Place, WACOL, , ","INV-23979/ 408190",2025-05-12,"2025-05-12 13:45:24","METRO 1",0,1,0,1.765,118.8
+23261,"Connectr Group, Attn: Stephen Little, 16 Kalamunda Close, ELANORA, , ","INV-23989/ Stephen Little Pick Up 13.05",2025-05-14,"2025-05-15 06:56:24","Warehouse Outbound",1,0,0,0.01,2.2
+12977,"Bidfood - Botany, , 14 Mcpherson Street, BANKSMEADOW, , ","INV-24001/ P8340654",2025-05-14,"2025-05-16 10:34:39","QLD to NSW Shuttle",0,1,0,1.764,386.2
+26513,"Petstock Cairns, , 287 Mulgrave Road, BUNGALOW, , ",INV-2835887,2025-05-12,"2025-05-14 06:03:13",CAIRNS,2,0,0,0.034,14
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV210865,2025-05-12,"2025-05-12 14:33:37","METRO 2",0,1,0,1.271,200
+26542,"Cairns Marine, , 14 Industrial Avenue, STRATFORD, , ",INV210865,2025-05-13,"2025-05-15 11:14:00",CAIRNS,0,1,0,1.271,200
+26582,"Roxy Aquarium, , 1b Fleet Street, SOMERTON, , ",INV210907,2025-05-14,"2025-05-16 12:08:39","QLD to VIC Shuttle",9,0,0,0.288,45
+25357,"Aquarium Cleaning, , 1 Overnewton Way, WOLLERT, , ",INV210909,2025-05-14,"2025-05-16 12:56:14","QLD to VIC Shuttle",4,0,0,0.128,20
+26583,"Lots Of Fins Aquarium, , 96 Victor Cres, NARRE WARREN, , ",INV210916,2025-05-14,"2025-05-16 18:18:36","QLD to VIC Shuttle",2,0,0,0.064,10
+26584,"Jurassic Jungle, , 743 Mountain Highway, BAYSWATER, , ",INV210924,2025-05-14,"2025-05-16 14:24:37","QLD to VIC Shuttle",4,0,0,0.128,20
+25807,"Kellyville Pets, , 106 Windsor Rd, KELLYVILLE, , ",INV210939,2025-05-14,"2025-05-15 17:08:37","QLD to NSW Shuttle",6,0,0,0.192,30
+25303,"Asylum Aquatics, , U2/1 Casuarina Street, OAK FLATS, , ",INV210940,2025-05-14,"2025-05-16 15:07:46","QLD to NSW Shuttle",3,0,0,0.096,15
+25243,"Fishtopia Aquarium, , Unit 1/ 18 Blaxland Road, CAMPBELLTOWN, , ",INV210953,2025-05-14,"2025-05-15 11:34:42","QLD to NSW Shuttle",4,0,0,0.128,20
+25305,"Fish World Aquarium, , 164 Cheltenham Road, DANDENONG, , ",INV210985,2025-05-14,"2025-05-20 13:51:38","QLD to VIC Shuttle",11,0,0,0.352,55
+24721,"Meals On Wheels Wollonong, , 99 Swan Street, WOLLONGONG, , ",INV554247,2025-05-02,"2025-05-12 08:25:15","QLD to NSW Shuttle",0,2,0,3.529,1400
+22732,"Meals On Wheels, , 1 Gribble Place, BLACKTOWN, , ",INV554683,2025-05-09,"2025-05-14 13:42:38","QLD to NSW Shuttle",0,1,0,1.764,460
+23068,"Meals On Wheels Central Coast, , 6/10 Pioneer Avenue, TUGGERAH, , ",INV554916,2025-05-09,"2025-05-14 12:26:38","QLD to NSW Shuttle",0,2,0,3.529,1300
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV555352,2025-05-14,"2025-05-15 06:56:24","GOLD COAST",0,1,0,1.764,700
+23068,"Meals On Wheels Central Coast, , 6/10 Pioneer Avenue, TUGGERAH, , ",INV555352,2025-05-14,"2025-05-16 12:42:38","QLD to NSW Shuttle",0,1,0,1.764,700
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV555354,2025-05-16,"2025-05-16 12:52:45","GOLD COAST",0,1,0,1.764,700
+22732,"Meals On Wheels, , 1 Gribble Place, BLACKTOWN, , ",INV555354,2025-05-16,"2025-05-21 13:24:39","QLD to NSW Shuttle",0,1,0,1.764,700
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV555716,2025-05-14,"2025-05-15 06:56:24","GOLD COAST",0,1,0,1.764,750
+24850,"Sutherland Food Services, , 430 Kingsway, CARINGBAH, , ",INV555716,2025-05-14,"2025-05-16 12:48:47","QLD to NSW Shuttle",0,1,0,1.764,750
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",INV556082,2025-05-16,"2025-05-16 12:52:47","GOLD COAST",0,2,0,3.529,1400
+23068,"Meals On Wheels Central Coast, , 6/10 Pioneer Avenue, TUGGERAH, , ",INV556082,2025-05-16,"2025-05-21 14:08:39","QLD to NSW Shuttle",0,2,0,3.529,1400
+26578,"The Green Edge-cale, , 2b/229 Lutwyche Rd, WINDSOR, , ",INV5584,2025-05-14,"2025-05-14 14:15:51","METRO 1",0,1,0,0.4,185
+10031,"Coles Adelaide St, , 79 Adelaide Street, BRISBANE CITY, , ",KKB112655,2025-05-07,"2025-05-12 12:38:18","METRO 1",1,0,0,0.024,3
+12902,"The Star Gold Coast, The Star Gold Coast, South Loading Dock, 14 Casino Drive, BROADBEACH, , ",KKB112714,2025-05-09,"2025-05-12 08:21:12","GOLD COAST",2,0,0,0.048,6
+12902,"The Star Gold Coast, The Star Gold Coast, South Loading Dock, 14 Casino Drive, BROADBEACH, , ","KKB112714 T2",2025-05-14,"2025-05-14 12:15:46","GOLD COAST",2,0,0,0.048,6
+25613,"Firm-n-fresh, Eric, Shop 9/155 Nineteenth Avenue, ELANORA, , ",KKB112736,2025-05-09,"2025-05-16 09:28:25","GOLD COAST",4,0,0,0.096,16
+12902,"The Star Gold Coast, The Star Gold Coast, South Loading Dock, 14 Casino Drive, BROADBEACH, , ",KKB112829,2025-05-14,"2025-05-15 06:56:25","GOLD COAST",2,0,0,0.048,6
+26570,"Coles Local - Cs Ascot 4568, Coles Local - Cs Ascot 4568, Crn Beattrice Terrace & Racecourse Road, ASCOT, , ",KKB112850,2025-05-16,"2025-05-16 09:29:36","METRO 1",1,0,0,0.008,3
+24034,"Coles Local - Cs Taringa 4694, C/o Chill Qld, 24 Octal Street, YATALA, , ",KKB112904,2025-05-16,"2025-05-16 09:29:36","METRO 2",1,0,0,0.004,2
+25967,"Coles Local - Cs Adelaide Street 4334, C/o Chill Qld, 24 Octal Street, YATALA, , ",KKB112905,2025-05-16,"2025-05-16 09:29:36","METRO 2",1,0,0,0.001,4
+24038,"Coles Local Woolloongabba, , 795 Stanley Street, Woolloongabba, , ",KKB112906,2025-05-16,"2025-05-16 09:29:36","METRO 1",1,0,0,0.001,7
+26585,"Coles Local - Cs Coorparoo 4467, C/o Chill Qld, 24 Octal Street, YATALA, , ",KKB112907,2025-05-16,"2025-05-16 09:29:36","METRO 2",1,0,0,0.004,2
+24897,"Fundies Lismore, , 140 Keen Street, LISMORE, , ","LIS CHIL 160525",2025-05-16,"2025-05-16 13:28:21",LISMORE,1,0,0,0,5
+24897,"Fundies Lismore, , 140 Keen Street, LISMORE, , ","LIS FRZ 160525",2025-05-16,"2025-05-16 13:28:08",LISMORE,1,0,0,0,5
+26581,"Stanley Restaurant - Louis Tikaram, , 5 Boundary Street, BRISBANE, , ","LP's to Stanley Restaurant 08.05",2025-05-14,"2025-05-14 13:33:40","METRO 1",1,0,0,0.019,8
+26177,"Mas Espresso, , 66 Eagle St, BRISBANE, , ","Mas Espresso 13.05",2025-05-14,"2025-05-14 08:27:39","METRO 1",2,0,0,0.054,8
+21549,"Chill Qld, Chill Qld, 24 Octal Street, YATALA, , ","MF Stock Collection 09-05-2025",2025-05-12,"2025-05-12 11:23:39","SUNSHINE COAST",0,1,0,1.764,300
+25842,"Morning After, , 57 Vulture Street, WEST END, , ","Morning After 14.05",2025-05-16,"2025-05-16 11:49:45","METRO 1",2,0,0,0.054,8
+25843,"No Name Lane Cafe & Bar, , 17-19 Elizabeth Avenue, BROADBEACH, , ","No Name Lane Cafe & Bar 13.05",2025-05-14,"2025-05-14 12:51:38","GOLD COAST",2,0,0,0.054,8
+26564,"Katie Day, Katie Day, 25 Lichfield Place, PARKINSON, Parkinson, ",nosh-3530,2025-05-12,"2025-05-13 07:19:29","METRO 2",1,0,0,0.021,6.115
+26565,"Samara Dorz, Samara Dorz, 32 Winnam Street, STAFFORD, Stafford, ",nosh-3934,2025-05-13,"2025-05-13 14:53:39","METRO 1",1,0,0,0.026,11.13
+26246,"Kitrina Scott-davies, Kitrina Scott-davies, 5 Louise Street, KENMORE, Kenmore, ",nosh-3940,2025-05-12,"2025-05-12 10:29:37","METRO 1",1,0,0,0.021,6.115
+23977,"Nourish Lane, , 3 Swan Lane, MUDGEERABA, , ","NOURISH CHILLED - 010525",2025-05-09,"2025-05-12 08:23:27","GOLD COAST",1,0,0,0,4
+25854,"Solskin Beauty Labs Pty Ltd, Solskin Beauty Labs Pty Ltd, 54 Lakewood Blvd, Carrum Downs, 3201, Vic, Australia, CARRUM DOWNS, Melb, SOLSKIN","OC-1325( Solskin)",2025-05-14,"2025-05-16 17:18:36","QLD to NSW Shuttle",0,1,0,1.764,160
+25081,"Stoa Bokarina, Jasmin Smith, 42 Bokarina Boulevard, Shop 1, BOKARINA, , ",OMO11008,2025-05-13,"2025-05-13 11:49:41","SUNSHINE COAST",2,0,0,0,24
+22380,"Decisions Cafe, , 10 Capital Place, 4, BIRTINYA, , ",OMO11009,2025-05-15,"2025-05-15 13:37:46","SUNSHINE COAST",2,0,0,0,24
+24757,"Fresh Coffee Bar, Natalie Swan, 194 Varsity Parade, VARSITY LAKES, , ",OMO11013,2025-05-14,"2025-05-14 15:05:45","GOLD COAST",2,0,0,0,24
+11658,"Urban Eatery & Cafe, , 90 Surf Parade, Shop 4, BROADBEACH, , ",OMO11018,2025-05-14,"2025-05-14 12:17:41","GOLD COAST",5,0,0,0,60
+12748,"Old Maids, , 30 Tweed Street, BRUNSWICK HEADS, , ",OMO11036,2025-05-16,"2025-05-16 08:03:40","NORTHERN RIVERS",4,0,0,0,48
+23560,"Vibin Nutrition, Victoria Mckay, 100-106 Old Pacific Highway, 3a, OXENFORD, , ",OMO11042,2025-05-16,"2025-05-16 09:47:40","GOLD COAST",2,0,0,0,24
+25009,"Bidfood Yatala, , 18 Nyholt Dr, YATALA, , ",P8335439.YAT,2025-05-14,"2025-05-14 10:31:44","METRO 2",0,1,0,2,700
+26628,"Bidfood Goldcoast, , 7-9 William Banks Drive, BURLEIGH HEADS, , ",P8339899.GOL,2025-05-16,"2025-05-16 09:31:18","GOLD COAST",0,1,0,2,700
+25798,"Pancha Cafe, , 6/33 Racecourse Rd, HAMILTON, , ","Pancha Cafe 13.05",2025-05-14,"2025-05-14 09:55:57","METRO 1",1,0,0,0.027,4
+25933,"P.e Foods, , U1 149 North Road, LOGAN CENTRAL, , ","PE Foods Chilled Pallet 12-05-2025",2025-05-14,"2025-05-14 09:55:54","METRO 2",0,1,1,1.764,300
+26624,"Convenience Solutions Pty Ltd, , Unit 4/37 Mortimer Road, ACACIA RIDGE, , ",PO-00031/8000395756,2025-05-16,"2025-05-20 12:18:33","METRO 1",0,3,3,6,756
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",PO220273,2025-05-14,"2025-05-14 11:14:02","METRO 1",0,2,2,3.529,1400
+25962,"Royal Foods, , 248 Fleming Road, HEMMANT, , ",PO220273,2025-05-14,"2025-05-14 11:41:39","METRO 1",0,2,2,3.529,1400
+8157,"Flannery's Maroochydore - Doca, , Shop 1 Central One 45 Plaza Pde, MAROOCHYDORE, , ",PO622660,2025-05-12,"2025-05-12 10:17:44","SUNSHINE COAST",4,0,0,0,48
+22162,"Chill Qld, , 24 Octal Street, YATALA, , ",POR2040545,2025-05-15,"2025-05-15 13:47:38","METRO 2",0,20,10,35.288,9600
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",PU915009,2025-05-15,"2025-05-15 13:47:45","METRO 1",0,2,2,3.529,1400
+11892,"Pfd Food Service G/coast, , 1 Wollemi Place (via Sussyer), TWEED HEADS, , ",PU915009,2025-05-16,"2025-05-16 11:49:40","NORTHERN RIVERS",0,2,2,3.529,1400
+24859,"Pfd Qld, , 38 Freight St, LYTTON, , ","PU916985 T2 - Deliver under PD706232",2025-05-13,"2025-05-13 16:43:40","METRO 1",0,3,3,5.293,1600
+22708,"Chill Qld, , 24 Octal Street, YATALA, , ","QLD stock transfer 07.05.25",2025-05-14,"2025-05-15 06:55:13","Warehouse Inbound",60,1,0,2.88,600
+6556,"Sunshine Coast Organic Meats, , 5/330 Mons Rd, FOREST GLEN, Sunshine Coast, ","Return Stock - IGA Mooloolha",2025-05-13,"2025-05-13 12:59:40","SUNSHINE COAST",1,0,0,0,6
+26627,"Chill Qld, , 24 Octal St, YATALA, , ","Revel Pallet",2025-05-16,"2025-05-19 11:14:04","Warehouse Inbound",0,1,0,2.036,600
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RPOR-43867 / RSOR-80633",2025-05-12,"2025-05-12 16:01:42","GOLD COAST",40,1,1,1.764,1000
+10192,"Global Imports, Dave Donnely, 4 / 18 Owen Creek Rd, FOREST GLEN, Qld, ","RPOR-43867 / RSOR-80633",2025-05-13,"2025-05-13 12:23:39","SUNSHINE COAST",40,1,1,1.764,1000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RPOR-44135 / RELEASE NO - 703 ",2025-05-14,"2025-05-14 11:13:53","METRO 1",0,1,1,1.764,960
+6881,"Orbatran Logistics, Rod, 1201 Lytton Rd, HEMMANT, , ","RPOR-44135 / RELEASE NO - 703 ",2025-05-14,"2025-05-14 14:11:39","METRO 1",0,1,1,1.764,960
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RPOR-44240 / RSOR-81079 Release # 124",2025-05-14,"2025-05-14 10:35:41","METRO 1",200,4,4,7.058,3000
+10192,"Global Imports, Dave Donnely, 4 / 18 Owen Creek Rd, FOREST GLEN, Qld, ","RPOR-44240 / RSOR-81079 Release # 124",2025-05-15,"2025-05-15 11:25:48","SUNSHINE COAST",200,4,4,7.058,3000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RPOR-44426 T2",2025-05-12,"2025-05-12 08:59:38","METRO 1",0,1,0,1.764,960
+6881,"Orbatran Logistics, Rod, 1201 Lytton Rd, HEMMANT, , ","RPOR-44426 T2",2025-05-12,"2025-05-12 09:37:47","METRO 1",0,1,0,1.764,960
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RPOR-44565 / RSOR-81506 ",2025-05-16,"2025-05-16 09:51:46","METRO 1",300,5,3,8.822,3000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-80630,2025-05-14,"2025-05-14 16:05:56","METRO 1",360,6,6,10.586,5400
+10192,"Global Imports, Dave Donnely, 4 / 18 Owen Creek Rd, FOREST GLEN, Qld, ",RSOR-80630,2025-05-15,"2025-05-15 11:25:53","SUNSHINE COAST",360,6,6,10.586,5400
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81055,2025-05-15,"2025-05-15 10:56:30","METRO 1",58,2,1,3.529,1000
+21984,"Le Sunrise Polynesian Takeaway Northside, Tino, 41-51 Bailey Road, DECEPTION BAY, , ",RSOR-81055,2025-05-16,"2025-05-15 10:56:36","METRO 2",58,2,1,3.529,1000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81220,2025-05-14,"2025-05-14 16:05:47","METRO 1",84,2,2,3.529,1807.74
+7196,"Sunvalley Fine Foods, , Unit 6 - 5 Cedarbrook Drive, FOREST GLEN, , ",RSOR-81220,2025-05-15,"2025-05-15 14:25:48","SUNSHINE COAST",84,2,2,3.529,1807.74
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81271,2025-05-12,"2025-05-12 09:39:40","METRO 1",86,2,2,3.529,1975
+10192,"Global Imports, Dave Donnely, 4 / 18 Owen Creek Rd, FOREST GLEN, Qld, ",RSOR-81271,2025-05-13,"2025-05-13 12:23:42","SUNSHINE COAST",86,2,2,3.529,1975
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81315,2025-05-13,"2025-05-13 16:44:45","METRO 1",90,2,2,3.529,1920.5
+21984,"Le Sunrise Polynesian Takeaway Northside, Tino, 41-51 Bailey Road, DECEPTION BAY, , ",RSOR-81315,2025-05-14,"2025-05-14 15:14:23","METRO 2",90,2,2,3.529,1920.5
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RSOR-81329 / PO-00002765",2025-05-13,"2025-05-13 16:45:14","METRO 1",50,2,1,3.529,1000
+11158,"Frontier Pets Pty Ltd, , 1173 KINGSFORD SMITH DRIVE, PINKENBA, , ","RSOR-81329 / PO-00002765",2025-05-13,"2025-05-13 16:45:51","METRO 1",50,2,1,3.529,1000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81442,2025-05-12,"2025-05-12 09:39:49","METRO 1",48,1,1,1.764,1000
+23709,"Filla Foods, , 42 Burnside Road16, YATALA, , ",RSOR-81442,2025-05-13,"2025-05-13 08:17:39","METRO 2",48,1,1,1.764,1000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RSOR-81496 - PO-5810-REPLACEMENT",2025-05-14,"2025-05-14 16:03:43","METRO 1",50,1,1,1.764,1000
+23820,"Proudi - Sunshine Coast, Jackie, 9 Production Ave, WARANA, , ","RSOR-81496 - PO-5810-REPLACEMENT",2025-05-15,"2025-05-15 14:21:44","SUNSHINE COAST",50,1,1,1.764,1000
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052",RSOR-81557,2025-05-16,"2025-05-16 09:12:16","METRO 1",81,1,1,1.764,810
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","RSRQ-2462 / RSIN-81350",2025-05-15,"2025-05-15 14:35:47","SUNSHINE COAST",56,1,1,1.764,924
+6881,"Orbatran Logistics, Rod, 1201 Lytton Rd, HEMMANT, , ","RSRQ-2462 / RSIN-81350",2025-05-16,"2025-05-16 09:12:27","METRO 1",56,1,1,1.764,924
+26527,"Made - Kirra, , Retail 2/101 Musgrave St, COOLANGATTA, , ","S-10 - MADEK",2025-05-16,"2025-05-16 13:23:50","GOLD COAST",1,0,0,0,6
+26528,"Sidonie Newport, , 10 Lakeview Promenade, NEWPORT, , ","S-15 - SN",2025-05-15,"2025-05-15 10:41:54","METRO 2",1,0,0,0,6
+26529,"Sweet Tempered Chocolateria, , 2/18 Lanyana Way, NOOSA HEADS, , ","S-17 - STC",2025-05-15,"2025-05-15 12:07:37","SUNSHINE COAST",1,0,0,0,6
+26530,"Beaudesert Cafe, , 99 Brisbane St, BEAUDESERT, , ","S-18 - BC",2025-05-14,"2025-05-14 12:15:42","GOLD COAST",1,0,0,0,6
+26600,"Alcove Specialty Coffee, , 1/4 Wain Ave, ASHMORE, , ","S-19 - ASC",2025-05-16,"2025-05-16 09:51:55","GOLD COAST",1,0,0,0,6
+26531,"Boutique Functions, , 17 Glenview Rd, GLENVIEW, , ","S-34 - BF",2025-05-15,"2025-05-15 12:05:43","SUNSHINE COAST",1,0,0,0,6
+26532,"Thirteen Takeaway And Cafe, , 2 Golden Links Dr, MURWILLUMBAH, , ","S-35 - T",2025-05-16,"2025-05-16 16:13:36","NORTHERN RIVERS",1,0,0,0,6
+26533,"Wow Cafe And Studio, , Shop 7/1 Brygon Creek Dr, UPPER COOMERA, , ","S-37 - WOWCS",2025-05-14,"2025-05-14 08:55:38","GOLD COAST",1,0,0,0,6
+26534,"Gourmet Express Toowoomba, , Shop 4/125 Herries St, TOOWOOMBA CITY, , ","S-38 - GET",2025-05-15,"2025-05-16 06:27:28",TOOWOOMBA,1,0,0,0,6
+26535,"The Old Storehouse, , 30 Williams St, DAYBORO, , ","S-39 - TOS",2025-05-15,"2025-05-15 09:29:37","METRO 2",1,0,0,0,6
+26592,"Yami- Mup, , 2/1 Park St, BRUNSWICK HEADS, , ","S-4 - YMUP",2025-05-16,"2025-05-20 12:29:10","NORTHERN RIVERS",1,0,0,0,6
+26536,"Lulu's Cafe, , Shop 8/104 Dalley St, MULLUMBIMBY, , ","S-44 - LC",2025-05-16,"2025-05-16 08:03:42","NORTHERN RIVERS",1,0,0,0,6
+26537,"Kerb Cafe, , 66 Highfields Rd, HIGHFIELDS, , ","S-46 - KC",2025-05-15,"2025-05-16 06:27:28",TOOWOOMBA,1,0,0,0,6
+26538,"House Of Gabriel, , 106 Riverside Dr, TUMBULGUM, , ","S-47 - HG",2025-05-16,"2025-05-16 15:01:39","NORTHERN RIVERS",1,0,0,0,6
+26540,"Yves Cafe, , 1657 Gympie Rd, CARSELDINE, , ","S-57 - YVESC",2025-05-15,"2025-05-15 12:49:38","METRO 1",1,0,0,0,6
+26541,"Sheoak Shack Gallery Cafe, , 64 Fingal Rd, FINGAL HEAD, , ","S-65 - SSGC",2025-05-16,"2025-05-16 15:01:42","NORTHERN RIVERS",1,0,0,0,6
+26619,"Garden Of Eden, , 2/4 Machinery Dr, TWEED HEADS SOUTH, , ","S-81 - GE",2025-05-16,"2025-05-16 09:26:37","NORTHERN RIVERS",1,0,0,0,6
+26620,"Salacia Waters Cafe & Restaurant, , Shop/14 Marina Promenade, PARADISE POINT, , ","S-82 - SWCR",2025-05-16,"2025-05-16 09:52:17","GOLD COAST",1,0,0,0,6
+26573,"Stairwell Coffee, , 3131 Surfers Paradise Boulevard, SURFERS PARADISE, , ","Stairwell Coffee 13.05",2025-05-14,"2025-05-14 11:41:42","GOLD COAST",1,0,0,0.027,4
+22708,"Chill Qld, , 24 Octal Street, YATALA, , ","Stock transfer to QLD14.05.25",2025-05-16,"2025-05-19 11:14:05","Warehouse Inbound",60,0,0,2.88,600
+25740,"Andrew/chill, , 5/33 Meakin Road, MEADOWBROOK, , ","Sydney-Brisbane -  stock transfer 14.05",2025-05-16,"2025-05-16 09:12:23","METRO 2",13,0,0,0.048,12
+26351,"The Holliday Coffee, , 2251 Gold Coast Highway, MERMAID BEACH, , ","The Holliday Coffee 13.05",2025-05-14,"2025-05-14 12:51:43","GOLD COAST",2,0,0,0.054,8
+26333,"The Top Shop, , 65 Carlyle Street, BYRON BAY, , ","The Top Shop 14.05",2025-05-16,"2025-05-16 08:35:37","NORTHERN RIVERS",4,0,0,0.108,16
+1847,"Petbarn Rockhampton, Store Manager, 363 Yaama Road,, ROCKHAMPTON, ROCKHAMPTON, ",TOR435005,2025-05-08,"2025-05-12 08:23:00",ROCKHAMPTON,64,2,0,1.024,667
+1825,"Petbarn Palmerston, Store Manager, Unit B7, Gateway Shop Complex,1 Roystonea Avenue, YARRAWONGA, YARRAWONGA, ",TOR435017,2025-05-08,"2025-05-12 08:23:27",NT,76,2,0,1.129,659.898
+1824,"Petbarn Coconut Grove, Store Manager, 287 Bagot Road,, COCONUT GROVE, COCONUT GROVE, ",TOR435024,2025-05-08,"2025-05-12 08:23:27",NT,41,2,0,0.701,395.21
+13105,"Petbarn Bald Hills, , 1915 Gympie Rd, BALD HILLS, , ",TOR435460,2025-05-12,"2025-05-12 16:51:44","METRO 2",22,0,0,0.342,229.798
+1829,"Petbarn Burleigh, Store Manager, Unit 2, 50 Kortum Drive,, BURLEIGH HEADS, BURLEIGH HEADS, ",TOR435461,2025-05-12,"2025-05-12 12:05:46","GOLD COAST",26,0,0,0.325,252.71
+1831,"Petbarn Toowoomba, Store Manager, Unit 2A Building A ,910 - 932 Ruthven Street, KEARNEYS SPRING, TOOWOOMBA, ",TOR435462,2025-05-12,"2025-05-12 12:26:24",TOOWOOMBA,99,0,0,1.317,887.66
+1831,"Petbarn Toowoomba, Store Manager, Unit 2A Building A ,910 - 932 Ruthven Street, KEARNEYS SPRING, TOOWOOMBA, ","TOR435462 T2",2025-05-13,"2025-05-14 06:02:51",TOOWOOMBA,99,2,0,1.317,887.66
+13144,"Petbarn Virginia, , 4/1814 Sandgate Rd, VIRGINIA, , ",TOR435463,2025-05-12,"2025-05-12 16:50:32","METRO 1",27,0,0,0.469,285.528
+13113,"Petbarn Cannon Hill, , 1881 Creek Rd, CANNON HILL, , ",TOR435464,2025-05-12,"2025-05-12 16:49:28","METRO 1",37,0,0,0.534,345.623
+13135,"Petbarn Rothwell, , Unit 3/439-443 Anzac Ave, ROTHWELL, , ",TOR435465,2025-05-12,"2025-05-12 13:47:49","METRO 2",49,0,0,0.823,544.477
+13124,"Petbarn Macgregor, , 1/544 Kessels Rd, MACGREGOR, , ",TOR435466,2025-05-12,"2025-05-12 16:45:23","METRO 1",14,0,0,0.154,95.358
+13119,"Petbarn Jindalee, , 13b Hmc Goggs Rd, JINDALEE, , ",TOR435467,2025-05-12,"2025-05-12 11:07:40","METRO 1",27,0,0,0.349,234.786
+13136,"Petbarn Springfield, , 1 Main Street - Orion Central, SPRINGFIELD, , ",TOR435468,2025-05-12,"2025-05-12 07:17:00","METRO 2",32,0,0,0.604,364.536
+13131,"Petbarn North Lakes, , 55 Flinders Parade, NORTH LAKES, , ",TOR435469,2025-05-12,"2025-05-12 13:25:39","METRO 2",22,0,0,0.37,249.09
+13132,"Petbarn Oxenford, , 3/4 Global Plaza, OXENFORD, , ",TOR435470,2025-05-12,"2025-05-12 16:45:40","GOLD COAST",63,0,0,1.056,708.738
+13120,"Petbarn Kawana, , 1 Nicklin Way, MINYAMA, , ",TOR435471,2025-05-12,"2025-05-12 09:47:41","SUNSHINE COAST",27,2,0,0.413,279.9
+24024,"Petbarn Arundel, , 1 Telford Place, Arundel, , ",TOR435472,2025-05-12,"2025-05-12 15:55:42","GOLD COAST",25,0,0,0.311,238.972
+1853,"Petbarn Beenleigh, Store Manager, 3/137 George St,, BEENLEIGH, BEENLEIGH, ",TOR435473,2025-05-12,"2025-05-12 14:07:39","METRO 2",31,0,0,0.543,377.23
+13107,"Petbarn Browns Plains, , 48 Browns Plains Rd, BROWNS PLAINS, , ",TOR435474,2025-05-12,"2025-05-12 07:18:00","METRO 2",43,0,0,0.714,498.806
+1862,"Petbarn Mount Gravatt, Store Manager, 1290 Logan Road,, MOUNT GRAVATT, MOUNT GRAVATT, ",TOR435475,2025-05-12,"2025-05-12 16:47:29","METRO 1",32,0,0,0.523,297.542
+21356,"Petbarn Kedron, , 561 Gympie Rd, KEDRON, , ",TOR435476,2025-05-12,"2025-05-12 16:52:46","METRO 1",24,0,0,0.397,245.582
+1855,"Petbarn Burleigh Waters, Store Manager, Treetops Plaza,9 Classic Way, BURLEIGH WATERS, BURLEIGH WATERS, ",TOR435477,2025-05-12,"2025-05-12 12:51:40","GOLD COAST",32,0,0,0.529,344.986
+13129,"Petbarn Morayfield North, , 113-137 Morayfield Rd, MORAYFIELD, , ",TOR435478,2025-05-12,"2025-05-12 12:21:48","METRO 2",26,0,0,0.419,261.94
+1859,"Petbarn Maroochydore, Store Manager, 68 Wises Road,, MAROOCHYDORE, MAROOCHYDORE, ",TOR435479,2025-05-12,"2025-05-12 09:27:42","SUNSHINE COAST",58,2,0,0.975,641.137
+24825,"Petbarn Victoria Point, , 349-369 Colburn Ave, VICTORIA POINT, , ",TOR435480,2025-05-12,"2025-05-12 13:05:53",BAYSIDE,42,0,0,0.769,502.436
+1863,"Petbarn Nerang, Store Manager, 19 Hinkler Drive,, NERANG, NERANG, ",TOR435481,2025-05-12,"2025-05-12 08:59:45","GOLD COAST",27,0,0,0.458,306.31
+1871,"Petbarn Mermaid Waters, Store Manager, D11 - Q Super Centre, ,Crnr of Markeri and Bermuda St, MERMAID WATERS, MERMAID WATERS, ",TOR435482,2025-05-12,"2025-05-12 14:47:39","GOLD COAST",25,0,0,0.315,209.42
+3778,"Petbarn Morayfield Supercentre, , Shop 19, 312-344 Morayfield Road, MORAYFIELD, Morayfield, ",TOR435483,2025-05-12,"2025-05-12 12:35:52","METRO 2",42,0,0,0.716,481.555
+13123,"Petbarn Logan, , Shop 5 J&k Hyperdome Home Cntr, LOGANHOLME, , ",TOR435484,2025-05-12,"2025-05-12 13:47:45","METRO 2",45,0,0,0.738,481.81
+22053,"Petbarn Wilsonton, , Wilsonton Shopping Centre, WILSONTON, Wilsonton, ",TOR435485,2025-05-12,"2025-05-12 12:26:00",TOOWOOMBA,56,0,0,1.099,662.327
+22053,"Petbarn Wilsonton, , Wilsonton Shopping Centre, WILSONTON, Wilsonton, ","TOR435485 T2",2025-05-13,"2025-05-14 06:02:51",TOOWOOMBA,56,2,0,1.099,662.327
+25748,"Robina, , 5/20 Scottsdale Drive, ROBINA, Robina, ",TOR435486,2025-05-12,"2025-05-12 09:37:43","GOLD COAST",37,2,0,0.544,378.576
+1827,"Petbarn Bundall, Store Manager, 40 Upton Street,, BUNDALL, BUNDALL, ",TOR435487,2025-05-12,"2025-05-12 14:47:44","GOLD COAST",17,0,0,0.332,193.548
+13143,"Petbarn Upper Coomera, , Shop 9, 1-13 Coomera Grand Drive, UPPER COOMERA, , 8",TOR435491,2025-05-12,"2025-05-12 08:19:47","GOLD COAST",25,0,0,0.41,288.406
+3142,"Petbarn Windsor, , 142 Newmarket Road, WINDSOR, , ",TOR435651,2025-05-13,"2025-05-13 14:11:48","METRO 1",53,0,0,0.662,461.912
+13135,"Petbarn Rothwell, , Unit 3/439-443 Anzac Ave, ROTHWELL, , ",TOR435652,2025-05-13,"2025-05-13 10:41:44","METRO 2",16,0,0,0.194,117.69
+1845,"*Petbarn Cleveland, Store Manager, Units 3-4, 42 Shore Street Central,, ORMISTON, ORMISTON, ",TOR435653,2025-05-13,"2025-05-13 15:31:43",BAYSIDE,25,0,0,0.347,257.936
+1835,"Petbarn Caloundra, Store Manager, 2 Sydal Street,, CALOUNDRA, CALOUNDRA, ",TOR435654,2025-05-13,"2025-05-13 10:41:56","SUNSHINE COAST",56,0,0,0.92,630.778
+1843,"Petbarn Noosa, Store Manager, Shop EC04/5 Noosa Emporium Noosa Civic Centre,28 Eenie Creek Road, NOOSAVILLE, NOOSAVILLE, ",TOR435655,2025-05-13,"2025-05-13 14:51:40","SUNSHINE COAST",70,2,0,1.092,722.846
+1837,"Petbarn Gladstone, Store Manager, W7 Windmill Shopping Centre,216-226 Phillip Street, GLADSTONE, , ",TOR435656,2025-05-12,"2025-05-12 12:18:40",GLADSTONE,139,2,0,1.037,665.702
+13131,"Petbarn North Lakes, , 55 Flinders Parade, NORTH LAKES, , ",TOR435657,2025-05-13,"2025-05-13 11:49:38","METRO 2",11,0,0,0.177,127.406
+21354,"Petbarn Capalaba, , 2, 3 & 4/227-229 Old Cleveland Rd, CAPALABA, , ",TOR435658,2025-05-13,"2025-05-13 14:11:45",BAYSIDE,49,0,0,0.744,488.5
+1860,"Petbarn Mitchelton, Store Manager, 45 Osborne Road,, MITCHELTON, MITCHELTON, ",TOR435659,2025-05-13,"2025-05-13 14:53:48","METRO 1",50,0,0,0.797,524.955
+1859,"Petbarn Maroochydore, Store Manager, 68 Wises Road,, MAROOCHYDORE, MAROOCHYDORE, ",TOR435660,2025-05-13,"2025-05-13 11:47:44","SUNSHINE COAST",20,2,0,0.27,170.838
+1878,"Petbarn Hervey Bay, Store Manager, Stockland Shopping Centre,6 Central Ave., URRAWEEN, , ",TOR435661,2025-05-13,"2025-05-13 11:11:43","HERVEY BAY",60,2,0,0.944,593
+1868,"Petbarn Bundaberg, Store Manager, T5, 21 Johanna Boulevard,, KENSINGTON, , ",TOR435662,2025-05-12,"2025-05-12 09:35:10",BUNDABERG,57,2,0,1,571.82
+13145,"Petbarn Wynnum, , 4/2021 Wynnum Rd, WYNNUM, , ",TOR435663,2025-05-13,"2025-05-13 12:57:40",BAYSIDE,28,0,0,0.364,290.168
+13105,"Petbarn Bald Hills, , 1915 Gympie Rd, BALD HILLS, , ",TOR435843,2025-05-14,"2025-05-14 15:12:59","METRO 2",22,0,0,0.28,182.348
+25144,"Petbarn Kenmore, , 13 Marshall Lane, KENMORE, , ",TOR435844,2025-05-14,"2025-05-14 11:03:42","METRO 1",31,0,0,0.458,294.702
+1829,"Petbarn Burleigh, Store Manager, Unit 2, 50 Kortum Drive,, BURLEIGH HEADS, BURLEIGH HEADS, ",TOR435845,2025-05-14,"2025-05-14 13:33:48","GOLD COAST",21,0,0,0.248,181.32
+13113,"Petbarn Cannon Hill, , 1881 Creek Rd, CANNON HILL, , ",TOR435846,2025-05-14,"2025-05-14 16:43:40","METRO 1",37,0,0,0.529,354.944
+13118,"Petbarn Ipswich, , Riverlink Sc Cnr Pine & Terrace, IPSWICH, , ",TOR435847,2025-05-14,"2025-05-14 15:03:55","METRO 2",37,0,0,0.51,306.874
+13106,"Petbarn Booval, , Shop C, Booval Fair Shop Centre, BOOVAL, , ",TOR435848,2025-05-14,"2025-05-14 15:03:46","METRO 2",48,0,0,0.786,522.644
+13136,"Petbarn Springfield, , 1 Main Street - Orion Central, SPRINGFIELD, , ",TOR435849,2025-05-14,"2025-05-14 15:53:46","METRO 2",23,0,0,0.407,266.682
+13132,"Petbarn Oxenford, , 3/4 Global Plaza, OXENFORD, , ",TOR435850,2025-05-14,"2025-05-14 08:55:47","GOLD COAST",38,0,0,0.695,455
+24024,"Petbarn Arundel, , 1 Telford Place, Arundel, , ",TOR435851,2025-05-14,"2025-05-14 10:16:15","GOLD COAST",41,0,0,0.735,525.959
+13107,"Petbarn Browns Plains, , 48 Browns Plains Rd, BROWNS PLAINS, , ",TOR435852,2025-05-14,"2025-05-14 10:31:48","METRO 2",30,0,0,0.449,304.768
+1862,"Petbarn Mount Gravatt, Store Manager, 1290 Logan Road,, MOUNT GRAVATT, MOUNT GRAVATT, ",TOR435853,2025-05-14,"2025-05-14 15:01:50","METRO 1",23,0,0,0.336,248.157
+13142,"Petbarn Underwood (cf), , 2946 Logan Rd, UNDERWOOD, , ",TOR435854,2025-05-14,"2025-05-14 09:25:43","METRO 1",43,0,0,0.686,431.566
+21356,"Petbarn Kedron, , 561 Gympie Rd, KEDRON, , ",TOR435855,2025-05-14,"2025-05-14 15:11:57","METRO 1",25,0,0,0.453,243.628
+1855,"Petbarn Burleigh Waters, Store Manager, Treetops Plaza,9 Classic Way, BURLEIGH WATERS, BURLEIGH WATERS, ",TOR435856,2025-05-14,"2025-05-14 14:15:43","GOLD COAST",30,0,0,0.517,334.556
+24825,"Petbarn Victoria Point, , 349-369 Colburn Ave, VICTORIA POINT, , ",TOR435857,2025-05-14,"2025-05-14 15:01:43",BAYSIDE,28,0,0,0.494,273.573
+1863,"Petbarn Nerang, Store Manager, 19 Hinkler Drive,, NERANG, NERANG, ",TOR435858,2025-05-14,"2025-05-14 09:57:42","GOLD COAST",32,0,0,0.442,299.45
+21706,"Petbarn Indooroopilly, , Shop Mm005, 34 Coonan St, INDOOROOPILLY, , ",TOR435859,2025-05-14,"2025-05-14 12:53:41","METRO 1",43,0,0,0.392,279.2
+3412,"**Petbarn Newstead, , 142 Breakfast Creek Road, NEWSTEAD, , ",TOR435860,2025-05-14,"2025-05-14 15:53:44","METRO 1",52,0,0,0.689,464.918
+13133,"Petbarn Pimpama, , Cnr Pacific Hwy & Yawalpah Rd, PIMPAMA, , 473",TOR435861,2025-05-14,"2025-05-14 09:25:50","GOLD COAST",48,0,0,0.788,511.477
+25748,"Robina, , 5/20 Scottsdale Drive, ROBINA, Robina, ",TOR435862,2025-05-14,"2025-05-14 15:03:52","GOLD COAST",31,2,0,0.478,309.908
+1827,"Petbarn Bundall, Store Manager, 40 Upton Street,, BUNDALL, BUNDALL, ",TOR435863,2025-05-14,"2025-05-14 15:53:42","GOLD COAST",11,0,0,0.137,97.446
+13143,"Petbarn Upper Coomera, , Shop 9, 1-13 Coomera Grand Drive, UPPER COOMERA, , 8",TOR435868,2025-05-14,"2025-05-14 08:53:50","GOLD COAST",21,0,0,0.257,184.233
+13144,"Petbarn Virginia, , 4/1814 Sandgate Rd, VIRGINIA, , ",TOR436045,2025-05-15,"2025-05-15 10:05:56","METRO 1",30,0,0,0.385,305.432
+13135,"Petbarn Rothwell, , Unit 3/439-443 Anzac Ave, ROTHWELL, , ",TOR436046,2025-05-15,"2025-05-15 11:21:39","METRO 2",27,0,0,0.494,312.285
+1835,"Petbarn Caloundra, Store Manager, 2 Sydal Street,, CALOUNDRA, CALOUNDRA, ",TOR436047,2025-05-15,"2025-05-15 12:53:44","SUNSHINE COAST",36,0,0,0.564,368.996
+1851,"Petbarn Cairns, Store Manager, 270 Mulgrave Road, WESTCOURT, WESTCOURT, ",TOR436048,2025-05-15,"2025-05-19 11:14:06",CAIRNS,113,2,0,1.712,1032.87
+1843,"Petbarn Noosa, Store Manager, Shop EC04/5 Noosa Emporium Noosa Civic Centre,28 Eenie Creek Road, NOOSAVILLE, NOOSAVILLE, ",TOR436049,2025-05-15,"2025-05-15 12:51:39","SUNSHINE COAST",44,2,0,0.705,427.308
+13124,"Petbarn Macgregor, , 1/544 Kessels Rd, MACGREGOR, , ",TOR436050,2025-05-15,"2025-05-15 14:23:37","METRO 1",20,0,0,0.302,200.296
+13119,"Petbarn Jindalee, , 13b Hmc Goggs Rd, JINDALEE, , ",TOR436051,2025-05-15,"2025-05-15 12:07:53","METRO 1",36,0,0,0.422,316.904
+13131,"Petbarn North Lakes, , 55 Flinders Parade, NORTH LAKES, , ",TOR436052,2025-05-15,"2025-05-15 11:23:40","METRO 2",24,0,0,0.349,262.024
+13120,"Petbarn Kawana, , 1 Nicklin Way, MINYAMA, , ",TOR436053,2025-05-15,"2025-05-15 14:23:40","SUNSHINE COAST",24,2,0,0.415,238.772
+1853,"Petbarn Beenleigh, Store Manager, 3/137 George St,, BEENLEIGH, BEENLEIGH, ",TOR436054,2025-05-15,"2025-05-15 10:43:44","METRO 2",24,0,0,0.469,285.35
+1860,"Petbarn Mitchelton, Store Manager, 45 Osborne Road,, MITCHELTON, MITCHELTON, ",TOR436055,2025-05-15,"2025-05-15 13:37:49","METRO 1",33,0,0,0.526,332.162
+13129,"Petbarn Morayfield North, , 113-137 Morayfield Rd, MORAYFIELD, , ",TOR436056,2025-05-15,"2025-05-15 12:07:55","METRO 2",34,0,0,0.604,366.466
+1859,"Petbarn Maroochydore, Store Manager, 68 Wises Road,, MAROOCHYDORE, MAROOCHYDORE, ",TOR436057,2025-05-15,"2025-05-15 10:41:50","SUNSHINE COAST",35,2,0,0.578,376.668
+3778,"Petbarn Morayfield Supercentre, , Shop 19, 312-344 Morayfield Road, MORAYFIELD, Morayfield, ",TOR436058,2025-05-15,"2025-05-15 12:51:46","METRO 2",33,0,0,0.501,358.05
+13123,"Petbarn Logan, , Shop 5 J&k Hyperdome Home Cntr, LOGANHOLME, , ",TOR436059,2025-05-15,"2025-05-15 10:43:40","METRO 2",43,0,0,0.703,483.77
+10978,"Petbarn Smithfield, , Captain Cook Highway, Smithfield Shopping Centre, Shop Mm02, SMITHFIELD, Smithfield, ",TOR436060,2025-05-15,"2025-05-15 11:14:00",CAIRNS,60,2,0,1.046,686.71
+1870,"Petbarn Lawnton, Store Manager, 640 Gympie Road,, LAWNTON, LAWNTON, ",TOR436061,2025-05-15,"2025-05-15 12:07:40","METRO 1",51,0,0,0.822,541.44
+26387,"Richlands, , 215 Government Road, RICHLANDS, Richlands, ",TOR436063,2025-05-15,"2025-05-15 12:07:46","METRO 1",23,0,0,0.38,278.823
+13105,"Petbarn Bald Hills, , 1915 Gympie Rd, BALD HILLS, , ",TOR436268,2025-05-16,"2025-05-16 16:16:31","METRO 2",22,0,0,0.324,237.896
+13113,"Petbarn Cannon Hill, , 1881 Creek Rd, CANNON HILL, , ",TOR436269,2025-05-16,"2025-05-16 16:13:36","METRO 1",28,0,0,0.466,292.205
+1976,"Petbarn Lismore, , Diadem Street, LISMORE, , ",TOR436270,2025-05-16,"2025-05-16 13:27:56",LISMORE,68,2,0,1.085,727.706
+1845,"*Petbarn Cleveland, Store Manager, Units 3-4, 42 Shore Street Central,, ORMISTON, ORMISTON, ",TOR436271,2025-05-16,"2025-05-16 17:05:40",BAYSIDE,23,0,0,0.39,261.298
+13136,"Petbarn Springfield, , 1 Main Street - Orion Central, SPRINGFIELD, , ",TOR436272,2025-05-16,"2025-05-16 12:35:43","METRO 2",19,0,0,0.354,241.839
+13132,"Petbarn Oxenford, , 3/4 Global Plaza, OXENFORD, , ",TOR436273,2025-05-16,"2025-05-16 09:47:45","GOLD COAST",30,0,0,0.464,288.35
+24024,"Petbarn Arundel, , 1 Telford Place, Arundel, , ",TOR436274,2025-05-16,"2025-05-16 11:55:42","GOLD COAST",15,0,0,0.18,159.754
+13107,"Petbarn Browns Plains, , 48 Browns Plains Rd, BROWNS PLAINS, , ",TOR436275,2025-05-16,"2025-05-16 15:07:38","METRO 2",29,0,0,0.439,296.85
+21354,"Petbarn Capalaba, , 2, 3 & 4/227-229 Old Cleveland Rd, CAPALABA, , ",TOR436276,2025-05-16,"2025-05-16 17:05:39",BAYSIDE,38,0,0,0.71,484.032
+1862,"Petbarn Mount Gravatt, Store Manager, 1290 Logan Road,, MOUNT GRAVATT, MOUNT GRAVATT, ",TOR436277,2025-05-16,"2025-05-16 12:35:39","METRO 1",20,0,0,0.403,258.734
+21356,"Petbarn Kedron, , 561 Gympie Rd, KEDRON, , ",TOR436278,2025-05-16,"2025-05-16 16:15:54","METRO 1",30,0,0,0.474,304.842
+1855,"Petbarn Burleigh Waters, Store Manager, Treetops Plaza,9 Classic Way, BURLEIGH WATERS, BURLEIGH WATERS, ",TOR436279,2025-05-16,"2025-05-16 10:31:46","GOLD COAST",23,0,0,0.405,261.842
+24825,"Petbarn Victoria Point, , 349-369 Colburn Ave, VICTORIA POINT, , ",TOR436280,2025-05-16,"2025-05-16 18:03:37",BAYSIDE,19,0,0,0.327,217.435
+1863,"Petbarn Nerang, Store Manager, 19 Hinkler Drive,, NERANG, NERANG, ",TOR436281,2025-05-16,"2025-05-16 10:31:41","GOLD COAST",22,0,0,0.359,257.9
+3143,"Petbarn Tweed Heads, Store Manager, 29-41 Greenway Drive, TWEED HEADS, TWEED HEADS, ",TOR436282,2025-05-16,"2025-05-16 15:07:43","NORTHERN RIVERS",84,2,0,1.346,901.574
+21712,"Petbarn Woolloongabba, , 114 Logan Rd, WOOLLOONGABBA, , ",TOR436283,2025-05-16,"2025-05-16 16:05:39","METRO 1",46,0,0,0.726,494.43
+1871,"Petbarn Mermaid Waters, Store Manager, D11 - Q Super Centre, ,Crnr of Markeri and Bermuda St, MERMAID WATERS, MERMAID WATERS, ",TOR436284,2025-05-16,"2025-05-16 09:47:49","GOLD COAST",28,0,0,0.337,278.46
+13116,"Petbarn Elanora, , Shop 61, 13/31 Guineas Creek Rd, ELANORA, , 461",TOR436285,2025-05-16,"2025-05-16 11:07:50","GOLD COAST",72,2,0,1.18,753.965
+1827,"Petbarn Bundall, Store Manager, 40 Upton Street,, BUNDALL, BUNDALL, ",TOR436286,2025-05-16,"2025-05-16 09:47:47","GOLD COAST",23,0,0,0.281,173.152
+13145,"Petbarn Wynnum, , 4/2021 Wynnum Rd, WYNNUM, , ",TOR436288,2025-05-16,"2025-05-16 16:13:02",BAYSIDE,24,0,0,0.351,255.607
+13143,"Petbarn Upper Coomera, , Shop 9, 1-13 Coomera Grand Drive, UPPER COOMERA, , 8",TOR436536,2025-05-16,"2025-05-16 13:52:32","GOLD COAST",21,0,0,0.321,250.712
+829,"*Chill Qld, , 24 Octal Street, YATALA, , 1035052","TPB Stock - 14-05-2025",2025-05-14,"2025-05-14 14:25:38","METRO 1",0,1,1,2.443,500
+21550,"Chill Nsw, Chill Nsw, 128 Old Pittwater Road, 2, BROOKVALE, , ","TPB Stock - 14-05-2025",2025-05-14,"2025-05-15 05:51:36","QLD to NSW Shuttle",0,1,1,2.443,500
+26003,"Side Piece Coffee, , Shop 1, 2 Capital Court, VARSITY LAKES, , ","TS2060-17080 T2",2025-05-12,"2025-05-12 09:55:41","GOLD COAST",2,0,0,0,12
+26056,"Cafe Catalina, , Broadwater Parklands, 10/11 Gold Coast Highway, SOUTHPORT, , ",TS2060-17134,2025-05-09,"2025-05-12 08:23:59","GOLD COAST",12,0,0,0,72
+26525,"Nates Cafe, , 1/37 Lawrence Dr, NERANG, , ",TS2060-17234,2025-05-14,"2025-05-14 10:31:51","GOLD COAST",3,0,0,0,18
+26055,"Arbour Restaurant & Bar, , 114 Grey St T66, T66a, SOUTH BRISBANE, , ",TS2060-17235,2025-05-15,"2025-05-15 13:37:44","METRO 1",16,0,0,0,96
+26526,"The Coolum Social, , Shop 7 8-26 Birtwill Street, COOLUM BEACH, , ",TS2060-17236,2025-05-15,"2025-05-15 11:21:42","SUNSHINE COAST",4,0,0,0,24
+26288,"Sofitel Noosa Pacific Resort, , 14 - 16 Hastings Street, NOOSA HEADS, , ",TS2060-17248,2025-05-15,"2025-05-15 12:51:49","SUNSHINE COAST",8,0,0,0,48
+25946,"Sonder Studios, , 12 Philip Avenue, BROADBEACH, , ",TS2060-17251,2025-05-14,"2025-05-14 12:51:40","GOLD COAST",4,0,0,0,24
+25938,"Banksy, , 2763-2765 Gold Coast Highway Suite 1 (ground Floor), BROADBEACH, , ",TS2060-17259,2025-05-14,"2025-05-14 11:41:44","GOLD COAST",2,0,0,0,12
+26289,"The Local Beerwah Cafe, , Shop 18/44 Simpson Street, BEERWAH, , ",TS2060-17262,2025-05-15,"2025-05-15 08:55:41","SUNSHINE COAST",2,0,0,0,12
+25960,"Cuba St. Coffee Roasters, , 968 David Low Way, MARCOOLA, , ",TS2060-17268,2025-05-15,"2025-05-13 14:39:41","SUNSHINE COAST",2,0,0,0,12
+26056,"Cafe Catalina, , Broadwater Parklands, 10/11 Gold Coast Highway, SOUTHPORT, , ",TS2060-17317,2025-05-16,"2025-05-16 09:51:11","GOLD COAST",6,0,0,0,36
+25961,"Scoopy's Family Cafe, , 2/2 Toorbul Street, BONGAREE, , ",TS2060-17319,2025-05-15,"2025-05-15 10:41:43","SUNSHINE COAST",2,0,0,0,12
+26523,"Franquette, , 155 Long Road, TAMBORINE MOUNTAIN, , ",TS2060-17326,2025-05-14,"2025-05-13 14:39:41","GOLD COAST",6,0,0,0,36
+26284,"Glass Coffee House, , Shop 4, 80-82 Sixth Avenue, MAROOCHYDORE, , ",TS2060-17328,2025-05-15,"2025-05-13 14:39:41","SUNSHINE COAST",6,0,0,0,36
+26000,"Raw And Rice Holding (immunity -pack In 12s), , C/o Chill Qld 24 Octal St, YATALA, , ",TS2060-17333,2025-05-13,"2025-05-13 14:39:26","Warehouse Inbound",1,0,0,0,6
+26001,"Raw And Rice Holding (tropical -pack In 12s), , C/o Chill Qld 24 Octal St, YATALA, , ",TS2060-17334,2025-05-13,"2025-05-13 14:39:26","Warehouse Inbound",3,0,0,0,18
+26282,"Burgster, , 4-10 Phillipine Parade, Shop 2&3, PALM BEACH, , ",TS2060-17342,2025-05-16,"2025-05-16 09:27:04","GOLD COAST",2,0,0,0,12
+25938,"Banksy, , 2763-2765 Gold Coast Highway Suite 1 (ground Floor), BROADBEACH, , ",TS2060-17366,2025-05-16,"2025-05-16 09:50:48","GOLD COAST",2,0,0,0,12
+25941,"Dorsett Hotel Gold Coast, , Dorsett Gold Coast Tower 1, 5 The Darling Avenue, BROADBEACH, , ",TS2060-17389,2025-05-16,"2025-05-16 09:51:33","GOLD COAST",6,0,0,0,36
+26122,"Raw And Rice Noosaville, , Unit 21, 187 Gympie Terrace, NOOSAVILLE, , ",TS2060-17430,2025-05-15,"2025-05-15 12:11:40","SUNSHINE COAST",4,0,0,0,20
+26123,"Raw And Rice Noosa, , 2/52 Hastings St,, NOOSA HEADS, , ",TS2060-17431,2025-05-15,"2025-05-15 12:55:38","SUNSHINE COAST",4,0,0,0,20
+26255,"Two Birds One Stone, , Shop B10, 14 Allandale Entrance, MERMAID WATERS, , ","Two Birds One Stone 14.05",2025-05-16,"2025-05-19 11:25:42","Warehouse Outbound",1,0,0,0.027,4
+24054,"Wholefood Pantry Palm Beach, , 155 Nineteenth Ave, PALM BEACH, , ","WHF CHL 160525",2025-05-16,"2025-05-16 17:13:37","GOLD COAST",1,0,0,0,15
+24054,"Wholefood Pantry Palm Beach, , 155 Nineteenth Ave, PALM BEACH, , ","WHOLEFOOD CHILLED - 010525",2025-05-09,"2025-05-12 08:23:27","GOLD COAST",1,0,0,0,7
+25856,"Will & Co By Bg, , Gl45, 226 Queen Street, BRISBANE, , ","Will & Co by BG 14.05",2025-05-16,"2025-05-16 10:27:43","METRO 1",1,0,0,0.027,4
+25791,"Ryan Booker, , 3 Merlin Place, ORMEAU, , ","YGF - Ryan Booker 13.05",2025-05-14,"2025-05-14 10:16:39","GOLD COAST",1,0,0,0.05,0.05
+25841,"Yolk, , Shop E40c, Gasworks Shopping Centre 76 Skyring Terrace, NEWSTEAD, , ","Yolk 14.05",2025-05-16,"2025-05-16 14:03:41","METRO 1",2,0,0,0.054,8
+26625,"Zac Kerr, , 20 Hockings Street, WEST END, , ","Zac Kerr Samples 14.05",2025-05-16,"2025-05-16 11:55:47","METRO 1",3,0,0,0.024,6
+26041,"Chill Qld, , 24 Octal Street, YATALA, , ",ZPL1305,2025-05-16,"2025-05-19 11:14:05","Warehouse Inbound",0,1,1,1.764,400

@@ -73,9 +73,19 @@ export default function AdminPage() {
     "Status & Dates": [
       { name: "status", label: "Status", required: true },
       { name: "estimatedDeliveryDate", label: "Estimated Delivery Date", required: false },
+      { name: "deliveryDate", label: "Delivery Date", required: false },
+      { name: "dateDelivered", label: "Date Delivered", required: false },
     ],
     "Properties": [
       { name: "temperatureZone", label: "Temperature Zone", required: false },
+    ],
+    "Shipping Details": [
+      { name: "deliveryRun", label: "Delivery Run", required: false },
+      { name: "quantity", label: "Quantity", required: false },
+      { name: "pallets", label: "Pallets", required: false },
+      { name: "spaces", label: "Spaces", required: false },
+      { name: "cubicMeters", label: "Cubic (m³)", required: false },
+      { name: "weightKg", label: "Weight (kg)", required: false },
     ]
   };
   
@@ -136,8 +146,24 @@ export default function AdminPage() {
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [currentlyEditingField, setCurrentlyEditingField] = useState<string | null>(null);
   
-  // State for mapping templates
-  const [savedTemplates, setSavedTemplates] = useState<Record<string, {mapping: Record<string, string>, combine: Record<string, string[]>}>>({});
+  // State for mapping templates with ConsignmentReport template pre-loaded
+  const [savedTemplates, setSavedTemplates] = useState<Record<string, {mapping: Record<string, string>, combine: Record<string, string[]>}>>({
+    "ConsignmentReport Template": {
+      mapping: {
+        "Delivery Address": "deliveryAddress",
+        "Delivery Date": "deliveryDate", 
+        "Consignment": "consignmentNumber",
+        "Delivery Run": "deliveryRun",
+        "Date Delivered": "dateDelivered",
+        "Quantity": "quantity",
+        "Pallets": "pallets",
+        "Spaces": "spaces",
+        "Cubic (m3)": "cubicMeters",
+        "Weight (kg)": "weightKg"
+      },
+      combine: {}
+    }
+  });
   const [templateName, setTemplateName] = useState("");
   const [showSaveTemplateInput, setShowSaveTemplateInput] = useState(false);
   
