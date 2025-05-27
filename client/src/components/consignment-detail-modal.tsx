@@ -282,13 +282,17 @@ export default function ConsignmentDetailModal({
             <div className="bg-white rounded-xl border border-neutral-100 p-6 shadow-sm">
               <div className="flow-root max-w-3xl mx-auto">
                 <ul role="list" className="-mb-8">
-                  {(consignment.events || []).map((event, index) => (
+                  {Array.isArray(consignment.events) ? consignment.events.map((event, index) => (
                     <TimelineEvent
                       key={index}
                       event={event}
-                      isLast={index === (consignment.events || []).length - 1}
+                      isLast={index === consignment.events.length - 1}
                     />
-                  ))}
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No timeline events available for this consignment</p>
+                    </div>
+                  )}
                 </ul>
               </div>
             </div>
