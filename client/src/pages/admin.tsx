@@ -101,10 +101,7 @@ export default function AdminPage() {
   async function onSubmit(values: FilterFormValues) {
     setIsImporting(true);
     try {
-      const res = await apiRequest("/api/admin/import", {
-        method: "POST",
-        body: JSON.stringify(values),
-      });
+      const res = await apiRequest("POST", "/api/admin/import", values);
       
       toast({
         title: "Import completed",
@@ -146,6 +143,11 @@ export default function AdminPage() {
   
   // State for CSV field dropdown
   const [csvFieldFilter, setCsvFieldFilter] = useState("");
+  
+  // State for template management
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
   
   // Process CSV file and detect headers
   const processCsvFile = (file: File) => {
@@ -381,6 +383,51 @@ export default function AdminPage() {
     });
   };
   
+  // Create new blank template
+  const createNewTemplate = () => {
+    if (!newTemplateName.trim()) {
+      toast({
+        title: "Template Name Required",
+        description: "Please provide a name for your template.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSavedTemplates(prev => ({
+      ...prev,
+      [newTemplateName]: { 
+        mapping: {},
+        combine: {}
+      }
+    }));
+    
+    toast({
+      title: "Template Created",
+      description: `New template "${newTemplateName}" has been created.`,
+      variant: "default"
+    });
+    
+    setNewTemplateName("");
+    setNewTemplateDescription("");
+    setShowTemplateManager(false);
+  };
+  
+  // Delete template
+  const deleteTemplate = (templateName: string) => {
+    setSavedTemplates(prev => {
+      const updated = { ...prev };
+      delete updated[templateName];
+      return updated;
+    });
+    
+    toast({
+      title: "Template Deleted",
+      description: `Template "${templateName}" has been removed.`,
+      variant: "default"
+    });
+  };
+  
   // Load a saved template
   const loadTemplate = (name: string) => {
     if (savedTemplates[name]) {
@@ -535,7 +582,7 @@ export default function AdminPage() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center text-lg">
@@ -669,6 +716,75 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center text-lg">
+              <Table className="h-5 w-5 mr-2 text-primary" />
+              Import Templates
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-neutral-600">
+                  Manage reusable field mapping templates
+                </p>
+                <Button
+                  onClick={() => setShowTemplateManager(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  New Template
+                </Button>
+              </div>
+              
+              {Object.keys(savedTemplates).length === 0 ? (
+                <div className="text-center py-8 text-neutral-500">
+                  <Table className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No templates created yet</p>
+                  <p className="text-xs">Create templates to reuse field mappings</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Object.keys(savedTemplates).map((templateName) => (
+                    <div key={templateName} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">{templateName}</h4>
+                        <p className="text-xs text-neutral-500">
+                          {Object.keys(savedTemplates[templateName].mapping).length} field mappings
+                        </p>
+                      </div>
+                      <div className="flex space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => loadTemplate(templateName)}
+                          className="h-8 w-8 p-0"
+                          title="Use template"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteTemplate(templateName)}
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                          title="Delete template"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
         
@@ -1217,6 +1333,51 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Template Manager Dialog */}
+      {showTemplateManager && (
+        <Dialog open={showTemplateManager} onOpenChange={setShowTemplateManager}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New Template</DialogTitle>
+              <DialogDescription>
+                Create a reusable template for CSV field mappings.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="template-name">Template Name</Label>
+                <Input
+                  id="template-name"
+                  placeholder="e.g., Daily Deliveries Template"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="template-description">Description (Optional)</Label>
+                <Input
+                  id="template-description"
+                  placeholder="Brief description of this template"
+                  value={newTemplateDescription}
+                  onChange={(e) => setNewTemplateDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowTemplateManager(false)}>
+                Cancel
+              </Button>
+              <Button onClick={createNewTemplate}>
+                Create Template
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
