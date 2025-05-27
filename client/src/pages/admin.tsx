@@ -189,7 +189,7 @@ export default function AdminPage() {
       if (e.target?.result) {
         const content = e.target.result as string;
         const rows = content.split('\n')
-          .map(row => row.split(',').map(cell => cell.trim().replace(/^"(.*)"$/, '$1')));
+          .map(row => row.split('\t').map(cell => cell.trim().replace(/^"(.*)"$/, '$1')));
         
         // Remove any empty rows
         const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
