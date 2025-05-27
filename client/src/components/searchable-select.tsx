@@ -70,7 +70,7 @@ export function SearchableSelect({
         onClick={handleToggle}
       >
         <div className="truncate">
-          {value || placeholder}
+          {value === "ignore" ? "Don't import" : value || placeholder}
         </div>
         <div className={`transition-transform ${isOpen ? "rotate-180" : ""}`}>
           ▼
