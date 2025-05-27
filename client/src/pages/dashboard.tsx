@@ -54,6 +54,13 @@ export default function Dashboard() {
             <Button 
               variant="ghost" 
               className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              onClick={() => window.location.href = '/analytics'}
+            >
+              Analytics
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
               onClick={() => window.location.href = '/simple-import'}
             >
               Import Data

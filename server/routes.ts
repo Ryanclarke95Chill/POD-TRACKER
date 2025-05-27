@@ -164,22 +164,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Process each row and create consignments
           for (const row of importRows) {
             try {
-              // Create a consignment from the mapped data
+              // Create a consignment from the mapped data with all required fields
               const consignmentData = {
                 userId,
                 consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                customerName: row.customerName || "Imported Customer",
+                customerName: row.customerName || "Imported Customer", 
                 deliveryAddress: row.deliveryAddress || "Unknown Address",
                 pickupAddress: row.pickupAddress || "Unknown Pickup",
                 status: row.status || "In Transit",
                 estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
                 lastKnownLocation: row.lastKnownLocation || "Processing Facility",
                 temperatureZone: row.temperatureZone || "Dry",
+                // Add missing required fields with defaults or imported values
+                quantity: row.quantity || "1",
+                pallets: row.pallets || "0", 
+                spaces: row.spaces || "0",
+                consignmentReference: row.consignmentReference || null,
+                deliveryDate: row.deliveryDate || null,
+                dateDelivered: row.dateDelivered || null,
+                consignmentRequiredDeliveryDate: row.consignmentRequiredDeliveryDate || null,
+                receiverCompanyName: row.receiverCompanyName || row.customerName || "Unknown Company",
+                pickupCity: row.pickupCity || "Unknown",
+                deliveryCity: row.deliveryCity || "Unknown",
                 events: JSON.stringify([
                   {
                     timestamp: new Date().toISOString(),
                     description: "Package imported into system",
-                    location: "Import Center",
+                    location: "Import Center", 
                     type: "import"
                   }
                 ])
