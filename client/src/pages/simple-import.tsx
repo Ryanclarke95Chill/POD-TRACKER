@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, FileSpreadsheet, Check, X } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -392,9 +393,10 @@ export default function SimpleImport() {
                         <p className="text-xs text-gray-500">System field</p>
                       </div>
                       <div className="flex-1">
-                        <Select
+                        <SearchableSelect
+                          options={["ignore", ...headers]}
                           value={mappedCsvHeader || "ignore"}
-                          onValueChange={(value) => {
+                          onChange={(value) => {
                             // Clear previous mapping for this system field
                             if (mappedCsvHeader) {
                               setFieldMapping(prev => ({
@@ -404,43 +406,14 @@ export default function SimpleImport() {
                             }
                             
                             // Set new mapping if a CSV header is selected
-                            if (value !== "ignore") {
+                            if (value !== "ignore" && value !== "") {
                               setFieldMapping(prev => ({
                                 ...prev,
                                 [value]: systemField.value
                               }));
                             }
                           }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your column..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="p-2 border-b">
-                              <input
-                                type="text"
-                                placeholder="Search your columns..."
-                                className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                onChange={(e) => {
-                                  const searchTerm = e.target.value.toLowerCase();
-                                  const items = document.querySelectorAll('[data-csv-item]');
-                                  items.forEach((item: any) => {
-                                    const text = item.textContent?.toLowerCase() || '';
-                                    item.style.display = text.includes(searchTerm) ? 'block' : 'none';
-                                  });
-                                }}
-                              />
-                            </div>
-                            <SelectItem value="ignore" data-csv-item>
-                              Don't map
-                            </SelectItem>
-                            {headers.map((header) => (
-                              <SelectItem key={header} value={header} data-csv-item>
-                                {header}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        />
                       </div>
                       <div className="w-8 flex justify-center">
                         {mappedCsvHeader ? (
