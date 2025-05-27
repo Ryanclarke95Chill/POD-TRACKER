@@ -12,6 +12,7 @@ export interface IStorage {
   createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
   updateConsignment(consignment: Consignment): Promise<Consignment>;
   seedDemoConsignments(userId: number): Promise<void>;
+  clearAllConsignments(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -306,6 +307,11 @@ export class MemStorage implements IStorage {
         }
       ]
     });
+  }
+
+  async clearAllConsignments(): Promise<void> {
+    this.consignments.clear();
+    this.consignmentIdCounter = 1;
   }
 }
 

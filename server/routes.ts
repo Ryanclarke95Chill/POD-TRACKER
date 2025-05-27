@@ -144,6 +144,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin route to import consignments from CSV or filter parameters
+  app.post("/api/admin/clear", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      await storage.clearAllConsignments();
+      res.json({ success: true, message: "All consignments cleared" });
+    } catch (error) {
+      console.error("Error clearing consignments:", error);
+      res.status(500).json({ success: false, message: "Failed to clear consignments" });
+    }
+  });
+
   app.post("/api/admin/import", authenticate, async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.user?.id;
