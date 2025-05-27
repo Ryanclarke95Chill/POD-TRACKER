@@ -8,7 +8,7 @@ import { Upload, FileSpreadsheet, Check, X } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 const SYSTEM_FIELDS = [
-  { value: "", label: "Don't import" },
+  { value: "ignore", label: "Don't import" },
   { value: "consignmentNumber", label: "Consignment Number" },
   { value: "customerName", label: "Customer Name" },
   { value: "deliveryAddress", label: "Delivery Address" },
@@ -61,7 +61,7 @@ export default function SimpleImport() {
               // Initialize field mapping
               const initialMapping: Record<string, string> = {};
               rows[0].forEach((header: string) => {
-                initialMapping[header] = "";
+                initialMapping[header] = "ignore";
               });
               setFieldMapping(initialMapping);
               
@@ -98,7 +98,7 @@ export default function SimpleImport() {
             // Initialize field mapping
             const initialMapping: Record<string, string> = {};
             rows[0].forEach((header: string) => {
-              initialMapping[header] = "";
+              initialMapping[header] = "ignore";
             });
             setFieldMapping(initialMapping);
             
@@ -122,7 +122,7 @@ export default function SimpleImport() {
   };
 
   const importData = async () => {
-    const mappedFields = Object.entries(fieldMapping).filter(([_, value]) => value !== "");
+    const mappedFields = Object.entries(fieldMapping).filter(([_, value]) => value !== "ignore");
     
     if (mappedFields.length === 0) {
       toast({
@@ -140,7 +140,7 @@ export default function SimpleImport() {
         const mappedRow: Record<string, string> = {};
         headers.forEach((header, index) => {
           const systemField = fieldMapping[header];
-          if (systemField && systemField !== "") {
+          if (systemField && systemField !== "ignore") {
             mappedRow[systemField] = row[index] || "";
           }
         });
@@ -239,7 +239,7 @@ export default function SimpleImport() {
                       </Select>
                     </div>
                     <div className="w-8 flex justify-center">
-                      {fieldMapping[header] && fieldMapping[header] !== "" ? (
+                      {fieldMapping[header] && fieldMapping[header] !== "ignore" ? (
                         <Check className="h-4 w-4 text-green-500" />
                       ) : (
                         <X className="h-4 w-4 text-gray-300" />
@@ -302,7 +302,7 @@ export default function SimpleImport() {
             </Button>
             <Button 
               onClick={importData}
-              disabled={isUploading || Object.values(fieldMapping).every(v => v === "")}
+              disabled={isUploading || Object.values(fieldMapping).every(v => v === "ignore")}
             >
               {isUploading ? "Importing..." : "Import Data"}
             </Button>
