@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -179,107 +180,141 @@ export default function AdminPage() {
   // Process CSV file and detect headers
   const processCsvFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        const content = e.target.result as string;
-        // Parse CSV with proper handling of quoted fields containing commas
-        const parseCSVRow = (row: string) => {
-          const result = [];
-          let current = '';
-          let inQuotes = false;
-          
-          for (let i = 0; i < row.length; i++) {
-            const char = row[i];
+    
+    // Handle different file types
+    if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          try {
+            const data = new Uint8Array(e.target.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
             
-            if (char === '"') {
-              if (inQuotes && row[i + 1] === '"') {
-                // Escaped quote
-                current += '"';
-                i++; // Skip next quote
-              } else {
-                // Toggle quote state
-                inQuotes = !inQuotes;
-              }
-            } else if (char === ',' && !inQuotes) {
-              // Comma outside of quotes - field separator
-              result.push(current.trim());
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          
-          // Add the last field
-          result.push(current.trim());
-          return result;
-        };
-        
-        const rows = content.split('\n')
-          .filter(line => line.trim())
-          .map(line => parseCSVRow(line));
-        
-        // Remove any empty rows
-        const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
-        
-        if (nonEmptyRows.length < 2) {
-          toast({
-            title: "Invalid CSV",
-            description: "The CSV file doesn't contain enough data",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        const headers = nonEmptyRows[0];
-        setCsvHeaders(headers);
-        setCsvData(nonEmptyRows);
-        
-        // Take first 5 rows for preview (or all if fewer)
-        const previewRows = nonEmptyRows.slice(1, Math.min(6, nonEmptyRows.length));
-        setCsvPreview(previewRows);
-        
-        // Auto-map fields where names match
-        const initialMapping: Record<string, string> = {};
-        const autoMapped: string[] = [];
-        
-        // Try to match CSV headers to field names
-        headers.forEach(header => {
-          // Clean up header for matching
-          const cleanHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
-          
-          // Try to find a matching field
-          for (const category in consignmentFields) {
-            const match = consignmentFields[category].find(field => {
-              const cleanField = field.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-              return cleanField === cleanHeader || 
-                cleanField.includes(cleanHeader) || 
-                cleanHeader.includes(cleanField);
+            // Convert to JSON array
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            const rows = jsonData.map((row: any) => 
+              Array.isArray(row) ? row.map(cell => cell?.toString() || '') : []
+            ).filter(row => row.some(cell => cell.trim() !== ''));
+            
+            processRows(rows);
+          } catch (error) {
+            toast({
+              title: "Error reading Excel file",
+              description: "Unable to parse the Excel file. Please check the format.",
+              variant: "destructive"
             });
-            
-            if (match) {
-              initialMapping[header] = match.name;
-              autoMapped.push(header);
-              break;
-            }
           }
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Handle CSV files
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          const content = e.target.result as string;
+          // Parse CSV with proper handling of quoted fields containing commas
+          const parseCSVRow = (row: string) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < row.length; i++) {
+              const char = row[i];
+              
+              if (char === '"') {
+                if (inQuotes && row[i + 1] === '"') {
+                  // Escaped quote
+                  current += '"';
+                  i++; // Skip next quote
+                } else {
+                  // Toggle quote state
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === ',' && !inQuotes) {
+                // Comma outside of quotes - field separator
+                result.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            
+            // Add the last field
+            result.push(current.trim());
+            return result;
+          };
+          
+          const rows = content.split('\n')
+            .filter(line => line.trim())
+            .map(line => parseCSVRow(line));
+          
+          processRows(rows);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+  
+  const processRows = (rows: string[][]) => {
+    // Remove any empty rows
+    const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
+        
+    if (nonEmptyRows.length < 2) {
+      toast({
+        title: "Invalid file",
+        description: "The file doesn't contain enough data",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const headers = nonEmptyRows[0];
+    setCsvHeaders(headers);
+    setCsvData(nonEmptyRows);
+    
+    // Take first 5 rows for preview (or all if fewer)
+    const previewRows = nonEmptyRows.slice(1, Math.min(6, nonEmptyRows.length));
+    setCsvPreview(previewRows);
+    
+    // Auto-map fields where names match
+    const initialMapping: Record<string, string> = {};
+    const autoMapped: string[] = [];
+    
+    // Try to match CSV headers to field names
+    headers.forEach(header => {
+      // Clean up header for matching
+      const cleanHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      // Try to find a matching field
+      for (const category in consignmentFields) {
+        const match = consignmentFields[category].find(field => {
+          const cleanField = field.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanField === cleanHeader || 
+            cleanField.includes(cleanHeader) || 
+            cleanHeader.includes(cleanField);
         });
         
-        setFieldMapping(initialMapping);
-        setAutoMappedFields(autoMapped);
-        
-        // If there are unmapped required fields, show mapping dialog
-        const mappedRequiredFields = Object.values(initialMapping).filter(value => 
-          requiredFields.includes(value)
-        );
-        
-        setMappingRequired(mappedRequiredFields.length < requiredFields.length);
-        
-        // Show mapping dialog to let user confirm/adjust mappings
-        setShowMappingDialog(true);
+        if (match) {
+          initialMapping[header] = match.name;
+          autoMapped.push(header);
+          break;
+        }
       }
-    };
+    });
     
-    reader.readAsText(file);
+    setFieldMapping(initialMapping);
+    setAutoMappedFields(autoMapped);
+    
+    // If there are unmapped required fields, show mapping dialog
+    const mappedRequiredFields = Object.values(initialMapping).filter(value => 
+      requiredFields.includes(value)
+    );
+    
+    setMappingRequired(mappedRequiredFields.length < requiredFields.length);
+    
+    // Show mapping dialog to let user confirm/adjust mappings
+    setShowMappingDialog(true);
   };
   
   // Track auto-mapped fields
