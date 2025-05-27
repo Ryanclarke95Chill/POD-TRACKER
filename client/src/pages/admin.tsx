@@ -188,8 +188,17 @@ export default function AdminPage() {
     reader.onload = (e) => {
       if (e.target?.result) {
         const content = e.target.result as string;
+        // Auto-detect delimiter
+        const firstLine = content.split('\n')[0];
+        let delimiter = ',';
+        if (firstLine.includes('\t')) {
+          delimiter = '\t';
+        } else if (firstLine.includes(';')) {
+          delimiter = ';';
+        }
+        
         const rows = content.split('\n')
-          .map(row => row.split('\t').map(cell => cell.trim().replace(/^"(.*)"$/, '$1')));
+          .map(row => row.split(delimiter).map(cell => cell.trim().replace(/^"(.*)"$/, '$1')));
         
         // Remove any empty rows
         const nonEmptyRows = rows.filter(row => row.some(cell => cell.trim() !== ''));
