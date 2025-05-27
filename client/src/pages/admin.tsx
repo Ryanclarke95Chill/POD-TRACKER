@@ -962,7 +962,7 @@ export default function AdminPage() {
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={handleFileSelect}
                 />
                 
