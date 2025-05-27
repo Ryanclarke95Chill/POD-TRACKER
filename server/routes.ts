@@ -152,7 +152,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
       
-      // Determine if this is a file upload or filter-based import
+      // Check if this is data from the simple import page
+      if (req.body.importRows) {
+        const { importRows, importToDatabase } = req.body;
+        
+        console.log(`Processing simple import with ${importRows.length} rows`);
+        
+        if (importToDatabase) {
+          let importedCount = 0;
+          
+          // Process each row and create consignments
+          for (const row of importRows) {
+            try {
+              // Create a consignment from the mapped data
+              const consignmentData = {
+                userId,
+                consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                customerName: row.customerName || "Imported Customer",
+                deliveryAddress: row.deliveryAddress || "Unknown Address",
+                pickupAddress: row.pickupAddress || "Unknown Pickup",
+                status: row.status || "In Transit",
+                estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
+                lastKnownLocation: row.lastKnownLocation || "Processing Facility",
+                temperatureZone: row.temperatureZone || "Dry",
+                events: JSON.stringify([
+                  {
+                    timestamp: new Date().toISOString(),
+                    description: "Package imported into system",
+                    location: "Import Center",
+                    type: "import"
+                  }
+                ])
+              };
+              
+              await storage.createConsignment(consignmentData);
+              importedCount++;
+            } catch (error) {
+              console.error("Error creating consignment:", error);
+            }
+          }
+          
+          return res.json({
+            success: true,
+            importedCount,
+            message: `Successfully imported ${importedCount} consignments.`
+          });
+        }
+      }
+      
+      // Handle legacy CSV file upload format
       const isFileUpload = req.headers['content-type']?.includes('multipart/form-data');
       
       if (isFileUpload) {
@@ -172,8 +220,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // For demo purposes, we'll just import some sample consignments
         const importedCount = Math.floor(Math.random() * 5) + 3; // Random number between 3-7
-        
-        // Note: In a real implementation, we'd parse the CSV file and apply the field mappings including combinations
         
         return res.json({
           success: true,

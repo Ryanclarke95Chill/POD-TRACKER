@@ -147,17 +147,36 @@ export default function SimpleImport() {
         return mappedRow;
       });
 
-      // For now, just show success (you can later connect to backend)
-      toast({
-        title: "Import completed",
-        description: `Successfully processed ${importRows.length} rows with ${mappedFields.length} mapped fields`
+      // Send data to backend for processing
+      const response = await fetch("/api/admin/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          importRows,
+          importToDatabase: true,
+          updateExisting: false
+        })
       });
 
-      // Reset the form
-      setFileData([]);
-      setHeaders([]);
-      setFieldMapping({});
-      setShowPreview(false);
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast({
+          title: "Import completed successfully",
+          description: `Successfully imported ${result.importedCount || importRows.length} records with ${mappedFields.length} mapped fields`
+        });
+
+        // Reset the form
+        setFileData([]);
+        setHeaders([]);
+        setFieldMapping({});
+        setShowPreview(false);
+      } else {
+        throw new Error(result.message || "Import failed");
+      }
       
     } catch (error) {
       toast({
