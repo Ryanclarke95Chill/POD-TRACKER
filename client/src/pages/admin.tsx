@@ -148,6 +148,9 @@ export default function AdminPage() {
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [editTemplateMapping, setEditTemplateMapping] = useState<Record<string, string>>({});
+  const [editTemplateCombine, setEditTemplateCombine] = useState<Record<string, string[]>>({});
   
   // Process CSV file and detect headers
   const processCsvFile = (file: File) => {
@@ -426,6 +429,54 @@ export default function AdminPage() {
       description: `Template "${templateName}" has been removed.`,
       variant: "default"
     });
+  };
+  
+  // Start editing template
+  const startEditingTemplate = (templateName: string) => {
+    const template = savedTemplates[templateName];
+    if (template) {
+      setEditingTemplate(templateName);
+      setEditTemplateMapping({ ...template.mapping });
+      setEditTemplateCombine({ ...template.combine });
+    }
+  };
+  
+  // Update template mapping field
+  const updateTemplateMapping = (csvField: string, systemField: string) => {
+    setEditTemplateMapping(prev => ({
+      ...prev,
+      [csvField]: systemField
+    }));
+  };
+  
+  // Save template changes
+  const saveTemplateChanges = () => {
+    if (editingTemplate) {
+      setSavedTemplates(prev => ({
+        ...prev,
+        [editingTemplate]: {
+          mapping: { ...editTemplateMapping },
+          combine: { ...editTemplateCombine }
+        }
+      }));
+      
+      toast({
+        title: "Template Updated",
+        description: `Template "${editingTemplate}" has been updated.`,
+        variant: "default"
+      });
+      
+      setEditingTemplate(null);
+      setEditTemplateMapping({});
+      setEditTemplateCombine({});
+    }
+  };
+  
+  // Cancel template editing
+  const cancelTemplateEdit = () => {
+    setEditingTemplate(null);
+    setEditTemplateMapping({});
+    setEditTemplateCombine({});
   };
   
   // Load a saved template
@@ -769,6 +820,18 @@ export default function AdminPage() {
                           title="Use template"
                         >
                           <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => startEditingTemplate(templateName)}
+                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700"
+                          title="Edit template"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
                         </Button>
                         <Button
                           size="sm"
@@ -1373,6 +1436,97 @@ export default function AdminPage() {
               </Button>
               <Button onClick={createNewTemplate}>
                 Create Template
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      
+      {/* Template Editing Dialog */}
+      {editingTemplate && (
+        <Dialog open={!!editingTemplate} onOpenChange={() => cancelTemplateEdit()}>
+          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Template: {editingTemplate}</DialogTitle>
+              <DialogDescription>
+                Configure field mappings for this template. Add CSV field names and map them to system fields.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(consignmentFields).map(([category, fields]) => (
+                  <div key={category} className="space-y-3">
+                    <h4 className="font-medium text-sm text-neutral-700 border-b pb-1">
+                      {category}
+                    </h4>
+                    
+                    {fields.map((field) => {
+                      const mappedCsvField = Object.entries(editTemplateMapping).find(
+                        ([_, systemField]) => systemField === field.name
+                      )?.[0] || "";
+                      
+                      return (
+                        <div key={field.name} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">
+                              {field.label}
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-xs text-neutral-500">CSV Field Name</Label>
+                            <Input
+                              placeholder="Enter CSV column name..."
+                              value={mappedCsvField}
+                              onChange={(e) => {
+                                // Remove old mapping if exists
+                                if (mappedCsvField) {
+                                  const newMapping = { ...editTemplateMapping };
+                                  delete newMapping[mappedCsvField];
+                                  setEditTemplateMapping(newMapping);
+                                }
+                                
+                                // Add new mapping if value provided
+                                if (e.target.value) {
+                                  updateTemplateMapping(e.target.value, field.name);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                  </svg>
+                  <div className="text-blue-700 text-sm">
+                    <p className="font-medium mb-1">Template Configuration Tips:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>Enter the exact column names as they appear in your CSV files</li>
+                      <li>Required fields (marked with *) should be mapped for successful imports</li>
+                      <li>Leave fields empty if they don't exist in your CSV format</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={cancelTemplateEdit}>
+                Cancel
+              </Button>
+              <Button onClick={saveTemplateChanges}>
+                Save Changes
               </Button>
             </DialogFooter>
           </DialogContent>
