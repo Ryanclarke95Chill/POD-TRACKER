@@ -148,38 +148,15 @@ export default function AdminPage() {
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [currentlyEditingField, setCurrentlyEditingField] = useState<string | null>(null);
   
-  // State for mapping templates with ConsignmentReport template pre-loaded
+  // State for mapping templates - focused on essential delivery columns only
   const [savedTemplates, setSavedTemplates] = useState<Record<string, {mapping: Record<string, string>, combine: Record<string, string[]>}>>({
-    "ConsignmentReport Template": {
-      mapping: {
-        "Customer Name": "customerName",
-        "Consignment Reference": "consignmentReference",
-        "Delivery Address": "deliveryAddress",
-        "Delivery Date": "deliveryDate", 
-        "Date Delivered": "dateDelivered",
-        "Delivery Run": "deliveryRun",
-        "Quantity": "quantity",
-        "Pallets": "pallets",
-        "Spaces": "spaces",
-        "Cubic (m3)": "cubicMeters",
-        "Weight (kg)": "weightKg",
-        "Consignment Required Delivery Date": "consignmentRequiredDeliveryDate"
-      },
-      combine: {}
-    },
     "Delivery Report Template": {
       mapping: {
-        "Customer Name": "customerName",
-        "Consignment Reference": "consignmentNumber",
         "Delivery Address": "deliveryAddress",
         "Delivery Run Date": "deliveryDate",
-        "Date Delivered": "dateDelivered",
-        "Delivery Run": "deliveryRun",
         "Quantity": "quantity",
-        "Pallets": "pallets",
+        "Pallets": "pallets", 
         "Spaces": "spaces",
-        "Cubic (m³)": "cubicMeters",
-        "Weight (kg)": "weightKg",
         "Consignment Required Delivery Date": "consignmentRequiredDeliveryDate"
       },
       combine: {}
