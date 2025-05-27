@@ -990,34 +990,30 @@ export default function AdminPage() {
                           <p className="text-xs text-neutral-500">Showing first 5 rows</p>
                         </div>
                         
-                        <div className="w-full">
-                          <div className="border rounded-lg bg-white shadow-sm">
-                            <div className="p-4">
-                              <div className="overflow-x-auto">
-                                <table className="w-full border-collapse">
-                                  <thead>
-                                    <tr className="bg-gray-50">
-                                      {csvHeaders.map((header, index) => (
-                                        <th key={index} className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border border-gray-200 min-w-32">
-                                          {header}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {csvPreview.slice(0, 5).map((row, rowIndex) => (
-                                      <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                        {row.map((cell, cellIndex) => (
-                                          <td key={cellIndex} className="px-4 py-3 text-sm text-gray-700 border border-gray-200 min-w-32">
-                                            {cell || '-'}
-                                          </td>
-                                        ))}
-                                      </tr>
+                        <div className="w-full bg-white border rounded-lg">
+                          <div className="overflow-x-auto p-4">
+                            <table className="border-collapse" style={{ width: 'max-content', minWidth: '100%' }}>
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  {csvHeaders.map((header, index) => (
+                                    <th key={index} className="px-3 py-2 text-left text-xs font-medium text-gray-700 border whitespace-nowrap" style={{ minWidth: '120px' }}>
+                                      {header}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {csvPreview.slice(0, 5).map((row, rowIndex) => (
+                                  <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    {row.map((cell, cellIndex) => (
+                                      <td key={cellIndex} className="px-3 py-2 text-xs text-gray-600 border whitespace-nowrap" style={{ minWidth: '120px' }}>
+                                        {cell || '-'}
+                                      </td>
                                     ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                         
