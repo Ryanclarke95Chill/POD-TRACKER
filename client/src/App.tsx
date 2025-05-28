@@ -6,6 +6,7 @@ import Dashboard from "@/pages/dashboard";
 import AdminPage from "@/pages/admin";
 import SimpleImport from "@/pages/simple-import";
 import Analytics from "@/pages/analytics";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
@@ -35,6 +36,7 @@ function App() {
 
             <Route path="/simple-import" component={SimpleImport} />
             <Route path="/analytics" component={Analytics} />
+            <Route path="/settings" component={Settings} />
             <Route component={NotFound} />
           </Switch>
         </div>

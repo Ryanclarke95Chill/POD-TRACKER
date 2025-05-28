@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin } from "lucide-react";
-import ConsignmentCard from "@/components/consignment-card";
+import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings } from "lucide-react";
+import ConsignmentTable from "@/components/consignment-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
+import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
 import { Consignment, temperatureZones } from "@shared/schema";
 
