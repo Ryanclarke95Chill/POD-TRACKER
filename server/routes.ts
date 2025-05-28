@@ -202,16 +202,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: "import"
         }]));
         
-        // Build and execute the dynamic SQL
+        // Build and execute the dynamic SQL with conflict handling
         const sql = `
           INSERT INTO consignments (${columns.join(', ')})
           VALUES (${placeholders.join(', ')})
+          ON CONFLICT (consignment_number) DO NOTHING
           RETURNING id
         `;
         
         console.log(`Inserting row ${successCount + 1} with ${columns.length} columns`);
         const result = await pool.query(sql, values);
-        successCount++;
+        
+        // Only count as success if the row was actually inserted
+        if (result.rows.length > 0) {
+          successCount++;
+        } else {
+          console.log(`Skipped duplicate consignment: ${row.consignmentNumber || 'unknown'}`);
+        }
         
         if (successCount % 100 === 0) {
           console.log(`Imported ${successCount} records...`);
