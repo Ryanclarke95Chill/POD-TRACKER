@@ -72,288 +72,219 @@ export default function SimpleImport() {
   const [fileData, setFileData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>(() => {
-    // Load saved field mapping from localStorage
-    const saved = localStorage.getItem('consignment-field-mapping');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    
-    // Default mapping based on your screenshot
-    return {
-      "Delivery Livetrack link": "trackingLink",
-      "Customer order number": "consignmentNumber", 
-      "Shipper": "customerName",
-      "document_string2": "deliveryAddress",
-      "From": "pickupAddress",
-      "Group causal delivery outcome": "status",
-      "Delivery planned ETA": "estimatedDeliveryDate",
-      "Recorded temperature": "temperatureZone",
-      "Quantity unit of measurement1": "quantity",
-      "Quantity unit of measurement2": "pallets"
-    };
-  });
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [showPreview, setShowPreview] = useState(false);
 
-  // Smart mapping suggestions based on column headers, position, and common patterns
-  const suggestMapping = (columnHeader: string, columnIndex: number): string => {
-    const header = columnHeader.toLowerCase().trim();
-    
-    // Position-based suggestions (Column D = index 3 for tracking links)
-    if (columnIndex === 3 && (header.includes('track') || header.includes('link') || header.includes('url') || header.includes('reference'))) {
-      return 'trackingLink';
+  // Auto-mapping that matches Excel column names directly to database fields
+  const autoMapColumn = (columnHeader: string): string => {
+    const directMappings: Record<string, string> = {
+      'consignment_number': 'consignmentNumber',
+      'customer_name': 'customerName', 
+      'delivery_address': 'deliveryAddress',
+      'pickup_address': 'pickupAddress',
+      'status': 'status',
+      'estimated_delivery_date': 'estimatedDeliveryDate',
+      'temperature_zone': 'temperatureZone',
+      'last_known_location': 'lastKnownLocation',
+      'quantity': 'quantity',
+      'pallets': 'pallets',
+      'spaces': 'spaces',
+      'delivery_run': 'deliveryRun',
+      'weight_kg': 'weightKg',
+      'cubic_meters': 'cubicMeters',
+      'shipper': 'shipper',
+      'receiver': 'receiver',
+      'driver': 'driver',
+      'vehicle': 'vehicle',
+      'route': 'route',
+      'notes': 'notes',
+      'delivery_time': 'deliveryTime',
+      'pickup_time': 'pickupTime',
+      'consignment_type': 'consignmentType',
+      'priority': 'priority',
+      'delivery_zone': 'deliveryZone',
+      'pickup_zone': 'pickupZone',
+      'customer_reference': 'customerReference',
+      'invoice_number': 'invoiceNumber',
+      'product_description': 'productDescription',
+      'special_instructions': 'specialInstructions',
+      'delivery_instructions': 'deliveryInstructions',
+      'pickup_instructions': 'pickupInstructions',
+      'pickup_company': 'pickupCompany',
+      'delivery_company': 'deliveryCompany',
+      'pickup_contact_name': 'pickupContactName',
+      'delivery_contact_name': 'deliveryContactName',
+      'pickup_contact_phone': 'pickupContactPhone',
+      'delivery_contact_phone': 'deliveryContactPhone',
+      'delivery_date': 'deliveryDate',
+      'date_delivered': 'dateDelivered',
+      'consignment_required_delivery_date': 'consignmentRequiredDeliveryDate',
+      'delivery_livetrack_link': 'deliveryLivetrackLink',
+      'customer_order_number': 'customerOrderNumber',
+      'document_string2': 'documentString2',
+      'from_location': 'fromLocation',
+      'to_location': 'toLocation',
+      'group_causal_delivery_outcome': 'groupCausalDeliveryOutcome',
+      'delivery_planned_eta': 'deliveryPlannedEta',
+      'recorded_temperature': 'recordedTemperature',
+      'quantity_unit_of_measurement': 'quantityUnitOfMeasurement',
+      'quantity_unit_of_measurement1': 'quantityUnitOfMeasurement1',
+      'quantity_unit_of_measurement2': 'quantityUnitOfMeasurement2',
+      'pod_signature': 'podSignature',
+      'delivery_proof': 'deliveryProof',
+      'tracking_link': 'trackingLink',
+      'consignment_reference': 'consignmentReference'
+    };
+
+    // Try exact match first (case-insensitive)
+    const normalizedHeader = columnHeader.toLowerCase().trim();
+    const exactMatch = directMappings[normalizedHeader];
+    if (exactMatch) {
+      return exactMatch;
     }
-    
-    // Header content analysis with comprehensive pattern matching
-    const suggestions = [
-      // Tracking links - very broad pattern matching
-      { field: 'trackingLink', score: 
-        header.includes('tracking') || header.includes('track') ? 100 :
-        header.includes('link') || header.includes('url') || header.includes('reference') ? 90 :
-        header.includes('ref') || header.includes('trace') ? 80 : 0 },
-      
-      // Consignment references - catch many variations
-      { field: 'consignmentNumber', score: 
-        header.includes('consign') ? 100 :
-        header.includes('order') || header.includes('job') ? 90 :
-        header.includes('number') || header.includes('num') || header.includes('#') ? 80 :
-        header.includes('id') || header.includes('code') ? 75 : 0 },
-      
-      // Customer information - very broad
-      { field: 'customerName', score:
-        header.includes('customer') || header.includes('client') ? 100 :
-        header.includes('company') || header.includes('business') ? 95 :
-        header.includes('name') || header.includes('receiver') ? 85 :
-        header.includes('vendor') || header.includes('supplier') ? 80 : 0 },
-      
-      // Delivery addresses - catch many formats
-      { field: 'deliveryAddress', score:
-        header.includes('deliver') && header.includes('addr') ? 100 :
-        header.includes('deliver') || header.includes('destination') ? 95 :
-        header.includes('to') || header.includes('ship') ? 90 :
-        header.includes('address') && !header.includes('pickup') && !header.includes('from') ? 85 : 0 },
-      
-      // Pickup addresses
-      { field: 'pickupAddress', score:
-        header.includes('pickup') || header.includes('collect') ? 100 :
-        header.includes('origin') || header.includes('from') ? 95 :
-        header.includes('source') || header.includes('start') ? 90 : 0 },
-      
-      // Status - broad matching
-      { field: 'status', score:
-        header.includes('status') || header.includes('state') ? 100 :
-        header.includes('condition') || header.includes('progress') ? 90 : 0 },
-      
-      // Dates - very broad patterns
-      { field: 'estimatedDeliveryDate', score:
-        header.includes('deliver') && header.includes('date') ? 100 :
-        header.includes('eta') || header.includes('estimated') ? 95 :
-        header.includes('due') || header.includes('expected') ? 90 :
-        header.includes('date') && header.includes('delivery') ? 85 : 0 },
-      
-      // Quantities - catch variations
-      { field: 'quantity', score:
-        header.includes('quantity') || header.includes('qty') ? 100 :
-        header.includes('count') || header.includes('amount') ? 95 :
-        header.includes('units') || header.includes('pieces') ? 90 :
-        header.includes('items') || header.includes('total') ? 85 : 0 },
-      
-      // Pallets
-      { field: 'pallets', score:
-        header.includes('pallet') ? 100 :
-        header.includes('skid') ? 90 : 0 },
-      
-      // Spaces
-      { field: 'spaces', score:
-        header.includes('space') ? 100 :
-        header.includes('slot') || header.includes('position') ? 90 : 0 },
-      
-      // Temperature zones
-      { field: 'temperatureZone', score:
-        header.includes('temp') || header.includes('temperature') ? 100 :
-        header.includes('zone') || header.includes('storage') ? 90 :
-        header.includes('cold') || header.includes('frozen') ? 85 : 0 },
-      
-      // Location
-      { field: 'lastKnownLocation', score:
-        header.includes('location') ? 100 :
-        header.includes('where') || header.includes('current') ? 90 :
-        header.includes('last') || header.includes('position') ? 85 : 0 }
-    ];
-    
-    // Find the highest scoring suggestion
-    const bestMatch = suggestions.reduce((best, current) => 
-      current.score > best.score ? current : best, { field: 'ignore', score: 0 });
-    
-    return bestMatch.score > 20 ? bestMatch.field : 'ignore';
+
+    // Try with spaces converted to underscores
+    const withUnderscores = normalizedHeader.replace(/\s+/g, '_');
+    const underscoreMatch = directMappings[withUnderscores];
+    if (underscoreMatch) {
+      return underscoreMatch;
+    }
+
+    return 'ignore';
   };
 
-  // Apply smart suggestions automatically when file is loaded
-  const applySuggestedMappings = (headersList: string[]) => {
-    const suggestedMappings: Record<string, string> = {};
-    headersList.forEach((header, index) => {
-      const suggestion = suggestMapping(header, index);
-      if (suggestion !== 'ignore') {
-        suggestedMappings[header] = suggestion;
-      }
+  // Auto-apply mapping when file is loaded
+  const applyAutoMapping = (headers: string[]) => {
+    const newMapping: Record<string, string> = {};
+    headers.forEach(header => {
+      newMapping[header] = autoMapColumn(header);
     });
-    setFieldMapping(suggestedMappings);
+    setFieldMapping(newMapping);
     
-    const mappedCount = Object.values(suggestedMappings).filter(val => val !== 'ignore').length;
+    localStorage.setItem('consignment-field-mapping', JSON.stringify(newMapping));
+    
     toast({
-      title: "Smart mapping applied!",
-      description: `Automatically mapped ${mappedCount} of ${headersList.length} columns. Column D prioritized for tracking links.`,
+      title: "Auto-mapping applied",
+      description: `Automatically mapped ${Object.values(newMapping).filter(v => v !== 'ignore').length} columns`,
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    const reader = new FileReader();
+    
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        defval: '',
+        raw: false
+      }) as string[][];
+      
+      if (jsonData.length === 0) {
+        toast({
+          title: "Error",
+          description: "The uploaded file appears to be empty.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
-      // Handle Excel files
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          try {
-            const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            
-            // Convert to JSON array
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            const rows = jsonData.map((row: any) => 
-              Array.isArray(row) ? row.map(cell => cell?.toString() || '') : []
-            ).filter(row => row.some(cell => cell.trim() !== ''));
-            
-            if (rows.length > 0) {
-              const headersList = rows[0].map(header => header || `Column ${rows[0].indexOf(header)}`);
-              setHeaders(headersList);
-              setFileData(rows);
-              setShowPreview(true);
-              
-              // Skip auto-mapping - let user manually select
-              
-              toast({
-                title: "Excel file loaded successfully",
-                description: `Found ${rows.length - 1} data rows with ${headersList.length} columns`
-              });
-            }
-          } catch (error) {
-            toast({
-              title: "Error reading Excel file",
-              description: "Unable to parse the Excel file. Please check the format.",
-              variant: "destructive"
-            });
-          }
-        }
-        setIsUploading(false);
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      // Handle CSV files
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          const content = e.target.result as string;
-          const rows = content.split('\n')
-            .filter(line => line.trim())
-            .map(line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
-          
-          if (rows.length > 0) {
-            const headersList = rows[0];
-            setHeaders(headersList);
-            setFileData(rows);
-            setShowPreview(true);
-            
-            // Skip auto-mapping - let user manually select
-            
-            toast({
-              title: "CSV file loaded successfully",
-              description: `Found ${rows.length - 1} data rows with ${headersList.length} columns`
-            });
-          }
-        }
-        setIsUploading(false);
-      };
-      reader.readAsText(file);
+      const fileHeaders = jsonData[0] || [];
+      const fileContent = jsonData.slice(1);
+      
+      setHeaders(fileHeaders);
+      setFileData(fileContent);
+      setShowPreview(true);
+      
+      // Apply auto-mapping
+      applyAutoMapping(fileHeaders);
+      
+      toast({
+        title: "File uploaded successfully",
+        description: `Found ${fileContent.length} rows with ${fileHeaders.length} columns`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to parse the uploaded file.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  const updateFieldMapping = (csvField: string, systemField: string) => {
-    const newMapping = {
-      ...fieldMapping,
-      [csvField]: systemField
-    };
+  const updateFieldMapping = (header: string, value: string) => {
+    const newMapping = { ...fieldMapping, [header]: value };
     setFieldMapping(newMapping);
-    // Save to localStorage so it persists between sessions
     localStorage.setItem('consignment-field-mapping', JSON.stringify(newMapping));
   };
 
-  const importData = async () => {
-    const mappedFields = Object.entries(fieldMapping).filter(([_, value]) => value !== "ignore");
-    
-    if (mappedFields.length === 0) {
+  const handleImport = async () => {
+    if (!fileData.length) {
       toast({
-        title: "No fields mapped",
-        description: "Please map at least one field before importing",
-        variant: "destructive"
+        title: "Error",
+        description: "No data to import",
+        variant: "destructive",
       });
       return;
     }
 
     setIsUploading(true);
-    try {
-      // Create the import data
-      const importRows = fileData.slice(1).map(row => {
-        const mappedRow: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          const systemField = fieldMapping[header];
-          if (systemField && systemField !== "ignore") {
-            mappedRow[systemField] = row[index] || "";
-          }
-        });
-        return mappedRow;
+    
+    const importRows = fileData.map((row) => {
+      const mappedRow: any = {};
+      headers.forEach((header, index) => {
+        const fieldName = fieldMapping[header];
+        if (fieldName && fieldName !== 'ignore') {
+          mappedRow[fieldName] = row[index] || '';
+        }
       });
+      return mappedRow;
+    });
 
-      // Send data to backend for processing
+    try {
       const response = await fetch("/api/admin/import-direct", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify({
-          importRows,
-          importToDatabase: true,
-          updateExisting: false
-        })
+        body: JSON.stringify({ importRows })
       });
 
       const result = await response.json();
       
-      if (response.ok) {
+      if (result.success) {
         toast({
-          title: "Import completed successfully",
-          description: `Successfully imported ${result.importedCount || importRows.length} records with ${mappedFields.length} mapped fields`
+          title: "Import successful",
+          description: result.message,
         });
-
-        // Reset the form
+        
+        // Clear the form
         setFileData([]);
         setHeaders([]);
         setFieldMapping({});
         setShowPreview(false);
       } else {
-        throw new Error(result.message || "Import failed");
+        toast({
+          title: "Import failed",
+          description: result.message || "There was an error importing the data",
+          variant: "destructive",
+        });
       }
-      
     } catch (error) {
       toast({
         title: "Import failed",
         description: "There was an error importing the data",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsUploading(false);
@@ -361,200 +292,113 @@ export default function SimpleImport() {
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <header className="bg-primary text-white shadow-md z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-white">ChillTrack</h1>
-            <span className="ml-4 text-white/80">Import Data</span>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
-              onClick={() => window.location.href = '/dashboard'}
-            >
-              Dashboard
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
-              onClick={() => window.location.href = '/admin'}
-            >
-              Admin
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Simple Data Import</h1>
-          <p className="text-gray-600">Upload your file and map columns to system fields</p>
-        </div>
-
-      {!showPreview ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileSpreadsheet className="h-5 w-5 mr-2" />
-              Upload File
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                className="hidden"
-                id="file-upload"
-              />
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium mb-2">Click to upload file</p>
-                <p className="text-gray-500">CSV or Excel files accepted</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-6 w-6" />
+            Excel Import
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="file-upload" className="block text-sm font-medium mb-2">
+                Upload Excel File
               </label>
+              <input
+                id="file-upload"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* Field Mapping */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle>Map Your Columns</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    For each system field, select which column from your file contains that data
-                  </p>
-                </div>
 
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {SYSTEM_FIELDS.filter(field => field.value !== "ignore").map((systemField, index) => {
-                  // Find which CSV header is mapped to this system field
-                  const mappedCsvHeader = Object.entries(fieldMapping).find(([_, value]) => value === systemField.value)?.[0];
-                  
-                  return (
-                    <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <label className="font-medium text-sm">{systemField.label}</label>
-                        <p className="text-xs text-gray-500">System field</p>
-                      </div>
-                      <div className="flex-1">
+            {showPreview && (
+              <>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Column Mapping</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {headers.map((header, index) => (
+                      <div key={index} className="space-y-2">
+                        <label className="block text-sm font-medium">
+                          {header}
+                        </label>
                         <SearchableSelect
-                          options={["ignore", ...headers]}
-                          value={mappedCsvHeader || "ignore"}
-                          onChange={(value) => {
-                            setFieldMapping(prev => {
-                              const newMapping = { ...prev };
-                              
-                              // Clear any existing mapping for this system field
-                              Object.keys(newMapping).forEach(key => {
-                                if (newMapping[key] === systemField.value) {
-                                  delete newMapping[key];
-                                }
-                              });
-                              
-                              // Clear any existing mapping for this CSV header (avoid conflicts)
-                              if (value !== "ignore" && value !== "") {
-                                Object.keys(newMapping).forEach(key => {
-                                  if (key === value) {
-                                    delete newMapping[key];
-                                  }
-                                });
-                                
-                                // Set new mapping
-                                newMapping[value] = systemField.value;
-                              }
-                              
-                              return newMapping;
-                            });
-                          }}
-                          placeholder="Select your column..."
+                          options={SYSTEM_FIELDS.map(field => field.value)}
+                          value={fieldMapping[header] || 'ignore'}
+                          onChange={(value) => updateFieldMapping(header, value)}
+                          placeholder="Select field..."
                           className="w-full"
                         />
                       </div>
-                      <div className="w-8 flex justify-center">
-                        {mappedCsvHeader ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <X className="h-4 w-4 text-gray-300" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Data Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Preview</CardTitle>
-              <p className="text-sm text-gray-600">
-                First 5 rows of your data
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {headers.map((header, index) => (
-                        <TableHead key={index} className="min-w-32">
-                          {header}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fileData.slice(1, 6).map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                          <TableCell key={cellIndex} className="max-w-48 truncate">
-                            {cell}
-                          </TableCell>
-                        ))}
-                      </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                  </div>
+                </div>
 
-          {/* Import Actions */}
-          <div className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowPreview(false);
-                setFileData([]);
-                setHeaders([]);
-                setFieldMapping({});
-              }}
-            >
-              Upload Different File
-            </Button>
-            <Button 
-              onClick={importData}
-              disabled={isUploading || Object.values(fieldMapping).every(v => v === "ignore")}
-            >
-              {isUploading ? "Importing..." : "Import Data"}
-            </Button>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Preview ({fileData.length} rows)</h3>
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="overflow-x-auto max-h-96">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {headers.map((header, index) => (
+                              <TableHead key={index} className="min-w-32">
+                                <div className="space-y-1">
+                                  <div className="font-medium">{header}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {fieldMapping[header] === 'ignore' ? (
+                                      <X className="h-3 w-3 text-red-500" />
+                                    ) : (
+                                      <Check className="h-3 w-3 text-green-500" />
+                                    )}
+                                    {SYSTEM_FIELDS.find(f => f.value === fieldMapping[header])?.label || 'Ignored'}
+                                  </div>
+                                </div>
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {fileData.slice(0, 5).map((row, rowIndex) => (
+                            <TableRow key={rowIndex}>
+                              {row.map((cell, cellIndex) => (
+                                <TableCell key={cellIndex} className="min-w-32">
+                                  {cell}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <Button 
+                    onClick={handleImport}
+                    disabled={isUploading}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? 'Importing...' : 'Import Data'}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => applyAutoMapping(headers)}
+                    disabled={isUploading}
+                  >
+                    Auto-Map Columns
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
