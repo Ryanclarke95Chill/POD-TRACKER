@@ -209,7 +209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ]
               };
               
+              console.log(`Attempting to save consignment ${importedCount + 1}:`, consignmentData);
               await storage.createConsignment(consignmentData);
+              console.log(`Successfully saved consignment ${importedCount + 1}`);
               importedCount++;
             } catch (error) {
               console.error("Error creating consignment:", error);
