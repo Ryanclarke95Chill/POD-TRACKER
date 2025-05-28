@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
 
   // Clear all local storage data automatically on load to remove the 30,000+ records
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.clear();
   }, []);
 
