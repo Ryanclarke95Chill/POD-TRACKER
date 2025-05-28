@@ -65,6 +65,16 @@ const SYSTEM_FIELDS = [
   { value: "quantityUnitOfMeasurement2", label: "Quantity Unit of Measurement 2" },
   { value: "podSignature", label: "POD Signature" },
   { value: "deliveryProof", label: "Delivery Proof" },
+  { value: "vehicleCode", label: "Vehicle Code" },
+  { value: "deliveryEtaDeviation", label: "Delivery ETA Deviation" },
+  { value: "receivedDeliveryPodFiles", label: "Received Delivery PoD Files" },
+  { value: "tripNumber", label: "Trip Number" },
+  { value: "from", label: "From" },
+  { value: "to", label: "To" },
+  { value: "carrier", label: "Carrier" },
+  { value: "requiredTags", label: "Required Tags" },
+  { value: "orderCarrierEmail", label: "Order Carrier Email" },
+  { value: "orderNumber", label: "Order Number" },
 ];
 
 export default function SimpleImport() {

@@ -10,7 +10,8 @@ interface ConsignmentCardProps {
 
 export default function ConsignmentCard({ consignment, onViewDetails }: ConsignmentCardProps) {
   // Helper to determine status badge color
-  const getStatusBadgeClass = (status: string): string => {
+  const getStatusBadgeClass = (status: string | null): string => {
+    if (!status) return "bg-neutral-400";
     switch (status) {
       case "In Transit":
         return "bg-status-transit";

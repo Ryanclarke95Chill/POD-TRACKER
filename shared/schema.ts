@@ -104,7 +104,7 @@ export const consignments = pgTable("consignments", {
   requiredTags: text("required_tags"),
   orderCarrierEmail: text("order_carrier_email"),
   orderNumber: text("order_number"),
-  events: json("events").$type<ConsignmentEvent[]>().default([]),
+  events: text("events").default('[]'),
 });
 
 export const insertConsignmentSchema = createInsertSchema(consignments).pick({
