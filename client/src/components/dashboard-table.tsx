@@ -9,16 +9,16 @@ interface DashboardTableProps {
 }
 
 export default function DashboardTable({ consignments, onViewDetails }: DashboardTableProps) {
-  // Fixed columns matching your image exactly
+  // Fixed columns using correct field names from database
   const columns = [
-    { key: 'delivery_livetrack_link', label: 'Tracking link' },
+    { key: 'pickupLivetrackLink', label: 'Tracking link' },
     { key: 'origin', label: 'Pickup from' },
-    { key: 'document_string2', label: 'Deliver to' },
-    { key: 'customer_order_number', label: 'Reference' },
-    { key: 'delivery_calculated_eta', label: 'ETA' },
+    { key: 'documentString2', label: 'Deliver to' },
+    { key: 'customerOrderNumber', label: 'Reference' },
+    { key: 'pickupCalculatedEta', label: 'ETA' },
     { key: 'shipper', label: 'Customer Name' },
-    { key: 'delivery_outcome_date', label: 'Delivered on' },
-    { key: 'group_causal_delivery_outcome', label: 'Status' }
+    { key: 'pickupOutcomeDate', label: 'Delivered on' },
+    { key: 'pickupOutcome', label: 'Status' }
   ];
 
   const getFieldValue = (consignment: Consignment, fieldKey: string): string => {
