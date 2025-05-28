@@ -118,6 +118,14 @@ export default function SimpleImport() {
       'recorded temperature': 'recordedTemperature',
       'quantity unit of measurement1': 'quantityUnitOfMeasurement1',
       'quantity unit of measurement2': 'quantityUnitOfMeasurement2',
+      'vehicle code': 'vehicleCode',
+      'delivery eta deviation': 'deliveryEtaDeviation',
+      'received delivery pod files': 'receivedDeliveryPodFiles',
+      'trip number': 'tripNumber',
+      'required tags': 'requiredTags',
+      'order carrier email': 'orderCarrierEmail',
+      'order number': 'orderNumber',
+      'document_string2': 'documentString2',
     };
 
     const specialMatch = specialMappings[normalizedHeader];
