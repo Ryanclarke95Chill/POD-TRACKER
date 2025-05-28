@@ -410,8 +410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log('');
       
-      for (let i = 0; i < testRows.length; i++) {
-        const row = testRows[i];
+      for (let i = 0; i < importRows.length; i++) {
+        const row = importRows[i];
         const columns = ['user_id'];
         const values = [userId];
         const placeholders = ['$1'];
