@@ -29,7 +29,11 @@ export default function SimpleImport() {
   const [fileData, setFileData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>(() => {
+    // Load saved field mapping from localStorage
+    const saved = localStorage.getItem('consignment-field-mapping');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [showPreview, setShowPreview] = useState(false);
 
   // Smart mapping suggestions based on column headers, position, and common patterns
@@ -220,10 +224,13 @@ export default function SimpleImport() {
   };
 
   const updateFieldMapping = (csvField: string, systemField: string) => {
-    setFieldMapping(prev => ({
-      ...prev,
+    const newMapping = {
+      ...fieldMapping,
       [csvField]: systemField
-    }));
+    };
+    setFieldMapping(newMapping);
+    // Save to localStorage so it persists between sessions
+    localStorage.setItem('consignment-field-mapping', JSON.stringify(newMapping));
   };
 
   const importData = async () => {
