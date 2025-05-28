@@ -309,7 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (value !== undefined && value !== null && value !== '') {
             // Escape reserved SQL keywords by wrapping in quotes
             const reservedKeywords = ['from', 'to', 'order', 'where', 'select', 'insert', 'update', 'delete'];
-            const escapedColumn = reservedKeywords.includes(dbColumn.toLowerCase()) ? `"${dbColumn}"` : dbColumn;
+            const needsEscaping = reservedKeywords.some(keyword => dbColumn.toLowerCase().includes(keyword));
+            const escapedColumn = needsEscaping ? `"${dbColumn}"` : dbColumn;
             
             columns.push(escapedColumn);
             paramCount++;
