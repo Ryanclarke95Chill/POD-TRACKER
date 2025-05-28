@@ -75,82 +75,48 @@ export default function SimpleImport() {
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [showPreview, setShowPreview] = useState(false);
 
-  // Auto-mapping that matches Excel column names directly to database fields
+  // Perfect 1:1 mapping since Excel columns match database exactly
   const autoMapColumn = (columnHeader: string): string => {
-    const directMappings: Record<string, string> = {
-      'consignment_number': 'consignmentNumber',
-      'customer_name': 'customerName', 
-      'delivery_address': 'deliveryAddress',
-      'pickup_address': 'pickupAddress',
-      'status': 'status',
-      'estimated_delivery_date': 'estimatedDeliveryDate',
-      'temperature_zone': 'temperatureZone',
-      'last_known_location': 'lastKnownLocation',
-      'quantity': 'quantity',
-      'pallets': 'pallets',
-      'spaces': 'spaces',
-      'delivery_run': 'deliveryRun',
-      'weight_kg': 'weightKg',
-      'cubic_meters': 'cubicMeters',
-      'shipper': 'shipper',
-      'receiver': 'receiver',
-      'driver': 'driver',
-      'vehicle': 'vehicle',
-      'route': 'route',
-      'notes': 'notes',
-      'delivery_time': 'deliveryTime',
-      'pickup_time': 'pickupTime',
-      'consignment_type': 'consignmentType',
-      'priority': 'priority',
-      'delivery_zone': 'deliveryZone',
-      'pickup_zone': 'pickupZone',
-      'customer_reference': 'customerReference',
-      'invoice_number': 'invoiceNumber',
-      'product_description': 'productDescription',
-      'special_instructions': 'specialInstructions',
-      'delivery_instructions': 'deliveryInstructions',
-      'pickup_instructions': 'pickupInstructions',
-      'pickup_company': 'pickupCompany',
-      'delivery_company': 'deliveryCompany',
-      'pickup_contact_name': 'pickupContactName',
-      'delivery_contact_name': 'deliveryContactName',
-      'pickup_contact_phone': 'pickupContactPhone',
-      'delivery_contact_phone': 'deliveryContactPhone',
-      'delivery_date': 'deliveryDate',
-      'date_delivered': 'dateDelivered',
-      'consignment_required_delivery_date': 'consignmentRequiredDeliveryDate',
-      'delivery_livetrack_link': 'deliveryLivetrackLink',
-      'customer_order_number': 'customerOrderNumber',
-      'document_string2': 'documentString2',
-      'from_location': 'fromLocation',
-      'to_location': 'toLocation',
-      'group_causal_delivery_outcome': 'groupCausalDeliveryOutcome',
-      'delivery_planned_eta': 'deliveryPlannedEta',
-      'recorded_temperature': 'recordedTemperature',
-      'quantity_unit_of_measurement': 'quantityUnitOfMeasurement',
-      'quantity_unit_of_measurement1': 'quantityUnitOfMeasurement1',
-      'quantity_unit_of_measurement2': 'quantityUnitOfMeasurement2',
-      'pod_signature': 'podSignature',
-      'delivery_proof': 'deliveryProof',
-      'tracking_link': 'trackingLink',
-      'consignment_reference': 'consignmentReference'
+    // Convert database field names to camelCase for the frontend
+    const toCamelCase = (str: string): string => {
+      return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
     };
 
-    // Try exact match first (case-insensitive)
+    // Clean the header and convert to camelCase
     const normalizedHeader = columnHeader.toLowerCase().trim();
-    const exactMatch = directMappings[normalizedHeader];
-    if (exactMatch) {
-      return exactMatch;
+    const camelCaseField = toCamelCase(normalizedHeader);
+    
+    // Check if this camelCase field exists in our SYSTEM_FIELDS
+    const fieldExists = SYSTEM_FIELDS.find(field => field.value === camelCaseField);
+    
+    if (fieldExists) {
+      return camelCaseField;
     }
 
-    // Try with spaces converted to underscores
-    const withUnderscores = normalizedHeader.replace(/\s+/g, '_');
-    const underscoreMatch = directMappings[withUnderscores];
-    if (underscoreMatch) {
-      return underscoreMatch;
+    // For exact matches, just return the camelCase version
+    // This handles cases like "shipper" -> "shipper", "status" -> "status"
+    if (SYSTEM_FIELDS.find(field => field.value === normalizedHeader)) {
+      return normalizedHeader;
     }
 
-    return 'ignore';
+    // Special handling for common variations
+    const specialMappings: Record<string, string> = {
+      'delivery livetrack link': 'deliveryLivetrackLink',
+      'customer order number': 'customerOrderNumber',
+      'group causal delivery outcome': 'groupCausalDeliveryOutcome',
+      'delivery planned eta': 'deliveryPlannedEta',
+      'recorded temperature': 'recordedTemperature',
+      'quantity unit of measurement1': 'quantityUnitOfMeasurement1',
+      'quantity unit of measurement2': 'quantityUnitOfMeasurement2',
+    };
+
+    const specialMatch = specialMappings[normalizedHeader];
+    if (specialMatch) {
+      return specialMatch;
+    }
+
+    // Default to camelCase conversion for any field that might exist
+    return camelCaseField;
   };
 
   // Auto-apply mapping when file is loaded
