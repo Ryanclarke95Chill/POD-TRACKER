@@ -159,6 +159,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("ERROR: No import data provided");
       return res.status(400).json({ success: false, message: "No import data provided" });
     }
+
+    // IMMEDIATE DEBUG - Show Excel columns at the very start
+    const firstRow = importRows[0];
+    const allExcelHeaders = Object.keys(firstRow);
+    
+    console.log(`\n🔍 COMPREHENSIVE MAPPING ANALYSIS - MOVED TO TOP`);
+    console.log(`📊 Total Excel Headers Found: ${allExcelHeaders.length}`);
+    console.log(`\n📋 ALL EXCEL HEADERS DETECTED:`);
+    allExcelHeaders.forEach((header, index) => {
+      console.log(`  ${index + 1}. "${header}"`);
+    });
+    console.log('');
     
     // Function to normalize Excel headers to database field names
     const normalizeHeader = (header: string): string => {
