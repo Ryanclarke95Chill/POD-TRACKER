@@ -24,7 +24,8 @@ export default function ConsignmentCard({ consignment, onViewDetails }: Consignm
   };
 
   // Helper to determine temperature zone dot color
-  const getTempZoneClass = (tempZone: string): string => {
+  const getTempZoneClass = (tempZone: string | null): string => {
+    if (!tempZone) return "bg-neutral-400";
     if (tempZone.includes("Dry")) return "bg-temp-dry";
     if (tempZone.includes("Chiller")) return "bg-temp-chiller";
     if (tempZone.includes("Freezer")) return "bg-temp-freezer";

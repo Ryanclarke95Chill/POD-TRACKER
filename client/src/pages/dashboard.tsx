@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,16 +22,24 @@ export default function Dashboard() {
   };
   const user = getUser();
 
-  const { data: consignments = [], isLoading } = useQuery({
-    queryKey: ["/api/consignments", Date.now()], // Force refresh
-    staleTime: 0, // Always fetch fresh data
-    cacheTime: 0, // Don't cache
+  const queryClient = useQueryClient();
+
+  const { data: consignments = [], isLoading, refetch } = useQuery({
+    queryKey: ["/api/consignments"],
+    staleTime: 0,
+    gcTime: 0,
   });
 
+  // Force refresh when component mounts and clear cache
+  useEffect(() => {
+    queryClient.clear();
+    refetch();
+  }, [refetch, queryClient]);
+
   // Filter consignments based on search term and temperature zone
-  const filteredConsignments = consignments.filter((consignment: Consignment) => {
+  const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
-      consignment.consignmentNumber.toLowerCase().includes(searchTerm.toLowerCase());
+      (consignment.consignmentNumber && consignment.consignmentNumber.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTempZone = selectedTempZone === "all" || 
       consignment.temperatureZone === selectedTempZone;
     return matchesSearch && matchesTempZone;

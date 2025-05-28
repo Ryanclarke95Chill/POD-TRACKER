@@ -93,6 +93,17 @@ export const consignments = pgTable("consignments", {
   invoiceNumber: text("invoice_number"),
   podSignature: text("pod_signature"),
   deliveryProof: text("delivery_proof"),
+  // Additional columns from your Excel file
+  vehicleCode: text("vehicle_code"),
+  deliveryEtaDeviation: text("delivery_eta_deviation"), 
+  receivedDeliveryPodFiles: text("received_delivery_pod_files"),
+  tripNumber: text("trip_number"),
+  from: text("from"),
+  to: text("to"),
+  carrier: text("carrier"),
+  requiredTags: text("required_tags"),
+  orderCarrierEmail: text("order_carrier_email"),
+  orderNumber: text("order_number"),
   events: json("events").$type<ConsignmentEvent[]>().default([]),
 });
 
