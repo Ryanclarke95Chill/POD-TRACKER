@@ -118,11 +118,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/admin/import", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== NEW IMPORT ROUTE HIT ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    
     try {
-      console.log("=== IMPORT ROUTE HIT ===");
-      console.log("Request body keys:", Object.keys(req.body));
-      console.log("Has importRows?", !!req.body.importRows);
-      
       const userId = req.user?.id;
       
       if (!userId) {
