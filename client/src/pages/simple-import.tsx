@@ -109,28 +109,33 @@ export default function SimpleImport() {
       return normalizedHeader;
     }
 
-    // Special handling for common variations
-    const specialMappings: Record<string, string> = {
-      'delivery livetrack link': 'deliveryLivetrackLink',
-      'customer order number': 'customerOrderNumber',
-      'group causal delivery outcome': 'groupCausalDeliveryOutcome',
-      'delivery planned eta': 'deliveryPlannedEta',
-      'recorded temperature': 'recordedTemperature',
-      'quantity unit of measurement1': 'quantityUnitOfMeasurement1',
-      'quantity unit of measurement2': 'quantityUnitOfMeasurement2',
+    // Exact mapping for your Excel column names
+    const exactMappings: Record<string, string> = {
       'vehicle code': 'vehicleCode',
       'delivery eta deviation': 'deliveryEtaDeviation',
       'received delivery pod files': 'receivedDeliveryPodFiles',
       'trip number': 'tripNumber',
+      'from': 'from',
+      'to': 'to',
+      'carrier': 'carrier',
+      'driver': 'driver',
+      'customer order number': 'customerOrderNumber',
+      'document_string2': 'documentString2',
+      'delivery livetrack link': 'deliveryLivetrackLink',
       'required tags': 'requiredTags',
       'order carrier email': 'orderCarrierEmail',
       'order number': 'orderNumber',
-      'document_string2': 'documentString2',
+      // Additional common mappings
+      'delivery planned eta': 'deliveryPlannedEta',
+      'recorded temperature': 'recordedTemperature',
+      'quantity unit of measurement1': 'quantityUnitOfMeasurement1',
+      'quantity unit of measurement2': 'quantityUnitOfMeasurement2',
+      'group causal delivery outcome': 'groupCausalDeliveryOutcome',
     };
 
-    const specialMatch = specialMappings[normalizedHeader];
-    if (specialMatch) {
-      return specialMatch;
+    const exactMatch = exactMappings[normalizedHeader];
+    if (exactMatch) {
+      return exactMatch;
     }
 
     // Default to camelCase conversion for any field that might exist
