@@ -343,7 +343,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sql = `
           INSERT INTO consignments (${escapedColumns.join(', ')})
           VALUES (${placeholders.join(', ')})
-          ON CONFLICT (consignment_number) DO NOTHING
           RETURNING id
         `;
         
