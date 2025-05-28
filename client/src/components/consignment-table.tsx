@@ -40,14 +40,14 @@ const DEFAULT_FIELD_LABELS: Record<string, string> = {
 
 // Default visible fields for dashboard - using fields that actually have data
 const DEFAULT_VISIBLE_FIELDS = [
-  'id',
   'shipper',
   'driver',
   'delivery_company',
   'pickup_company',
   'vehicle',
   'route',
-  'delivery_planned_eta'
+  'delivery_planned_eta',
+  'events'
 ];
 
 export default function ConsignmentTable({ consignments, onViewDetails }: ConsignmentTableProps) {
