@@ -147,9 +147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Completely rebuilt import route that can handle any Excel columns
+  // Smart Excel import with dynamic header normalization
   app.post("/api/admin/import-direct", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== REBUILT IMPORT ROUTE ===");
+    console.log("=== SMART EXCEL IMPORT ===");
     const userId = req.user!.id;
     const { importRows } = req.body;
     
@@ -160,195 +160,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ success: false, message: "No import data provided" });
     }
     
+    // Function to normalize Excel headers to database field names
+    const normalizeHeader = (header: string): string => {
+      return header
+        .toLowerCase()                    // Convert to lowercase
+        .trim()                          // Remove leading/trailing spaces
+        .replace(/[\[\]()]/g, '')        // Remove brackets and parentheses
+        .replace(/[^a-z0-9]/g, '_')      // Replace non-alphanumeric with underscores
+        .replace(/_+/g, '_')             // Collapse multiple underscores
+        .replace(/^_|_$/g, '');          // Remove leading/trailing underscores
+    };
+    
+    // Get all database columns from the schema to match against
+    const allDbColumns = [
+      'consignment_number', 'customer_name', 'consignment_reference', 'tracking_link',
+      'pickup_address', 'delivery_address', 'status', 'estimated_delivery_date',
+      'delivery_date', 'date_delivered', 'consignment_required_delivery_date',
+      'temperature_zone', 'last_known_location', 'delivery_run', 'quantity',
+      'pallets', 'spaces', 'cubic_meters', 'weight_kg', 'shipper', 'receiver',
+      'pickup_company', 'delivery_company', 'pickup_contact_name', 'delivery_contact_name',
+      'pickup_contact_phone', 'delivery_contact_phone', 'special_instructions',
+      'product_description', 'delivery_instructions', 'pickup_instructions',
+      'delivery_livetrack_link', 'customer_order_number', 'document_string2',
+      'from_location', 'to_location', 'group_causal_delivery_outcome',
+      'delivery_planned_eta', 'recorded_temperature', 'quantity_unit_of_measurement',
+      'quantity_unit_of_measurement1', 'quantity_unit_of_measurement2', 'route',
+      'driver', 'vehicle', 'delivery_time', 'pickup_time', 'consignment_type',
+      'priority', 'delivery_zone', 'pickup_zone', 'notes', 'customer_reference',
+      'invoice_number', 'pod_signature', 'delivery_proof', 'vehicle_code',
+      'delivery_eta_deviation', 'received_delivery_pod_files', 'trip_number',
+      'from', 'to', 'carrier', 'required_tags', 'order_carrier_email', 'order_number',
+      'delivery_calculated_eta', 'time_spent_in_the_unloading_area',
+      'delivery_outcome_causal', 'delivery_arrival_date', 'delivery_outcome_date',
+      'delivery_unload_date', 'delivery_outcome_note', 'delivery_last_position',
+      'delivery_last_position_date', 'pickup_planned_eta', 'eta_delivery_on_departure',
+      'delivery_live_distance_km', 'delivery_distance_km', 'delivery_outcome_transmission_date',
+      'delivery_outcome_receipt_date', 'delivery_unload_sequence', 'delivery_time_window',
+      'pickup_arrival_date', 'pickup_outcome_date', 'pickup_load_date',
+      'pickup_outcome_reason', 'group_causal_pickup_outcome', 'pickup_outcome_note',
+      'pickup_last_position', 'pickup_last_position_date', 'pickup_calculated_eta',
+      'eta_pickup_on_departure', 'pickup_live_distance_km', 'pickup_distance_km',
+      'pickup_outcome_receipt_date', 'pickup_load_sequence', 'pickup_time_window',
+      'from_master_data_code', 'shipper_city', 'shipper_province',
+      'shipper_master_data_code', 'depot', 'depot_master_data_code',
+      'recipient_master_data_code', 'delivery_city', 'delivery_province',
+      'carrier_master_data_code', 'sub_carrier', 'sub_carrier_master_data_code',
+      'order_date', 'document_note', 'order_type', 'order_series',
+      'shipper_order_reference_number', 'error_description', 'driver_phone',
+      'tractor_license_plate', 'trailer_license_plate', 'delivery_outcome',
+      'delivery_punctuality', 'delivery_geolocalization_state', 'pickup_outcome',
+      'pickup_punctuality', 'pickup_geolocation_state', 'delivery_state',
+      'pickup_state', 'destination_coordinates', 'departure_coordinates',
+      'expected_temperature', 'delivery_maximum_date', 'delivery_minimum_date',
+      'pickup_minimum_date', 'pickup_maximum_date', 'volume_m3', 'linear_meters_m',
+      'ground_bases', 'document_date1', 'document_date2', 'document_date3',
+      'document_string1', 'document_string3', 'time_spent_in_the_loading_area',
+      'delivery_outcome_in_area', 'pickup_outcome_in_area', 'delivery_outcome_position',
+      'pickup_outcome_position', 'seals', 'task_id', 'id_creation_import',
+      'expected_payment_method_code', 'expected_payment_method',
+      'delivery_outcome_registration_date', 'pickup_outcome_registration_date',
+      'delivery_pin_is_valid', 'pick_up_pin_is_valid', 'expected_payment_notes',
+      'delivery_pod_files', 'pickup_pod_files', 'departure_date_initially_planned_by_the_context',
+      'order_carrier_mobile_telephone_number', 'order_carrier_telephone_number',
+      'order_pickup_email', 'order_pickup_mobile_telephone_number',
+      'order_pickup_telephone_number', 'order_delivery_email',
+      'order_delivery_mobile_telephone_number', 'order_delivery_telephone_number',
+      'order_sub_carrier_email', 'order_sub_carrier_mobile_telephone_number',
+      'order_sub_carrier_telephone_number', 'order_shipper_email',
+      'order_shipper_mobile_telephone_number', 'order_shipper_telephone_number',
+      'forbidden_tags', 'pickup_planned_service_time', 'delivery_planned_service_time',
+      'external_reference', 'depot_phone_number_specified_in_the_order',
+      'depot_mobile_phone_number_specified_in_the_order', 'received_pickup_pod_files',
+      'required_tags_description', 'forbidden_tags_description', 'from_postal_code',
+      'to_postal_code', 'from_country', 'to_country', 'pickup_eta_deviation',
+      'pickup_livetrack_link', 'vehicle_description'
+    ];
+    
     let successCount = 0;
     
     try {
-      // Process only first 10 rows for testing to prevent timeouts
+      // Process first 10 rows for debugging
       const testRows = importRows.slice(0, 10);
       console.log(`Testing with first ${testRows.length} rows to verify mapping...`);
       
+      // Build dynamic mapping from Excel headers to database columns
+      const firstRow = testRows[0];
+      const excelHeaders = Object.keys(firstRow);
+      const headerMapping: { [key: string]: string } = {};
+      
+      console.log('\n=== HEADER NORMALIZATION ===');
+      excelHeaders.forEach(header => {
+        const normalized = normalizeHeader(header);
+        if (allDbColumns.includes(normalized)) {
+          headerMapping[header] = normalized;
+          console.log(`✓ "${header}" → "${normalized}"`);
+        } else {
+          console.log(`✗ "${header}" → "${normalized}" (no DB match)`);
+        }
+      });
+      
+      console.log(`\nFound ${Object.keys(headerMapping).length} matching columns out of ${excelHeaders.length} Excel headers\n`);
+      
       for (let i = 0; i < testRows.length; i++) {
         const row = testRows[i];
-        // Build dynamic column list and values based on what's in the Excel data
         const columns = ['user_id'];
         const values = [userId];
         const placeholders = ['$1'];
         let paramCount = 1;
         
-        // Map EVERY Excel column exactly as they appear in YOUR actual file
-        const columnMapping = {
-          'Delivery ETA deviation': 'delivery_eta_deviation',
-          'Required tags': 'required_tags',
-          'Received delivery PoD files': 'received_delivery_pod_files',
-          'Order carrier email': 'order_carrier_email',
-          'Trip number': 'trip_number',
-          'Order number': 'order_number',
-          'From': 'from',
-          'To': 'to',
-          'Carrier': 'carrier',
-          'Driver': 'driver',
-          'document_string2': 'document_string2',
-          'Customer order number': 'customer_order_number',
-          'Delivery planned ETA': 'delivery_planned_eta',
-          'Delivery calculated ETA': 'delivery_calculated_eta',
-          'Time spent in the unloading area': 'time_spent_in_the_unloading_area',
-          'Delivery outcome causal': 'delivery_outcome_causal',
-          'Shipper': 'shipper',
-          'Delivery arrival date': 'delivery_arrival_date',
-          'Delivery outcome date': 'delivery_outcome_date',
-          'Delivery unload date': 'delivery_unload_date',
-          'Group causal delivery outcome': 'group_causal_delivery_outcome',
-          'Delivery outcome note': 'delivery_outcome_note',
-          'Delivery last position': 'delivery_last_position',
-          'Delivery last position date': 'delivery_last_position_date',
-          'Pickup planned ETA': 'pickup_planned_eta',
-          'ETA delivery on departure': 'eta_delivery_on_departure',
-          'Delivery live distance [km]': 'delivery_live_distance_km',
-          'Delivery distance [km]': 'delivery_distance_km',
-          'Delivery outcome transmission date': 'delivery_outcome_transmission_date',
-          'Delivery outcome receipt date': 'delivery_outcome_receipt_date',
-          'Delivery unload sequence': 'delivery_unload_sequence',
-          'Delivery time window': 'delivery_time_window',
-          'Pickup arrival date': 'pickup_arrival_date',
-          'Pickup outcome date': 'pickup_outcome_date',
-          'Pickup load date': 'pickup_load_date',
-          'Pickup outcome reason': 'pickup_outcome_reason',
-          'Group causal pickup outcome': 'group_causal_pickup_outcome',
-          'Pickup outcome note': 'pickup_outcome_note',
-          'Pickup last position': 'pickup_last_position',
-          'Pickup last position date': 'pickup_last_position_date',
-          'Pickup calculated ETA': 'pickup_calculated_eta',
-          'ETA pickup on departure': 'eta_pickup_on_departure',
-          'Pickup live distance [km]': 'pickup_live_distance_km',
-          'Pickup distance [km]': 'pickup_distance_km',
-          'Pickup outcome receipt date': 'pickup_outcome_receipt_date',
-          'Pickup load sequence': 'pickup_load_sequence',
-          'Pickup time window': 'pickup_time_window',
-          'From  -  Master data code': 'from_master_data_code',
-          'Shipper city': 'shipper_city',
-          'Shipper province': 'shipper_province',
-          'Shipper  - Master data code': 'shipper_master_data_code',
-          'Depot': 'depot',
-          'Depot  - Master data code': 'depot_master_data_code',
-          'Recipient - Master data code': 'recipient_master_data_code',
-          'Delivery city': 'delivery_city',
-          'Delivery province': 'delivery_province',
-          'Carrier   - Master data code': 'carrier_master_data_code',
-          'Sub carrier': 'sub_carrier',
-          'Sub carrier  - Master data code': 'sub_carrier_master_data_code',
-          'Order date': 'order_date',
-          'Document note': 'document_note',
-          'Order type': 'order_type',
-          'Order series': 'order_series',
-          'Shipper order reference number': 'shipper_order_reference_number',
-          'Error description': 'error_description',
-          'Driver phone': 'driver_phone',
-          'Tractor license plate': 'tractor_license_plate',
-          'Trailer license plate': 'trailer_license_plate',
-          'Delivery outcome': 'delivery_outcome',
-          'Delivery punctuality': 'delivery_punctuality',
-          'Delivery geolocalization state': 'delivery_geolocalization_state',
-          'Pickup outcome': 'pickup_outcome',
-          'Pickup punctuality': 'pickup_punctuality',
-          'Pickup geolocation state': 'pickup_geolocation_state',
-          'Delivery state': 'delivery_state',
-          'Pickup state': 'pickup_state',
-          'Destination coordinates': 'destination_coordinates',
-          'Departure coordinates': 'departure_coordinates',
-          'Expected temperature': 'expected_temperature',
-          'Recorded temperature': 'recorded_temperature',
-          'Delivery maximum date': 'delivery_maximum_date',
-          'Delivery minimum date': 'delivery_minimum_date',
-          'Pickup minimum date': 'pickup_minimum_date',
-          'Pickup maximum date': 'pickup_maximum_date',
-          'Quantity unit of measurement1': 'quantity_unit_of_measurement1',
-          'Quantity unit of measurement2': 'quantity_unit_of_measurement2',
-          'Weight [kg]': 'weight_kg',
-          'Volume  [m³]': 'volume_m3',
-          'Linear meters [m]': 'linear_meters_m',
-          'Ground bases': 'ground_bases',
-          'document_date1': 'document_date1',
-          'document_date2': 'document_date2',
-          'document_date3': 'document_date3',
-          'document_string1': 'document_string1',
-          'document_string3': 'document_string3',
-          'Time spent in the loading area': 'time_spent_in_the_loading_area',
-          'Delivery outcome in area': 'delivery_outcome_in_area',
-          'Pickup outcome in area': 'pickup_outcome_in_area',
-          'Delivery outcome position': 'delivery_outcome_position',
-          'Pickup outcome position': 'pickup_outcome_position',
-          'Seals': 'seals',
-          'TaskID': 'task_id',
-          'ID creation import': 'id_creation_import',
-          'Expected payment method code': 'expected_payment_method_code',
-          'Expected payment method': 'expected_payment_method',
-          'Delivery outcome registration date': 'delivery_outcome_registration_date',
-          'Pickup outcome registration date': 'pickup_outcome_registration_date',
-          'Delivery pin is valid': 'delivery_pin_is_valid',
-          'Pick up pin is valid': 'pick_up_pin_is_valid',
-          'Expected payment notes': 'expected_payment_notes',
-          'Delivery PoD files': 'delivery_pod_files',
-          'Pickup PoD files': 'pickup_pod_files',
-          'Departure date initially planned by the context': 'departure_date_initially_planned_by_the_context',
-          'Order carrier mobile telephone number': 'order_carrier_mobile_telephone_number',
-          'Order carrier telephone number': 'order_carrier_telephone_number',
-          'Order pickup email': 'order_pickup_email',
-          'Order pickup mobile telephone number': 'order_pickup_mobile_telephone_number',
-          'Order pickup telephone number': 'order_pickup_telephone_number',
-          'Order delivery email': 'order_delivery_email',
-          'Order delivery mobile telephone number': 'order_delivery_mobile_telephone_number',
-          'Order delivery telephone number': 'order_delivery_telephone_number',
-          'Order sub carrier email': 'order_sub_carrier_email',
-          'Order sub carrier mobile telephone number': 'order_sub_carrier_mobile_telephone_number',
-          'Order sub carrier telephone number': 'order_sub_carrier_telephone_number',
-          'Order shipper email': 'order_shipper_email',
-          'Order shipper mobile telephone number': 'order_shipper_mobile_telephone_number',
-          'Order shipper telephone number': 'order_shipper_telephone_number',
-          'Forbidden tags': 'forbidden_tags',
-          'Pickup planned service time': 'pickup_planned_service_time',
-          'Delivery planned service time': 'delivery_planned_service_time',
-          'External reference': 'external_reference',
-          'Depot phone number specified in the order': 'depot_phone_number_specified_in_the_order',
-          'Depot mobile phone number specified in the order': 'depot_mobile_phone_number_specified_in_the_order',
-          'Received pickup PoD files': 'received_pickup_pod_files',
-          'Required tags description': 'required_tags_description',
-          'Forbidden tags description': 'forbidden_tags_description',
-          'From - Postal Code': 'from_postal_code',
-          'To - Postal Code': 'to_postal_code',
-          'From - Country': 'from_country',
-          'To - Country': 'to_country',
-          'Pickup ETA deviation': 'pickup_eta_deviation',
-          'Pickup Livetrack link': 'pickup_livetrack_link',
-          'Vehicle description': 'vehicle_description'
-        };
-        
-        // Debug: Log first row data to see what's actually available
-        if (successCount === 0) {
-          console.log('=== FIRST ROW DEBUG ===');
-          console.log('Available Excel keys:', Object.keys(row));
-          console.log('Sample values:');
-          Object.keys(row).slice(0, 10).forEach(key => {
-            console.log(`  "${key}": "${row[key]}"`);
-          });
-        }
-        
-        // Add each available column from the Excel data
-        for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
-          if (row[excelCol] !== undefined && row[excelCol] !== null && row[excelCol] !== '') {
-            columns.push(dbCol);
+        // Map each Excel column to database column using normalized headers
+        for (const [excelHeader, dbColumn] of Object.entries(headerMapping)) {
+          const value = row[excelHeader];
+          if (value !== undefined && value !== null && value !== '') {
+            columns.push(dbColumn);
             paramCount++;
             placeholders.push(`$${paramCount}`);
+            values.push(String(value));
             
-            // Handle different data types
-            if (dbCol === 'quantity' || dbCol === 'pallets' || dbCol === 'spaces') {
-              values.push(parseInt(row[excelCol]) || 0);
-            } else {
-              values.push(String(row[excelCol]));
-            }
-            
-            // Debug: Log successful mappings for first row
+            // Debug first row mapping
             if (successCount === 0) {
-              console.log(`  MAPPED: "${excelCol}" -> "${dbCol}" = "${row[excelCol]}"`);
+              console.log(`  MAPPED: "${excelHeader}" → "${dbColumn}" = "${value}"`);
             }
           }
         }
