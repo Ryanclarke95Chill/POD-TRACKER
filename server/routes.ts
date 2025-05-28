@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { pool } from "./db";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -195,7 +196,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ]
           };
           
-          await storage.createConsignment(consignmentData);
+          // Force direct database insert bypassing any cache
+          const insertQuery = `
+            INSERT INTO consignments (
+              user_id, consignment_number, customer_name, delivery_address, pickup_address,
+              status, estimated_delivery_date, temperature_zone, last_known_location,
+              quantity, pallets, events
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `;
+          
+          await pool.query(insertQuery, [
+            consignmentData.userId,
+            consignmentData.consignmentNumber,
+            consignmentData.customerName,
+            consignmentData.deliveryAddress,
+            consignmentData.pickupAddress,
+            consignmentData.status,
+            consignmentData.estimatedDeliveryDate,
+            consignmentData.temperatureZone,
+            consignmentData.lastKnownLocation,
+            consignmentData.quantity,
+            consignmentData.pallets,
+            JSON.stringify(consignmentData.events)
+          ]);
+          
           successCount++;
           
           if (successCount % 100 === 0) {
