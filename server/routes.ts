@@ -295,9 +295,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: "import"
         }]));
         
+        // Escape reserved SQL keywords by wrapping in quotes
+        const escapedColumns = columns.map(col => {
+          const reservedKeywords = ['from', 'to', 'order', 'where', 'select', 'insert', 'update', 'delete'];
+          if (reservedKeywords.includes(col.toLowerCase())) {
+            return `"${col}"`;
+          }
+          return col;
+        });
+        
         // Build and execute the dynamic SQL with conflict handling
         const sql = `
-          INSERT INTO consignments (${columns.join(', ')})
+          INSERT INTO consignments (${escapedColumns.join(', ')})
           VALUES (${placeholders.join(', ')})
           ON CONFLICT (consignment_number) DO NOTHING
           RETURNING id
