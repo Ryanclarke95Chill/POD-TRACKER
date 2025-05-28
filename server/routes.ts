@@ -135,8 +135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     console.log("=== DIRECT DATABASE IMPORT ===");
     console.log(`Processing ${importRows?.length || 0} rows for direct database save`);
+    console.log("First few rows:", JSON.stringify(importRows?.slice(0, 2), null, 2));
     
     if (!importRows || !Array.isArray(importRows)) {
+      console.log("ERROR: No import data provided or not an array");
       return res.status(400).json({ message: "No import data provided" });
     }
     
