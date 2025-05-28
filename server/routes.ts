@@ -307,7 +307,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const [excelHeader, dbColumn] of Object.entries(headerMapping)) {
           const value = row[excelHeader];
           if (value !== undefined && value !== null && value !== '') {
-            columns.push(dbColumn);
+            // Escape reserved SQL keywords by wrapping in quotes
+            const reservedKeywords = ['from', 'to', 'order', 'where', 'select', 'insert', 'update', 'delete'];
+            const escapedColumn = reservedKeywords.includes(dbColumn.toLowerCase()) ? `"${dbColumn}"` : dbColumn;
+            
+            columns.push(escapedColumn);
             paramCount++;
             placeholders.push(`$${paramCount}`);
             values.push(String(value));
