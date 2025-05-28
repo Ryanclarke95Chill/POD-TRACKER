@@ -82,8 +82,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      console.log("Fetching demo consignments for user ID:", req.user?.id);
+      console.log("Fetching consignments for user ID:", req.user?.id);
       const consignments = await storage.getConsignmentsByUserId(req.user!.id);
+      console.log(`Found ${consignments.length} consignments in database`);
       res.json(consignments);
     } catch (error) {
       console.error("Error fetching consignments:", error);

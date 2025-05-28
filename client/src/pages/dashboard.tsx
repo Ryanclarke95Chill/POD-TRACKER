@@ -23,7 +23,9 @@ export default function Dashboard() {
   const user = getUser();
 
   const { data: consignments = [], isLoading } = useQuery({
-    queryKey: ["/api/consignments"],
+    queryKey: ["/api/consignments", Date.now()], // Force refresh
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
   // Filter consignments based on search term and temperature zone
