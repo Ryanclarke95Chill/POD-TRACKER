@@ -168,6 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Processing simple import with ${importRows.length} rows`);
         console.log(`Import to database flag: ${importToDatabase}`);
+        console.log(`Sample row data:`, importRows[0]);
         
         // Always import to database now that we have PostgreSQL
         if (true) {
@@ -212,6 +213,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               importedCount++;
             } catch (error) {
               console.error("Error creating consignment:", error);
+              console.error("Failed row data:", row);
+              console.error("Full error details:", error);
             }
           }
           
