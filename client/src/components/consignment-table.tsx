@@ -13,6 +13,7 @@ interface ConsignmentTableProps {
 
 // Default field labels using database column names
 const DEFAULT_FIELD_LABELS: Record<string, string> = {
+  id: "ID",
   consignment_number: "Consignment Number",
   customer_name: "Customer Name",
   delivery_address: "Delivery Address",
@@ -24,6 +25,11 @@ const DEFAULT_FIELD_LABELS: Record<string, string> = {
   delivery_planned_eta: "Delivery Planned ETA",
   carrier: "Carrier",
   driver: "Driver",
+  shipper: "Shipper",
+  delivery_company: "Delivery Company",
+  pickup_company: "Pickup Company",
+  vehicle: "Vehicle",
+  route: "Route",
   from: "From",
   to: "To",
   delivery_outcome: "Delivery Outcome",
@@ -32,16 +38,16 @@ const DEFAULT_FIELD_LABELS: Record<string, string> = {
   quantity: "Quantity"
 };
 
-// Default visible fields for dashboard
+// Default visible fields for dashboard - using fields that actually have data
 const DEFAULT_VISIBLE_FIELDS = [
-  'consignment_number',
-  'customer_name', 
-  'delivery_address',
-  'status',
-  'estimated_delivery_date',
-  'temperature_zone',
-  'vehicle_code',
-  'carrier'
+  'id',
+  'shipper',
+  'driver',
+  'delivery_company',
+  'pickup_company',
+  'vehicle',
+  'route',
+  'delivery_planned_eta'
 ];
 
 export default function ConsignmentTable({ consignments, onViewDetails }: ConsignmentTableProps) {
