@@ -162,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Function to normalize Excel headers to database field names
     const normalizeHeader = (header: string): string => {
-      // Specific mappings for your Excel headers
+      // Specific mappings for your Excel headers - AVOID RESERVED SQL KEYWORDS
       const specificMappings: { [key: string]: string } = {
         'Vehicle code': 'vehicle_code',
         'Delivery Livetrack link': 'delivery_livetrack_link',
@@ -172,8 +172,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Order carrier email': 'order_carrier_email',
         'Trip number': 'trip_number',
         'Order number': 'order_number',
-        'From': 'from_location',
-        'To': 'to_location',
+        'From': 'pickup_address',
+        'To': 'delivery_address',
         'Carrier': 'carrier',
         'Driver': 'driver',
         'Customer order number': 'customer_order_number',
