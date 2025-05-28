@@ -196,14 +196,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return specificMappings[header];
       }
       
-      // Fall back to general normalization
-      return header
+      // Fall back to general normalization and avoid "from" keyword
+      let normalized = header
         .toLowerCase()                    // Convert to lowercase
         .trim()                          // Remove leading/trailing spaces
         .replace(/[\[\]()]/g, '')        // Remove brackets and parentheses
         .replace(/[^a-z0-9]/g, '_')      // Replace non-alphanumeric with underscores
         .replace(/_+/g, '_')             // Collapse multiple underscores
         .replace(/^_|_$/g, '');          // Remove leading/trailing underscores
+      
+      // Replace any occurrence of "from" with "origin" to avoid SQL conflicts
+      normalized = normalized.replace(/from/g, 'origin');
+      
+      return normalized;
     };
     
     // Get all database columns from the schema to match against
