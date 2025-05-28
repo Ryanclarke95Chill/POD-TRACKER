@@ -83,6 +83,13 @@ export default function Dashboard() {
               Import Data
             </Button>
             <Button 
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
+              onClick={() => window.location.href = '/settings'}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button 
               className="bg-red-500/20 hover:bg-red-500/30 text-white border border-red-300/30 backdrop-blur-sm"
               onClick={clearLocalStorage}
             >
@@ -215,14 +222,11 @@ export default function Dashboard() {
               ))}
             </>
           ) : filteredConsignments.length > 0 ? (
-            /* Consignments data */
-            filteredConsignments.map((consignment: Consignment, index: number) => (
-              <ConsignmentCard
-                key={consignment.id}
-                consignment={consignment}
-                onViewDetails={() => handleViewDetails(consignment)}
-              />
-            ))
+            /* Consignments table */
+            <ConsignmentTable
+              consignments={filteredConsignments}
+              onViewDetails={handleViewDetails}
+            />
           ) : (
             /* No consignments found */
             <div className="text-center py-12">
