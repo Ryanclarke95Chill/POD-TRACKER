@@ -246,16 +246,12 @@ export default function Settings() {
           
           // Create field labels for all database fields
           const dynamicLabels: Record<string, string> = {};
-          databaseFields.forEach(field => {
-            if (DEFAULT_FIELD_LABELS[field]) {
-              dynamicLabels[field] = DEFAULT_FIELD_LABELS[field];
-            } else {
-              // Convert snake_case to Title Case
-              dynamicLabels[field] = field
-                .split('_')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
-            }
+          databaseFields.forEach((field: string) => {
+            // Convert snake_case to Title Case for all fields
+            dynamicLabels[field] = field
+              .split('_')
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
           });
           
           // Load saved settings or use defaults
