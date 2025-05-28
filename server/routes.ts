@@ -179,32 +179,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId,
                 consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 customerName: row.customerName || "Imported Customer", 
+                consignmentReference: row.consignmentReference || null,
                 trackingLink: row.trackingLink || null,
-                deliveryAddress: row.deliveryAddress || "Unknown Address",
                 pickupAddress: row.pickupAddress || "Unknown Pickup",
+                deliveryAddress: row.deliveryAddress || "Unknown Address",
                 status: row.status || "In Transit",
                 estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
-                lastKnownLocation: row.lastKnownLocation || "Processing Facility",
-                temperatureZone: row.temperatureZone || "Dry",
-                // Add missing required fields with defaults or imported values
-                quantity: row.quantity || "1",
-                pallets: row.pallets || "0", 
-                spaces: row.spaces || "0",
-                consignmentReference: row.consignmentReference || null,
                 deliveryDate: row.deliveryDate || null,
                 dateDelivered: row.dateDelivered || null,
                 consignmentRequiredDeliveryDate: row.consignmentRequiredDeliveryDate || null,
-                receiverCompanyName: row.receiverCompanyName || row.customerName || "Unknown Company",
-                pickupCity: row.pickupCity || "Unknown",
-                deliveryCity: row.deliveryCity || "Unknown",
-                events: JSON.stringify([
+                temperatureZone: row.temperatureZone || "Dry",
+                lastKnownLocation: row.lastKnownLocation || "Processing Facility",
+                deliveryRun: row.deliveryRun || null,
+                quantity: parseInt(row.quantity) || null,
+                pallets: parseInt(row.pallets) || null, 
+                spaces: parseInt(row.spaces) || null,
+                cubicMeters: row.cubicMeters || null,
+                weightKg: row.weightKg || null,
+                events: [
                   {
                     timestamp: new Date().toISOString(),
                     description: "Package imported into system",
                     location: "Import Center", 
                     type: "import"
                   }
-                ])
+                ]
               };
               
               await storage.createConsignment(consignmentData);
