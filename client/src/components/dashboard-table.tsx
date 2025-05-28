@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, ExternalLink } from "lucide-react";
+import { Eye, ExternalLink, GripVertical } from "lucide-react";
 import { Consignment } from "@shared/schema";
+import { useState } from "react";
 
 interface DashboardTableProps {
   consignments: Consignment[];
@@ -9,8 +10,8 @@ interface DashboardTableProps {
 }
 
 export default function DashboardTable({ consignments, onViewDetails }: DashboardTableProps) {
-  // Fixed columns using correct field names from database
-  const columns = [
+  // Initial column order - can be reordered via drag and drop
+  const [columns, setColumns] = useState([
     { key: 'pickupLivetrackLink', label: 'Tracking link' },
     { key: 'origin', label: 'Pickup from' },
     { key: 'documentString2', label: 'Deliver to' },
@@ -19,7 +20,44 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     { key: 'shipper', label: 'Customer Name' },
     { key: 'pickupOutcomeDate', label: 'Delivered on' },
     { key: 'pickupOutcome', label: 'Status' }
-  ];
+  ]);
+
+  const [draggedColumn, setDraggedColumn] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedColumn(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedColumn === null || draggedColumn === dropIndex) {
+      setDraggedColumn(null);
+      return;
+    }
+
+    const newColumns = [...columns];
+    const draggedItem = newColumns[draggedColumn];
+    
+    // Remove the dragged item
+    newColumns.splice(draggedColumn, 1);
+    
+    // Insert at new position
+    newColumns.splice(dropIndex, 0, draggedItem);
+    
+    setColumns(newColumns);
+    setDraggedColumn(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumn(null);
+  };
 
   const getFieldValue = (consignment: Consignment, fieldKey: string): string => {
     const value = (consignment as any)[fieldKey];
@@ -116,9 +154,22 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            {columns.map((column) => (
-              <TableHead key={column.key} className="font-semibold text-gray-700">
-                {column.label}
+            {columns.map((column, index) => (
+              <TableHead 
+                key={column.key} 
+                className={`font-semibold text-gray-700 cursor-move select-none ${
+                  draggedColumn === index ? 'opacity-50' : ''
+                }`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex items-center gap-2">
+                  <GripVertical className="h-4 w-4 text-gray-400" />
+                  {column.label}
+                </div>
               </TableHead>
             ))}
             <TableHead className="font-semibold text-gray-700">Actions</TableHead>
