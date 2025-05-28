@@ -408,7 +408,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log('');
       
+      console.log(`🚀 Starting loop to process ${importRows.length} rows`);
+      
       for (let i = 0; i < importRows.length; i++) {
+        console.log(`🔄 Processing row ${i + 1} of ${importRows.length}`);
+        
         const row = importRows[i];
         const columns = ['user_id'];
         const values = [userId];
