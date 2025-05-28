@@ -128,123 +128,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // New direct database import route
+  // Completely rebuilt import route that can handle any Excel columns
   app.post("/api/admin/import-direct", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== IMPORT-DIRECT ROUTE HIT ===");
+    console.log("=== REBUILT IMPORT ROUTE ===");
     const userId = req.user!.id;
     const { importRows } = req.body;
     
-    console.log("=== DIRECT DATABASE IMPORT ===");
-    console.log(`Processing ${importRows?.length || 0} rows for direct database save`);
-    console.log("First few rows:", JSON.stringify(importRows?.slice(0, 2), null, 2));
+    console.log(`Processing ${importRows?.length || 0} rows for database import`);
     
     if (!importRows || !Array.isArray(importRows)) {
-      console.log("ERROR: No import data provided or not an array");
-      return res.status(400).json({ message: "No import data provided" });
+      console.log("ERROR: No import data provided");
+      return res.status(400).json({ success: false, message: "No import data provided" });
     }
     
     let successCount = 0;
     
     try {
       for (const row of importRows) {
-        // Use the storage layer to ensure proper handling
-        const consignmentData = {
-          userId: userId,
-          consignmentNumber: row.consignmentNumber || `DIRECT-${Date.now()}-${successCount}`,
-          customerName: row.customerName || "Imported Customer",
-          consignmentReference: row.consignmentReference || null,
-          trackingLink: row.trackingLink || null,
-          deliveryAddress: row.deliveryAddress || "Unknown Address",
-          pickupAddress: row.pickupAddress || "Unknown Pickup",
-          status: row.status || "In Transit",
-          estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
-          deliveryDate: row.deliveryDate || null,
-          dateDelivered: row.dateDelivered || null,
-          consignmentRequiredDeliveryDate: row.consignmentRequiredDeliveryDate || null,
-          temperatureZone: row.temperatureZone || "Dry",
-          lastKnownLocation: "Processing Center",
-          deliveryRun: row.deliveryRun || null,
-          quantity: parseInt(row.quantity) || 0,
-          pallets: parseInt(row.pallets) || 0,
-          spaces: parseInt(row.spaces) || null,
-          cubicMeters: row.cubicMeters || null,
-          weightKg: row.weightKg || null,
-          shipper: row.shipper || null,
-          receiver: row.receiver || null,
-          pickupCompany: row.pickupCompany || null,
-          deliveryCompany: row.deliveryCompany || null,
-          pickupContactName: row.pickupContactName || null,
-          deliveryContactName: row.deliveryContactName || null,
-          pickupContactPhone: row.pickupContactPhone || null,
-          deliveryContactPhone: row.deliveryContactPhone || null,
-          specialInstructions: row.specialInstructions || null,
-          productDescription: row.productDescription || null,
-          quantityUnitOfMeasurement: row.quantityUnitOfMeasurement || null,
-          quantityUnitOfMeasurement2: row.quantityUnitOfMeasurement2 || null,
-          deliveryLivetrackLink: row.deliveryLivetrackLink || null,
-          customerOrderNumber: row.customerOrderNumber || null,
-          documentString2: row.documentString2 || null,
-          fromLocation: row.fromLocation || null,
-          toLocation: row.toLocation || null,
-          deliveryInstructions: row.deliveryInstructions || null,
-          pickupInstructions: row.pickupInstructions || null,
-          events: [{
-            timestamp: new Date().toISOString(),
-            description: "Direct database import",
-            location: "Import Center",
-            type: "import"
-          }]
+        // Build dynamic column list and values based on what's in the Excel data
+        const columns = ['user_id'];
+        const values = [userId];
+        const placeholders = ['$1'];
+        let paramCount = 1;
+        
+        // Map common Excel columns to database columns
+        const columnMapping = {
+          'consignmentNumber': 'consignment_number',
+          'customerName': 'customer_name',
+          'pickupAddress': 'pickup_address',
+          'deliveryAddress': 'delivery_address',
+          'status': 'status',
+          'estimatedDeliveryDate': 'estimated_delivery_date',
+          'temperatureZone': 'temperature_zone',
+          'lastKnownLocation': 'last_known_location',
+          'quantity': 'quantity',
+          'pallets': 'pallets',
+          'spaces': 'spaces',
+          'deliveryRun': 'delivery_run',
+          'weightKg': 'weight_kg',
+          'cubicMeters': 'cubic_meters',
+          'shipper': 'shipper',
+          'receiver': 'receiver',
+          'notes': 'notes',
+          'driver': 'driver',
+          'vehicle': 'vehicle',
+          'route': 'route'
         };
         
-        // Use direct SQL insert to bypass field validation issues
-        const result = await pool.query(`
-          INSERT INTO consignments (
-            user_id, consignment_number, customer_name, delivery_address, pickup_address,
-            status, estimated_delivery_date, temperature_zone, last_known_location,
-            quantity, pallets, events
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        // Add each available column from the Excel data
+        for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
+          if (row[excelCol] !== undefined && row[excelCol] !== null && row[excelCol] !== '') {
+            columns.push(dbCol);
+            paramCount++;
+            placeholders.push(`$${paramCount}`);
+            
+            // Handle different data types
+            if (dbCol === 'quantity' || dbCol === 'pallets' || dbCol === 'spaces') {
+              values.push(parseInt(row[excelCol]) || 0);
+            } else {
+              values.push(String(row[excelCol]));
+            }
+          }
+        }
+        
+        // Always add events column
+        columns.push('events');
+        paramCount++;
+        placeholders.push(`$${paramCount}`);
+        values.push(JSON.stringify([{
+          timestamp: new Date().toISOString(),
+          description: "Excel import",
+          location: "Import Center",
+          type: "import"
+        }]));
+        
+        // Build and execute the dynamic SQL
+        const sql = `
+          INSERT INTO consignments (${columns.join(', ')})
+          VALUES (${placeholders.join(', ')})
           RETURNING id
-        `, [
-          userId,
-          row.consignmentNumber || `IMPORT-${Date.now()}-${successCount}`,
-          row.customerName || "Imported Customer",
-          row.deliveryAddress || "Unknown Address", 
-          row.pickupAddress || "Unknown Pickup",
-          row.status || "In Transit",
-          row.estimatedDeliveryDate || new Date().toISOString(),
-          row.temperatureZone || "Dry",
-          "Processing Center",
-          parseInt(row.quantity) || 0,
-          parseInt(row.pallets) || 0,
-          JSON.stringify([{
-            timestamp: new Date().toISOString(),
-            description: "Import from Excel",
-            location: "Import Center",
-            type: "import"
-          }])
-        ]);
+        `;
+        
+        console.log(`Inserting row ${successCount + 1} with ${columns.length} columns`);
+        const result = await pool.query(sql, values);
         successCount++;
         
-        if (successCount % 500 === 0) {
-          console.log(`Direct import: ${successCount} records saved...`);
+        if (successCount % 100 === 0) {
+          console.log(`Imported ${successCount} records...`);
         }
       }
       
-      console.log(`Direct import completed: ${successCount} records saved to database`);
+      console.log(`Import completed: ${successCount} records saved to database`);
       return res.json({
         success: true,
         importedCount: successCount,
-        message: `Successfully imported ${successCount} consignments directly to database.`
+        message: `Successfully imported ${successCount} consignments to database.`
       });
       
-    } catch (error) {
-      console.error("Direct import error:", error);
-      console.error("Error details:", error.message);
-      console.error("Stack trace:", error.stack);
+    } catch (error: any) {
+      console.error("Import error:", error);
+      console.error("Error message:", error.message);
       return res.status(500).json({ 
         success: false, 
-        message: "Direct import failed", 
-        error: error.message,
+        message: "Import failed: " + error.message,
         importedCount: successCount 
       });
     }
