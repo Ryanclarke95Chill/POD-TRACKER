@@ -232,14 +232,11 @@ export default function Settings() {
   useEffect(() => {
     const loadDatabaseFields = async () => {
       try {
-        // Fetch a sample record to get all available fields
-        const response = await fetch('/api/consignments');
-        const consignments = await response.json();
+        // Fetch all database columns from the API
+        const response = await fetch('/api/database/columns');
+        const databaseFields = await response.json();
         
-        if (consignments && consignments.length > 0) {
-          // Get all field names from the first consignment record
-          const firstRecord = consignments[0];
-          const databaseFields = Object.keys(firstRecord).filter(key => key !== 'id' && key !== 'userId');
+        if (databaseFields && Array.isArray(databaseFields)) {
           setAllDatabaseFields(databaseFields);
           
           // Create field labels for all database fields
@@ -348,21 +345,25 @@ export default function Settings() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(fieldLabels).map(([fieldKey, label]) => (
-              <div key={fieldKey} className="space-y-2">
-                <Label htmlFor={fieldKey} className="text-sm font-medium">
-                  {fieldKey}
-                </Label>
-                <Input
-                  id={fieldKey}
-                  value={label}
-                  onChange={(e) => handleLabelChange(fieldKey, e.target.value)}
-                  placeholder="Enter display label"
-                />
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-8">Loading database fields...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allDatabaseFields.map((fieldKey) => (
+                <div key={fieldKey} className="space-y-2">
+                  <Label htmlFor={fieldKey} className="text-sm font-medium">
+                    {fieldKey}
+                  </Label>
+                  <Input
+                    id={fieldKey}
+                    value={fieldLabels[fieldKey] || fieldKey}
+                    onChange={(e) => handleLabelChange(fieldKey, e.target.value)}
+                    placeholder="Enter display label"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

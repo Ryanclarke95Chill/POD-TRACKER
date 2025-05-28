@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/database/columns", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      const result = await db.execute(sql`
+      const result = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'consignments' 
