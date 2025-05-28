@@ -233,7 +233,12 @@ export default function Settings() {
     const loadDatabaseFields = async () => {
       try {
         // Fetch all database columns from the API
-        const response = await fetch('/api/database/columns');
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/database/columns', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const databaseFields = await response.json();
         
         if (databaseFields && Array.isArray(databaseFields)) {
