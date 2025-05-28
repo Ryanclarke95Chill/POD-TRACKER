@@ -149,9 +149,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Smart Excel import with dynamic header normalization
   app.post("/api/admin/import-direct", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== SMART EXCEL IMPORT ===");
+    console.log("=== SMART EXCEL IMPORT ROUTE HIT ===");
+    console.log("🔥 URGENT: DEBUGGING 10 ROW LIMIT ISSUE");
     const userId = req.user!.id;
     const { importRows } = req.body;
+    console.log(`📊 Received ${importRows?.length || 0} rows from frontend`);
     
     console.log(`Processing ${importRows?.length || 0} rows for database import`);
     
