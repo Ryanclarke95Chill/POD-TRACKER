@@ -463,16 +463,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           RETURNING id
         `;
         
-        console.log(`Inserting row ${successCount + 1} with ${columns.length} columns`);
-        console.log('SQL Query:', sql);
-        console.log('Escaped columns:', escapedColumns);
-        const result = await pool.query(sql, values);
+        console.log(`Inserting row ${i + 1} of ${importRows.length} with ${columns.length} columns`);
         
-        // Only count as success if the row was actually inserted
-        if (result.rows.length > 0) {
-          successCount++;
-        } else {
-          console.log(`Skipped duplicate consignment: ${row.consignmentNumber || 'unknown'}`);
+        try {
+          const result = await pool.query(sql, values);
+          
+          // Only count as success if the row was actually inserted
+          if (result.rows.length > 0) {
+            successCount++;
+            console.log(`✅ Successfully inserted row ${i + 1}`);
+          } else {
+            console.log(`⚠️ Skipped duplicate consignment: ${row.consignmentNumber || 'unknown'}`);
+          }
+        } catch (rowError: any) {
+          console.error(`❌ Error inserting row ${i + 1}:`, rowError.message);
+          console.error('Failed SQL:', sql);
+          console.error('Failed values:', values);
+          // Continue processing other rows instead of stopping
+          continue;
         }
         
         if (successCount % 100 === 0) {
