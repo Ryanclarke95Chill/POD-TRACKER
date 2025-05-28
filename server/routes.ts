@@ -163,7 +163,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let successCount = 0;
     
     try {
-      for (const row of importRows) {
+      // Process only first 10 rows for testing to prevent timeouts
+      const testRows = importRows.slice(0, 10);
+      console.log(`Testing with first ${testRows.length} rows to verify mapping...`);
+      
+      for (let i = 0; i < testRows.length; i++) {
+        const row = testRows[i];
         // Build dynamic column list and values based on what's in the Excel data
         const columns = ['user_id'];
         const values = [userId];
