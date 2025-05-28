@@ -175,10 +175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const placeholders = ['$1'];
         let paramCount = 1;
         
-        // Map EVERY Excel column exactly as it appears to database columns
+        // Map EVERY Excel column exactly as they appear in YOUR actual file
         const columnMapping = {
-          'Vehicle code': 'vehicle_code',
-          'Delivery Livetrack link': 'delivery_livetrack_link',
           'Delivery ETA deviation': 'delivery_eta_deviation',
           'Required tags': 'required_tags',
           'Received delivery PoD files': 'received_delivery_pod_files',
