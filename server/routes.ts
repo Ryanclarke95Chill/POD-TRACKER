@@ -513,7 +513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/admin/import", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== NEW IMPORT ROUTE HIT ===");
+    console.log("🚨 WRONG ROUTE: /api/admin/import was called instead of /api/admin/import-direct");
+    console.log("This route has the 10-row limitation!");
     console.log("Request body:", JSON.stringify(req.body, null, 2));
     
     try {
