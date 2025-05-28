@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings } from "lucide-react";
-import DataTable from "@/components/data-table";
+import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -223,7 +223,7 @@ export default function Dashboard() {
             </>
           ) : filteredConsignments.length > 0 ? (
             /* Consignments table */
-            <DataTable
+            <DashboardTable
               consignments={filteredConsignments}
               onViewDetails={handleViewDetails}
             />
