@@ -15,7 +15,15 @@ export default function Dashboard() {
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
 
   const clearLocalStorage = () => {
+    // Clear all local storage items that might contain consignment data
+    localStorage.removeItem('consignments');
+    localStorage.removeItem('imported-consignments');
+    localStorage.removeItem('consignment-data');
+    localStorage.removeItem('csv-data');
+    localStorage.removeItem('import-data');
     localStorage.clear();
+    
+    // Force reload to refresh from database
     window.location.reload();
   };
   const user = getUser();
