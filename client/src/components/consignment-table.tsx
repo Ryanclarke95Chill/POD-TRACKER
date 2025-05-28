@@ -11,36 +11,36 @@ interface ConsignmentTableProps {
   onViewDetails: (consignment: Consignment) => void;
 }
 
-// Default field labels
+// Default field labels using database column names
 const DEFAULT_FIELD_LABELS: Record<string, string> = {
-  consignmentNumber: "Consignment Number",
-  customerName: "Customer Name",
-  deliveryAddress: "Delivery Address",
-  pickupAddress: "Pickup Address",
+  consignment_number: "Consignment Number",
+  customer_name: "Customer Name",
+  delivery_address: "Delivery Address",
+  pickup_address: "Pickup Address",
   status: "Status",
-  estimatedDeliveryDate: "Estimated Delivery Date",
-  temperatureZone: "Temperature Zone",
-  vehicleCode: "Vehicle Code",
-  deliveryPlannedEta: "Delivery Planned ETA",
+  estimated_delivery_date: "Estimated Delivery Date",
+  temperature_zone: "Temperature Zone",
+  vehicle_code: "Vehicle Code",
+  delivery_planned_eta: "Delivery Planned ETA",
   carrier: "Carrier",
   driver: "Driver",
   from: "From",
   to: "To",
-  deliveryOutcome: "Delivery Outcome",
-  expectedTemperature: "Expected Temperature",
-  weightKg: "Weight (kg)",
+  delivery_outcome: "Delivery Outcome",
+  expected_temperature: "Expected Temperature",
+  weight_kg: "Weight (kg)",
   quantity: "Quantity"
 };
 
 // Default visible fields for dashboard
 const DEFAULT_VISIBLE_FIELDS = [
-  'consignmentNumber',
-  'customerName', 
-  'deliveryAddress',
+  'consignment_number',
+  'customer_name', 
+  'delivery_address',
   'status',
-  'estimatedDeliveryDate',
-  'temperatureZone',
-  'vehicleCode',
+  'estimated_delivery_date',
+  'temperature_zone',
+  'vehicle_code',
   'carrier'
 ];
 
@@ -109,7 +109,7 @@ export default function ConsignmentTable({ consignments, onViewDetails }: Consig
                     <Badge variant={getStatusBadgeVariant(getFieldValue(consignment, fieldKey))}>
                       {getFieldValue(consignment, fieldKey)}
                     </Badge>
-                  ) : fieldKey === 'temperatureZone' ? (
+                  ) : fieldKey === 'temperature_zone' ? (
                     <div className="flex items-center gap-2">
                       <div 
                         className="w-3 h-3 rounded-full"
