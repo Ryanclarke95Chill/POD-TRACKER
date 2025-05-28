@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { consignments } from "@shared/schema";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -83,9 +84,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
+      console.log("=== CONSIGNMENTS ENDPOINT DEBUG ===");
       console.log("Fetching consignments for user ID:", req.user?.id);
+      
+      // Force direct database query to bypass any caching
+      const directQuery = await pool.query('SELECT COUNT(*) FROM consignments WHERE user_id = $1', [req.user!.id]);
+      console.log("Direct database count:", directQuery.rows[0].count);
+      
       const consignments = await storage.getConsignmentsByUserId(req.user!.id);
-      console.log(`Found ${consignments.length} consignments in database`);
+      console.log(`Storage returned ${consignments.length} consignments`);
+      console.log("First consignment sample:", consignments[0]?.consignmentNumber);
+      
       res.json(consignments);
     } catch (error) {
       console.error("Error fetching consignments:", error);
@@ -135,35 +144,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       for (const row of importRows) {
-        const insertQuery = `
-          INSERT INTO consignments (
-            user_id, consignment_number, customer_name, delivery_address, pickup_address,
-            status, estimated_delivery_date, temperature_zone, last_known_location,
-            quantity, pallets, events
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        `;
-        
-        await pool.query(insertQuery, [
-          userId,
-          row.consignmentNumber || `DIRECT-${Date.now()}-${successCount}`,
-          row.customerName || "Imported Customer",
-          row.deliveryAddress || "Unknown Address",
-          row.pickupAddress || "Unknown Pickup",
-          row.status || "In Transit",
-          row.estimatedDeliveryDate || new Date().toISOString(),
-          row.temperatureZone || "Dry",
-          "Processing Center",
-          parseInt(row.quantity) || 0,
-          parseInt(row.pallets) || 0,
-          JSON.stringify([{
+        // Use the storage layer to ensure proper handling
+        const consignmentData = {
+          userId: userId,
+          consignmentNumber: row.consignmentNumber || `DIRECT-${Date.now()}-${successCount}`,
+          customerName: row.customerName || "Imported Customer",
+          deliveryAddress: row.deliveryAddress || "Unknown Address",
+          pickupAddress: row.pickupAddress || "Unknown Pickup",
+          status: row.status || "In Transit",
+          estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
+          temperatureZone: row.temperatureZone || "Dry",
+          lastKnownLocation: "Processing Center",
+          quantity: parseInt(row.quantity) || 0,
+          pallets: parseInt(row.pallets) || 0,
+          events: [{
             timestamp: new Date().toISOString(),
             description: "Direct database import",
             location: "Import Center",
             type: "import"
-          }])
-        ]);
+          }]
+        };
         
+        await storage.createConsignment(consignmentData);
         successCount++;
+        
         if (successCount % 500 === 0) {
           console.log(`Direct import: ${successCount} records saved...`);
         }
