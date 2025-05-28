@@ -225,23 +225,65 @@ export default function Settings() {
   const { toast } = useToast();
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
+  const [allDatabaseFields, setAllDatabaseFields] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load saved settings
+  // Load database schema and saved settings
   useEffect(() => {
-    const savedLabels = localStorage.getItem('field-labels');
-    const savedVisible = localStorage.getItem('visible-fields');
-    
-    if (savedLabels) {
-      setFieldLabels({ ...DEFAULT_FIELD_LABELS, ...JSON.parse(savedLabels) });
-    } else {
-      setFieldLabels(DEFAULT_FIELD_LABELS);
-    }
-    
-    if (savedVisible) {
-      setVisibleFields(JSON.parse(savedVisible));
-    } else {
-      setVisibleFields(DASHBOARD_FIELDS);
-    }
+    const loadDatabaseFields = async () => {
+      try {
+        // Fetch a sample record to get all available fields
+        const response = await fetch('/api/consignments');
+        const consignments = await response.json();
+        
+        if (consignments && consignments.length > 0) {
+          // Get all field names from the first consignment record
+          const firstRecord = consignments[0];
+          const databaseFields = Object.keys(firstRecord).filter(key => key !== 'id' && key !== 'userId');
+          setAllDatabaseFields(databaseFields);
+          
+          // Create field labels for all database fields
+          const dynamicLabels: Record<string, string> = {};
+          databaseFields.forEach(field => {
+            if (DEFAULT_FIELD_LABELS[field]) {
+              dynamicLabels[field] = DEFAULT_FIELD_LABELS[field];
+            } else {
+              // Convert snake_case to Title Case
+              dynamicLabels[field] = field
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            }
+          });
+          
+          // Load saved settings or use defaults
+          const savedLabels = localStorage.getItem('field-labels');
+          const savedVisible = localStorage.getItem('visible-fields');
+          
+          if (savedLabels) {
+            setFieldLabels({ ...dynamicLabels, ...JSON.parse(savedLabels) });
+          } else {
+            setFieldLabels(dynamicLabels);
+          }
+          
+          if (savedVisible) {
+            setVisibleFields(JSON.parse(savedVisible));
+          } else {
+            setVisibleFields(DASHBOARD_FIELDS);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading database fields:', error);
+        // Fallback to predefined fields
+        setFieldLabels(DEFAULT_FIELD_LABELS);
+        setVisibleFields(DASHBOARD_FIELDS);
+        setAllDatabaseFields(Object.keys(DEFAULT_FIELD_LABELS));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDatabaseFields();
   }, []);
 
   const handleLabelChange = (fieldKey: string, newLabel: string) => {
