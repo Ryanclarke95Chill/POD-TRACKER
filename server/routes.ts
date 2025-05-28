@@ -188,7 +188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Group causal pickup outcome': 'group_causal_pickup_outcome',
         'Pickup last position': 'pickup_last_position',
         'Pickup last position date': 'pickup_last_position_date',
-        'Pickup calculated ETA': 'pickup_calculated_eta'
+        'Pickup calculated ETA': 'pickup_calculated_eta',
+        'From - Postal Code': 'origin_postal_code',
+        'From - Country': 'origin_country',
+        'From  -  Master data code': 'origin_master_data_code',
+        'To - Postal Code': 'destination_postal_code', 
+        'To - Country': 'destination_country'
       };
       
       // Check for exact match first
