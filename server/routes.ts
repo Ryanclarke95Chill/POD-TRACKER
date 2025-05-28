@@ -236,6 +236,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'invoice_number', 'pod_signature', 'delivery_proof', 'vehicle_code',
       'delivery_eta_deviation', 'received_delivery_pod_files', 'trip_number',
       'origin_postal_code', 'origin_country', 'origin_master_data_code', 'destination_postal_code', 'destination_country', 'carrier', 'required_tags', 'order_carrier_email', 'order_number',
+      'delivery_calculated_eta', 'eta_pickup_on_departure', 'pickup_live_distance_km', 'pickup_load_sequence', 'pickup_time_window',
+      'shipper_city', 'shipper_master_data_code', 'depot', 'depot_master_data_code', 'recipient_master_data_code', 'delivery_city', 'carrier_master_data_code',
+      'order_date', 'document_note', 'order_type', 'driver_phone', 'tractor_license_plate', 'pickup_outcome', 'pickup_punctuality',
+      'pickup_geolocation_state', 'pickup_state', 'destination_coordinates', 'departure_coordinates', 'expected_temperature',
+      'pickup_minimum_date', 'pickup_maximum_date', 'pickup_outcome_in_area', 'pickup_outcome_position', 'id_creation_import',
+      'pickup_outcome_registration_date', 'pickup_pod_files', 'pickup_planned_service_time', 'received_pickup_pod_files', 'pickup_eta_deviation', 'pickup_livetrack_link',
       'delivery_calculated_eta', 'time_spent_in_the_unloading_area',
       'delivery_outcome_causal', 'delivery_arrival_date', 'delivery_outcome_date',
       'delivery_unload_date', 'delivery_outcome_note', 'delivery_last_position',
@@ -305,7 +311,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      console.log(`\nFound ${Object.keys(headerMapping).length} matching columns out of ${excelHeaders.length} Excel headers\n`);
+      console.log(`\nFound ${Object.keys(headerMapping).length} matching columns out of ${excelHeaders.length} Excel headers`);
+      console.log('UNMAPPED HEADERS:');
+      excelHeaders.forEach(header => {
+        const normalized = normalizeHeader(header);
+        if (!allDbColumns.includes(normalized)) {
+          console.log(`  UNMAPPED: "${header}" → "${normalized}" (not in DB)`);
+        }
+      });
+      console.log('');
       
       for (let i = 0; i < testRows.length; i++) {
         const row = testRows[i];
