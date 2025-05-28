@@ -167,8 +167,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { importRows, importToDatabase } = req.body;
         
         console.log(`Processing simple import with ${importRows.length} rows`);
+        console.log(`Import to database flag: ${importToDatabase}`);
         
-        if (importToDatabase) {
+        // Always import to database now that we have PostgreSQL
+        if (true) {
           let importedCount = 0;
           
           // Process each row and create consignments
