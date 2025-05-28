@@ -247,6 +247,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'delivery_unload_date', 'delivery_outcome_note', 'delivery_last_position',
       'delivery_last_position_date', 'pickup_planned_eta', 'eta_delivery_on_departure',
       'delivery_live_distance_km', 'delivery_distance_km', 'delivery_outcome_transmission_date',
+      
+      // Add the missing Excel columns that are causing NULL values
+      'pickup_live_distance_km', 'eta_pickup_on_departure', 'pickup_calculated_eta',
+      'pickup_outcome_reason', 'group_causal_pickup_outcome', 'pickup_outcome_date',
+      'pickup_outcome_causal', 'pickup_outcome_transmission_date', 'pickup_outcome_receipt_date',
+      'eta_delivery_on_departure', 'delivery_live_distance_km', 'delivery_calculated_eta',
+      'delivery_outcome_reason', 'group_causal_delivery_outcome_detailed', 'delivery_outcome_causal_detailed',
       'delivery_outcome_receipt_date', 'delivery_unload_sequence', 'delivery_time_window',
       'pickup_arrival_date', 'pickup_outcome_date', 'pickup_load_date',
       'pickup_outcome_reason', 'group_causal_pickup_outcome', 'pickup_outcome_note',
