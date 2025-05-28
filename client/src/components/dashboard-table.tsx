@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye } from "lucide-react";
+import { Eye, ExternalLink } from "lucide-react";
 import { Consignment } from "@shared/schema";
 
 interface DashboardTableProps {
@@ -28,6 +28,44 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       return '-';
     }
 
+    // Handle ETA fields - convert from Excel serial date to AEST
+    if (fieldKey === 'pickupCalculatedEta' && typeof value === 'string') {
+      try {
+        const excelDate = parseFloat(value);
+        // Excel serial date to JavaScript date (Excel epoch is 1900-01-01, but adjusted for leap year bug)
+        const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
+        // Convert to AEST (UTC+10)
+        const aestDate = new Date(jsDate.getTime() + (10 * 60 * 60 * 1000));
+        return aestDate.toLocaleString('en-AU', {
+          timeZone: 'Australia/Sydney',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return String(value);
+      }
+    }
+
+    // Handle date fields - convert from Excel serial date to AEST
+    if (fieldKey === 'pickupOutcomeDate' && typeof value === 'string') {
+      try {
+        const excelDate = parseFloat(value);
+        const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
+        const aestDate = new Date(jsDate.getTime() + (10 * 60 * 60 * 1000));
+        return aestDate.toLocaleDateString('en-AU', {
+          timeZone: 'Australia/Sydney',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      } catch {
+        return String(value);
+      }
+    }
+
     // Handle JSON strings or objects
     if (typeof value === 'object') {
       if (Array.isArray(value)) {
@@ -50,6 +88,27 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     }
 
     return String(value);
+  };
+
+  const renderCellContent = (consignment: Consignment, column: { key: string; label: string }) => {
+    const value = (consignment as any)[column.key];
+    
+    // Render tracking link as a button
+    if (column.key === 'pickupLivetrackLink' && value && value !== '-') {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(value, '_blank')}
+          className="h-8 px-3 text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-200"
+        >
+          <ExternalLink className="h-3 w-3 mr-1" />
+          Track
+        </Button>
+      );
+    }
+    
+    return getFieldValue(consignment, column.key);
   };
 
   return (
@@ -77,7 +136,7 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
               <TableRow key={consignment.id} className="hover:bg-gray-50">
                 {columns.map((column) => (
                   <TableCell key={column.key} className="py-3">
-                    {getFieldValue(consignment, column.key)}
+                    {renderCellContent(consignment, column)}
                   </TableCell>
                 ))}
                 <TableCell className="py-3">
