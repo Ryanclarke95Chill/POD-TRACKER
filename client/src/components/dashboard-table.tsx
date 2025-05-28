@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, ExternalLink, GripVertical } from "lucide-react";
+import { Eye, ExternalLink, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Consignment } from "@shared/schema";
 import { useState } from "react";
 
@@ -23,6 +23,8 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
   ]);
 
   const [draggedColumn, setDraggedColumn] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedColumn(index);
@@ -57,6 +59,16 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
 
   const handleDragEnd = () => {
     setDraggedColumn(null);
+  };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(consignments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentConsignments = consignments.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
   const getFieldValue = (consignment: Consignment, fieldKey: string): string => {
@@ -176,14 +188,14 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
           </TableRow>
         </TableHeader>
         <TableBody>
-          {consignments.length === 0 ? (
+          {currentConsignments.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length + 1} className="text-center py-8 text-gray-500">
                 No consignments found
               </TableCell>
             </TableRow>
           ) : (
-            consignments.map((consignment) => (
+            currentConsignments.map((consignment) => (
               <TableRow key={consignment.id} className="hover:bg-gray-50">
                 {columns.map((column) => (
                   <TableCell key={column.key} className="py-3">
@@ -205,6 +217,67 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
           )}
         </TableBody>
       </Table>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+          <div className="text-sm text-gray-600">
+            Showing {startIndex + 1} to {Math.min(endIndex, consignments.length)} of {consignments.length} consignments
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="h-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {/* Show page numbers */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => goToPage(pageNum)}
+                    className="h-8 w-8 p-0"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="h-8"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
