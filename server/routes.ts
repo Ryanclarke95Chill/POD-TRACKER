@@ -319,6 +319,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Vehicle description': 'vehicle_description'
         };
         
+        // Debug: Log first row data to see what's actually available
+        if (successCount === 0) {
+          console.log('=== FIRST ROW DEBUG ===');
+          console.log('Available Excel keys:', Object.keys(row));
+          console.log('Sample values:');
+          Object.keys(row).slice(0, 10).forEach(key => {
+            console.log(`  "${key}": "${row[key]}"`);
+          });
+        }
+        
         // Add each available column from the Excel data
         for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
           if (row[excelCol] !== undefined && row[excelCol] !== null && row[excelCol] !== '') {
@@ -331,6 +341,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               values.push(parseInt(row[excelCol]) || 0);
             } else {
               values.push(String(row[excelCol]));
+            }
+            
+            // Debug: Log successful mappings for first row
+            if (successCount === 0) {
+              console.log(`  MAPPED: "${excelCol}" -> "${dbCol}" = "${row[excelCol]}"`);
             }
           }
         }
