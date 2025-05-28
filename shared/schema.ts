@@ -56,6 +56,17 @@ export const consignments = pgTable("consignments", {
   spaces: integer("spaces"),
   cubicMeters: text("cubic_meters"),
   weightKg: text("weight_kg"),
+  // Additional columns for CSV import
+  shipper: text("shipper"),
+  deliveryLivetrackLink: text("delivery_livetrack_link"),
+  customerOrderNumber: text("customer_order_number"),
+  documentString2: text("document_string2"),
+  fromLocation: text("from_location"),
+  groupCausalDeliveryOutcome: text("group_causal_delivery_outcome"),
+  deliveryPlannedEta: text("delivery_planned_eta"),
+  recordedTemperature: text("recorded_temperature"),
+  quantityUnitOfMeasurement1: text("quantity_unit_of_measurement1"),
+  quantityUnitOfMeasurement2: text("quantity_unit_of_measurement2"),
   events: json("events").notNull().$type<ConsignmentEvent[]>(),
 });
 

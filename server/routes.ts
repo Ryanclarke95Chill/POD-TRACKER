@@ -170,6 +170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             spaces: row.spaces ? parseInt(row.spaces) : null,
             cubicMeters: row.cubicMeters || null,
             weightKg: row.weightKg || null,
+            // Additional CSV columns
+            shipper: row.shipper || null,
+            deliveryLivetrackLink: row.deliveryLivetrackLink || null,
+            customerOrderNumber: row.customerOrderNumber || null,
+            documentString2: row.documentString2 || null,
+            fromLocation: row.fromLocation || null,
+            groupCausalDeliveryOutcome: row.groupCausalDeliveryOutcome || null,
+            deliveryPlannedEta: row.deliveryPlannedEta || null,
+            recordedTemperature: row.recordedTemperature || null,
+            quantityUnitOfMeasurement1: row.quantityUnitOfMeasurement1 || null,
+            quantityUnitOfMeasurement2: row.quantityUnitOfMeasurement2 || null,
             events: [
               {
                 timestamp: new Date().toISOString(),
