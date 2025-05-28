@@ -82,6 +82,8 @@ export const consignments = pgTable("consignments", {
   route: text("route"),
   driver: text("driver"),
   vehicle: text("vehicle"),
+  origin: text("origin"),
+  destination: text("destination"),
   deliveryTime: text("delivery_time"),
   pickupTime: text("pickup_time"),
   consignmentType: text("consignment_type"),
