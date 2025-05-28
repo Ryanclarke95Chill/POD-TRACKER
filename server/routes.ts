@@ -166,10 +166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ]
             };
             
+            console.log(`About to save consignment ${importedCount + 1}`);
             await storage.createConsignment(consignmentData);
+            console.log(`Saved consignment ${importedCount + 1} successfully`);
             importedCount++;
           } catch (error) {
             console.error("Error creating consignment:", error);
+            console.error("Error details:", error);
           }
         }
         
