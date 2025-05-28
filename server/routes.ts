@@ -170,28 +170,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const placeholders = ['$1'];
         let paramCount = 1;
         
-        // Map common Excel columns to database columns
+        // Map your actual Excel columns to database columns
         const columnMapping = {
-          'consignmentNumber': 'consignment_number',
-          'customerName': 'customer_name',
-          'pickupAddress': 'pickup_address',
-          'deliveryAddress': 'delivery_address',
-          'status': 'status',
-          'estimatedDeliveryDate': 'estimated_delivery_date',
-          'temperatureZone': 'temperature_zone',
-          'lastKnownLocation': 'last_known_location',
-          'quantity': 'quantity',
-          'pallets': 'pallets',
-          'spaces': 'spaces',
-          'deliveryRun': 'delivery_run',
-          'weightKg': 'weight_kg',
-          'cubicMeters': 'cubic_meters',
-          'shipper': 'shipper',
-          'receiver': 'receiver',
-          'notes': 'notes',
-          'driver': 'driver',
-          'vehicle': 'vehicle',
-          'route': 'route'
+          'Order number': 'consignment_number',
+          'Driver': 'driver',
+          'Shipper': 'shipper',
+          'To': 'receiver',
+          'From': 'pickup_address',
+          'Delivery city': 'delivery_address',
+          'Vehicle code': 'vehicle',
+          'Trip number': 'route',
+          'Weight [kg]': 'weight_kg',
+          'Volume  [m³]': 'cubic_meters',
+          'Expected temperature': 'temperature_zone',
+          'Delivery outcome': 'status',
+          'Document note': 'notes',
+          'Carrier': 'carrier',
+          'Customer order number': 'customer_order_number',
+          'Delivery planned ETA': 'estimated_delivery_date',
+          'Pickup planned ETA': 'pickup_planned_eta',
+          'Delivery last position': 'last_known_location',
+          'Delivery outcome note': 'delivery_notes',
+          'Ground bases': 'pallets',
+          'Quantity unit of measurement1': 'quantity'
         };
         
         // Add each available column from the Excel data
