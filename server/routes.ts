@@ -129,6 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { importRows } = req.body;
         
         console.log(`Processing simple import with ${importRows.length} rows`);
+        console.log(`Sample row:`, importRows[0]);
         
         let importedCount = 0;
         

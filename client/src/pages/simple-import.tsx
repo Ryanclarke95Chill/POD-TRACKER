@@ -32,7 +32,23 @@ export default function SimpleImport() {
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>(() => {
     // Load saved field mapping from localStorage
     const saved = localStorage.getItem('consignment-field-mapping');
-    return saved ? JSON.parse(saved) : {};
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    
+    // Default mapping based on your screenshot
+    return {
+      "Delivery Livetrack link": "trackingLink",
+      "Customer order number": "consignmentNumber", 
+      "Shipper": "customerName",
+      "document_string2": "deliveryAddress",
+      "From": "pickupAddress",
+      "Group causal delivery outcome": "status",
+      "Delivery planned ETA": "estimatedDeliveryDate",
+      "Recorded temperature": "temperatureZone",
+      "Quantity unit of measurement1": "quantity",
+      "Quantity unit of measurement2": "pallets"
+    };
   });
   const [showPreview, setShowPreview] = useState(false);
 
