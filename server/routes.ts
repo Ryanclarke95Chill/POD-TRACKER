@@ -128,18 +128,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      console.log("Import request received");
+      console.log("Import request received with proper field mapping");
       console.log("Request body keys:", Object.keys(req.body));
       
-      // Direct handling of importRows data
-      const { importRows } = req.body;
+      // Handle both direct importRows and mapped CSV data
+      const { importRows, fieldMapping, combineFields } = req.body;
       
       if (!importRows || !Array.isArray(importRows)) {
         console.log("No importRows found in request");
         return res.status(400).json({ message: "No import data provided" });
       }
       
-      console.log(`Processing ${importRows.length} rows for database import`);
+      console.log(`Processing ${importRows.length} rows with field mapping:`, fieldMapping);
       
       let successCount = 0;
       let errorCount = 0;

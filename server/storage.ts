@@ -73,8 +73,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async seedDemoConsignments(userId: number): Promise<void> {
-    // Clear existing consignments for this user first
-    await db.delete(consignments).where(eq(consignments.userId, userId));
+    // No more demo data - using real imported data only
+    return;
 
     const demoConsignments = [
       {
