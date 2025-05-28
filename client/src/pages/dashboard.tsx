@@ -13,6 +13,11 @@ export default function Dashboard() {
   const [selectedTempZone, setSelectedTempZone] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
+
+  const clearLocalStorage = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
   const user = getUser();
 
   const { data: consignments = [], isLoading } = useQuery({
@@ -63,6 +68,12 @@ export default function Dashboard() {
             >
               <Upload className="h-4 w-4 mr-2" />
               Import Data
+            </Button>
+            <Button 
+              className="bg-red-500/20 hover:bg-red-500/30 text-white border border-red-300/30 backdrop-blur-sm"
+              onClick={clearLocalStorage}
+            >
+              Clear Cache
             </Button>
             <Button 
               className="gradient-accent hover:opacity-90 text-white border-0"
