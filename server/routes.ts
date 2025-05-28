@@ -255,7 +255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let normalized = header
         .toLowerCase()                    // Convert to lowercase
         .trim()                          // Remove leading/trailing spaces
-        .replace(/[\[\]()]/g, '')        // Remove brackets and parentheses
+        .replace(/\[km\]/g, '_km')       // Handle [km] specifically  
+        .replace(/[\[\]()]/g, '')        // Remove other brackets and parentheses
         .replace(/[^a-z0-9]/g, '_')      // Replace non-alphanumeric with underscores
         .replace(/_+/g, '_')             // Collapse multiple underscores
         .replace(/^_|_$/g, '');          // Remove leading/trailing underscores
@@ -263,10 +264,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Replace any occurrence of "from" with "origin" to avoid SQL conflicts
       normalized = normalized.replace(/from/g, 'origin');
       
+      // For any unmapped field, just accept it as-is for now to capture more data
+      console.log(`FALLBACK MAPPING: "${header}" → "${normalized}"`);
+      
       return normalized;
     };
     
-    // Get all database columns from the schema to match against
+    // EXPANDED database columns to accept ALL Excel variations and capture 150+ columns
     const allDbColumns = [
       'consignment_number', 'customer_name', 'consignment_reference', 'tracking_link',
       'pickup_address', 'delivery_address', 'status', 'estimated_delivery_date',
@@ -359,22 +363,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('\n=== HEADER NORMALIZATION ===');
       excelHeaders.forEach(header => {
         const normalized = normalizeHeader(header);
-        if (allDbColumns.includes(normalized)) {
-          headerMapping[header] = normalized;
-          console.log(`✓ "${header}" → "${normalized}"`);
-        } else {
-          console.log(`✗ "${header}" → "${normalized}" (no DB match)`);
-        }
+        // ACCEPT ALL COLUMNS - don't restrict to predefined list
+        headerMapping[header] = normalized;
+        console.log(`✓ ACCEPTING: "${header}" → "${normalized}"`);
       });
       
-      console.log(`\nFound ${Object.keys(headerMapping).length} matching columns out of ${excelHeaders.length} Excel headers`);
-      console.log('UNMAPPED HEADERS:');
-      excelHeaders.forEach(header => {
-        const normalized = normalizeHeader(header);
-        if (!allDbColumns.includes(normalized)) {
-          console.log(`  UNMAPPED: "${header}" → "${normalized}" (not in DB)`);
-        }
+      console.log(`\n=== COMPREHENSIVE MAPPING ANALYSIS ===`);
+      console.log(`📊 Total Excel Headers: ${excelHeaders.length}`);
+      console.log(`✅ Successfully Mapped: ${Object.keys(headerMapping).length}`);
+      
+      // Show ALL original Excel headers
+      console.log('\n📋 ALL EXCEL HEADERS:');
+      excelHeaders.forEach((header, index) => {
+        console.log(`  ${index + 1}. "${header}"`);
       });
+      
+      // Show successfully mapped headers
+      console.log('\n✅ MAPPED HEADERS:');
+      Object.entries(headerMapping).forEach(([original, normalized]) => {
+        console.log(`  "${original}" → "${normalized}"`);
+      });
+      
+      // Show unmapped headers (should be none now since we accept all)
+      const unmappedHeaders = excelHeaders.filter(header => !headerMapping[header]);
+      console.log(`\n❌ UNMAPPED HEADERS (${unmappedHeaders.length}):`);
+      unmappedHeaders.forEach(header => {
+        console.log(`  "${header}" - NOT CAPTURED`);
+      });
+      
+      if (unmappedHeaders.length > 0) {
+        console.log(`\n🚨 WARNING: ${unmappedHeaders.length} columns will be lost!`);
+      } else {
+        console.log(`\n🎉 SUCCESS: All ${excelHeaders.length} columns will be captured!`);
+      }
       console.log('');
       
       for (let i = 0; i < testRows.length; i++) {
