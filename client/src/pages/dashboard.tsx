@@ -195,17 +195,6 @@ export default function Dashboard() {
         
         {/* Consignments List */}
         <div className="gradient-card shadow-card rounded-xl overflow-hidden border border-white/20">
-          {/* Table header */}
-          <div className="grid grid-cols-7 bg-gray-50/80 border-b border-gray-200 p-4 font-semibold text-gray-700 text-sm">
-            <div className="col-span-1">Reference #</div>
-            <div className="col-span-1">Status</div>
-            <div className="col-span-1">Customer</div>
-            <div className="col-span-1">From</div>
-            <div className="col-span-1">To</div>
-            <div className="col-span-1">Temperature</div>
-            <div className="col-span-1 text-center">Action</div>
-          </div>
-          
           {isLoading ? (
             /* Loading skeletons */
             <>
