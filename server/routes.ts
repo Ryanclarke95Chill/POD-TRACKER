@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, db } from "./db";
 import { consignments } from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -79,6 +80,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/database/columns", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'consignments' 
+        AND column_name NOT IN ('id', 'user_id')
+        ORDER BY ordinal_position
+      `);
+      
+      const columns = result.rows.map((row: any) => row.column_name);
+      res.json(columns);
+    } catch (error) {
+      console.error("Database columns error:", error);
+      res.status(500).json({ error: "Failed to fetch database columns" });
     }
   });
 
