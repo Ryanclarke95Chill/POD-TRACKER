@@ -347,6 +347,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `;
         
         console.log(`Inserting row ${successCount + 1} with ${columns.length} columns`);
+        console.log('SQL Query:', sql);
+        console.log('Escaped columns:', escapedColumns);
         const result = await pool.query(sql, values);
         
         // Only count as success if the row was actually inserted
