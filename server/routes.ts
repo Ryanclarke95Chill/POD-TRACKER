@@ -198,6 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check for exact match first
       if (specificMappings[header]) {
+        console.log(`SPECIFIC MAPPING: "${header}" → "${specificMappings[header]}"`);
         return specificMappings[header];
       }
       
