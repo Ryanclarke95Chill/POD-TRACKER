@@ -129,8 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
+      console.log("=== IMPORT DEBUG ===");
       console.log("Import request received with proper field mapping");
       console.log("Request body keys:", Object.keys(req.body));
+      console.log("importRows length:", req.body.importRows?.length);
+      console.log("Sample row:", req.body.importRows?.[0]);
       
       // Handle both direct importRows and mapped CSV data
       const { importRows, fieldMapping, combineFields } = req.body;
