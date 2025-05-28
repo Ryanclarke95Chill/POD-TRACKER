@@ -162,6 +162,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Function to normalize Excel headers to database field names
     const normalizeHeader = (header: string): string => {
+      // Specific mappings for your Excel headers
+      const specificMappings: { [key: string]: string } = {
+        'Vehicle code': 'vehicle_code',
+        'Delivery Livetrack link': 'delivery_livetrack_link',
+        'Delivery ETA deviation': 'delivery_eta_deviation',
+        'Required tags': 'required_tags',
+        'Received delivery PoD files': 'received_delivery_pod_files',
+        'Order carrier email': 'order_carrier_email',
+        'Trip number': 'trip_number',
+        'Order number': 'order_number',
+        'From': 'from_location',
+        'To': 'to_location',
+        'Carrier': 'carrier',
+        'Driver': 'driver',
+        'Customer order number': 'customer_order_number',
+        'Shipper': 'shipper',
+        'Weight [kg]': 'weight_kg',
+        'document_string2': 'document_string2',
+        'Delivery last position': 'delivery_last_position',
+        'Delivery last position date': 'delivery_last_position_date',
+        'Pickup planned ETA': 'pickup_planned_eta',
+        'Pickup outcome date': 'pickup_outcome_date',
+        'Pickup outcome reason': 'pickup_outcome_reason',
+        'Group causal pickup outcome': 'group_causal_pickup_outcome',
+        'Pickup last position': 'pickup_last_position',
+        'Pickup last position date': 'pickup_last_position_date',
+        'Pickup calculated ETA': 'pickup_calculated_eta'
+      };
+      
+      // Check for exact match first
+      if (specificMappings[header]) {
+        return specificMappings[header];
+      }
+      
+      // Fall back to general normalization
       return header
         .toLowerCase()                    // Convert to lowercase
         .trim()                          // Remove leading/trailing spaces
