@@ -363,9 +363,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let successCount = 0;
     
     try {
-      // Process first 10 rows for debugging
-      const testRows = importRows.slice(0, 10);
-      console.log(`Testing with first ${testRows.length} rows to verify mapping...`);
+      // Process all rows - no limit
+      const testRows = importRows;
+      console.log(`Processing all ${testRows.length} rows...`);
       
       // Build dynamic mapping from Excel headers to database columns
       const firstRow = testRows[0];
