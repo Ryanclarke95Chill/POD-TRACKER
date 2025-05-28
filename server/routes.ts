@@ -246,13 +246,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           update: updateExisting
         });
         
-        // For demo purposes, we'll just import some sample consignments
-        const importedCount = Math.floor(Math.random() * 5) + 3; // Random number between 3-7
-        
-        return res.json({
-          success: true,
-          importedCount,
-          message: `Successfully imported ${importedCount} consignments.`
+        // This path shouldn't be used anymore - redirect to proper processing
+        return res.status(400).json({
+          success: false,
+          message: "Please use the new import format with importRows"
         });
       }
       
