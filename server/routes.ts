@@ -489,6 +489,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         
+        // CRITICAL DEBUG: Track exactly where we stop
+        if (i === 9) {
+          console.log("🚨 CRITICAL: Just finished row 10! About to continue to row 11...");
+        }
+        if (i === 10) {
+          console.log("🚨 CRITICAL: Processing row 11! The loop IS continuing!");
+        }
+        if (i === 11) {
+          console.log("🚨 CRITICAL: Processing row 12! No 10-row limit found!");
+        }
+        
         if (successCount % 100 === 0) {
           console.log(`Imported ${successCount} records...`);
         }
