@@ -352,15 +352,22 @@ export default function SimpleImport() {
 
     setIsUploading(true);
     
-    const importRows = fileData.map((row) => {
-      const mappedRow: any = {};
+    // Send RAW Excel data directly to smart backend - no frontend mapping needed!
+    const importRows = fileData.slice(1).map((row) => {
+      const rowData: any = {};
       headers.forEach((header, index) => {
-        const fieldName = fieldMapping[header];
-        if (fieldName && fieldName !== 'ignore') {
-          mappedRow[fieldName] = row[index] || '';
+        // Use original Excel header names exactly as they appear
+        if (row[index] !== undefined && row[index] !== null && row[index] !== '') {
+          rowData[header] = row[index];
         }
       });
-      return mappedRow;
+      return rowData;
+    });
+
+    console.log('Sending raw Excel data to smart backend:', {
+      totalRows: importRows.length,
+      sampleHeaders: headers.slice(0, 10),
+      sampleRow: importRows[0]
     });
 
     try {
@@ -378,7 +385,7 @@ export default function SimpleImport() {
       if (result.success) {
         toast({
           title: "Import successful",
-          description: result.message,
+          description: `Successfully imported ${result.importedCount} records with smart column mapping!`,
         });
         
         // Clear the form
