@@ -71,13 +71,30 @@ export default function ConsignmentTable({ consignments, onViewDetails }: Consig
   const getFieldValue = (consignment: Consignment, fieldKey: string): string => {
     const value = (consignment as any)[fieldKey];
     
+    // Handle null/undefined values first
+    if (!value) return '-';
+    
+    // Handle events field (JSON array)
+    if (fieldKey === 'events') {
+      try {
+        const events = Array.isArray(value) ? value : JSON.parse(value);
+        return events.length > 0 ? `${events.length} events` : '-';
+      } catch {
+        return value.toString();
+      }
+    }
+    
     // Handle date formatting
     if (fieldKey.toLowerCase().includes('date') || fieldKey.toLowerCase().includes('eta')) {
       return value ? formatToAEST(value) : '-';
     }
     
-    // Handle null/undefined values
-    return value || '-';
+    // Handle objects/arrays - convert to string
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    
+    return value.toString();
   };
 
   const getStatusBadgeVariant = (status: string) => {
