@@ -129,63 +129,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      if (req.body.importRows) {
-        const { importRows } = req.body;
-        
-        console.log(`Processing simple import with ${importRows.length} rows`);
-        console.log(`Sample row:`, importRows[0]);
-        
-        let importedCount = 0;
-        
-        for (const row of importRows) {
-          try {
-            const consignmentData = {
-              userId,
-              consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-              customerName: row.customerName || "Imported Customer", 
-              consignmentReference: row.consignmentReference || null,
-              trackingLink: row.trackingLink || null,
-              pickupAddress: row.pickupAddress || "Unknown Pickup",
-              deliveryAddress: row.deliveryAddress || "Unknown Address",
-              status: row.status || "In Transit",
-              estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
-              deliveryDate: row.deliveryDate || null,
-              dateDelivered: row.dateDelivered || null,
-              consignmentRequiredDeliveryDate: row.consignmentRequiredDeliveryDate || null,
-              temperatureZone: row.temperatureZone || "Dry",
-              lastKnownLocation: row.lastKnownLocation || "Processing Facility",
-              deliveryRun: row.deliveryRun || null,
-              quantity: parseInt(row.quantity) || null,
-              pallets: parseInt(row.pallets) || null, 
-              spaces: parseInt(row.spaces) || null,
-              cubicMeters: row.cubicMeters || null,
-              weightKg: row.weightKg || null,
-              events: [
-                {
-                  timestamp: new Date().toISOString(),
-                  description: "Package imported into system",
-                  location: "Import Center", 
-                  type: "import"
-                }
-              ]
-            };
-            
-            console.log(`About to save consignment ${importedCount + 1}`);
-            await storage.createConsignment(consignmentData);
-            console.log(`Saved consignment ${importedCount + 1} successfully`);
-            importedCount++;
-          } catch (error) {
-            console.error("Error creating consignment:", error);
-            console.error("Error details:", error);
-          }
-        }
-        
-        return res.json({
-          success: true,
-          importedCount,
-          message: `Successfully imported ${importedCount} consignments.`
-        });
+      console.log("Import request received");
+      console.log("Request body keys:", Object.keys(req.body));
+      
+      // Direct handling of importRows data
+      const { importRows } = req.body;
+      
+      if (!importRows || !Array.isArray(importRows)) {
+        console.log("No importRows found in request");
+        return res.status(400).json({ message: "No import data provided" });
       }
+      
+      console.log(`Processing ${importRows.length} rows for database import`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Process each row and save to database
+      for (let i = 0; i < importRows.length; i++) {
+        const row = importRows[i];
+        
+        try {
+          const consignmentData = {
+            userId,
+            consignmentNumber: row.consignmentNumber || `IMP-${Date.now()}-${i}`,
+            customerName: row.customerName || "Imported Customer",
+            consignmentReference: row.consignmentReference || null,
+            trackingLink: row.trackingLink || null,
+            pickupAddress: row.pickupAddress || "Unknown Pickup",
+            deliveryAddress: row.deliveryAddress || "Unknown Address", 
+            status: row.status || "In Transit",
+            estimatedDeliveryDate: row.estimatedDeliveryDate || new Date().toISOString(),
+            deliveryDate: row.deliveryDate || null,
+            dateDelivered: row.dateDelivered || null,
+            consignmentRequiredDeliveryDate: row.consignmentRequiredDeliveryDate || null,
+            temperatureZone: row.temperatureZone || "Dry",
+            lastKnownLocation: row.lastKnownLocation || "Processing Facility",
+            deliveryRun: row.deliveryRun || null,
+            quantity: row.quantity ? parseInt(row.quantity) : null,
+            pallets: row.pallets ? parseInt(row.pallets) : null,
+            spaces: row.spaces ? parseInt(row.spaces) : null,
+            cubicMeters: row.cubicMeters || null,
+            weightKg: row.weightKg || null,
+            events: [
+              {
+                timestamp: new Date().toISOString(),
+                description: "Package imported from CSV",
+                location: "Import Center",
+                type: "import"
+              }
+            ]
+          };
+          
+          await storage.createConsignment(consignmentData);
+          successCount++;
+          
+          if (successCount % 100 === 0) {
+            console.log(`Saved ${successCount} consignments so far...`);
+          }
+          
+        } catch (error) {
+          console.error(`Error saving row ${i + 1}:`, error);
+          errorCount++;
+        }
+      }
+      
+      console.log(`Import complete: ${successCount} saved, ${errorCount} errors`);
+      
+      return res.json({
+        success: true,
+        importedCount: successCount,
+        errorCount,
+        message: `Successfully imported ${successCount} consignments to database.`
+      });
 
       return res.status(400).json({ message: "No import data provided" });
     } catch (error) {
