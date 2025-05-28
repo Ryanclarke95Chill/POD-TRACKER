@@ -276,7 +276,7 @@ export default function SimpleImport() {
       });
 
       // Send data to backend for processing
-      const response = await fetch("/api/admin/import", {
+      const response = await fetch("/api/admin/import-direct", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -119,6 +119,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New direct database import route
+  app.post("/api/admin/import-direct", authenticate, async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.id;
+    const { importRows } = req.body;
+    
+    console.log("=== DIRECT DATABASE IMPORT ===");
+    console.log(`Processing ${importRows?.length || 0} rows for direct database save`);
+    
+    if (!importRows || !Array.isArray(importRows)) {
+      return res.status(400).json({ message: "No import data provided" });
+    }
+    
+    let successCount = 0;
+    
+    try {
+      for (const row of importRows) {
+        const insertQuery = `
+          INSERT INTO consignments (
+            user_id, consignment_number, customer_name, delivery_address, pickup_address,
+            status, estimated_delivery_date, temperature_zone, last_known_location,
+            quantity, pallets, events
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `;
+        
+        await pool.query(insertQuery, [
+          userId,
+          row.consignmentNumber || `DIRECT-${Date.now()}-${successCount}`,
+          row.customerName || "Imported Customer",
+          row.deliveryAddress || "Unknown Address",
+          row.pickupAddress || "Unknown Pickup",
+          row.status || "In Transit",
+          row.estimatedDeliveryDate || new Date().toISOString(),
+          row.temperatureZone || "Dry",
+          "Processing Center",
+          parseInt(row.quantity) || 0,
+          parseInt(row.pallets) || 0,
+          JSON.stringify([{
+            timestamp: new Date().toISOString(),
+            description: "Direct database import",
+            location: "Import Center",
+            type: "import"
+          }])
+        ]);
+        
+        successCount++;
+        if (successCount % 500 === 0) {
+          console.log(`Direct import: ${successCount} records saved...`);
+        }
+      }
+      
+      console.log(`Direct import completed: ${successCount} records saved to database`);
+      return res.json({
+        success: true,
+        importedCount: successCount,
+        message: `Successfully imported ${successCount} consignments directly to database.`
+      });
+      
+    } catch (error) {
+      console.error("Direct import error:", error);
+      return res.status(500).json({ message: "Direct import failed" });
+    }
+  });
+
   app.post("/api/admin/import", authenticate, async (req: AuthRequest, res: Response) => {
     console.log("=== NEW IMPORT ROUTE HIT ===");
     console.log("Request body:", JSON.stringify(req.body, null, 2));
