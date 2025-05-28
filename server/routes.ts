@@ -130,6 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // New direct database import route
   app.post("/api/admin/import-direct", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== IMPORT-DIRECT ROUTE HIT ===");
     const userId = req.user!.id;
     const { importRows } = req.body;
     
