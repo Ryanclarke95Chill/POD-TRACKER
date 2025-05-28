@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Consignment } from "@shared/schema";
+import { formatToAEST } from "@/lib/utils";
 
 interface ConsignmentCardProps {
   consignment: Consignment;
@@ -130,7 +131,7 @@ export default function ConsignmentCard({ consignment, onViewDetails }: Consignm
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
-              <p className="text-sm font-medium">{consignment.estimatedDeliveryDate}</p>
+              <p className="text-sm font-medium">{formatToAEST(consignment.estimatedDeliveryDate)}</p>
             </div>
           </div>
           <div className="bg-neutral-50 rounded p-2">

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Consignment } from "@shared/schema";
 import TimelineEvent from "./timeline-event";
+import { formatToAEST } from "@/lib/utils";
 
 interface ConsignmentDetailModalProps {
   consignment: Consignment;
@@ -227,7 +228,7 @@ export default function ConsignmentDetailModal({
                     <p className="text-xs text-neutral-500 font-medium">
                       {consignment.status === "Delivered" ? "Delivered On" : "Estimated Delivery"}
                     </p>
-                    <p className="text-sm font-semibold text-neutral-800">{consignment.estimatedDeliveryDate}</p>
+                    <p className="text-sm font-semibold text-neutral-800">{formatToAEST(consignment.estimatedDeliveryDate)}</p>
                   </div>
                 </div>
                 
