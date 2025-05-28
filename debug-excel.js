@@ -19,16 +19,31 @@ Object.entries(firstRow).slice(0, 15).forEach(([key, value]) => {
   }
 });
 
-// Test mapping
+// Test the exact logic from the import code
 const columnMapping = {
+  'Delivery ETA deviation': 'delivery_eta_deviation',
   'Trip number': 'trip_number',
-  'Order number': 'order_number', 
+  'Order number': 'order_number',
+  'From': 'from',
+  'To': 'to',
+  'Carrier': 'carrier',
   'Driver': 'driver',
+  'document_string2': 'document_string2',
+  'Customer order number': 'customer_order_number',
   'Shipper': 'shipper'
 };
 
-console.log('\nTesting mapping:');
+console.log('\nTesting mapping exactly like import code:');
+let foundColumns = 0;
 Object.entries(columnMapping).forEach(([excelCol, dbCol]) => {
   const value = firstRow[excelCol];
-  console.log(`"${excelCol}" -> "${dbCol}": "${value}" (${value ? 'FOUND' : 'MISSING'})`);
+  const hasValue = value !== undefined && value !== null && value !== '';
+  if (hasValue) {
+    foundColumns++;
+    console.log(`✓ "${excelCol}" -> "${dbCol}": "${value}"`);
+  } else {
+    console.log(`✗ "${excelCol}" -> "${dbCol}": EMPTY/NULL`);
+  }
 });
+
+console.log(`\nTotal columns that should be imported: ${foundColumns}`);
