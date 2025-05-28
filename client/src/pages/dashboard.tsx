@@ -14,14 +14,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
 
-  // Clear only consignment data, keep auth token
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    localStorage.clear();
-    if (token) localStorage.setItem('token', token);
-    if (user) localStorage.setItem('user', user);
-  }, []);
+
 
   const clearLocalStorage = () => {
     localStorage.clear();
