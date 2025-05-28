@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Consignment } from "@shared/schema";
 import { formatToAEST } from "@/lib/utils";
+import AnimatedProgress from "./animated-progress";
 
 interface ConsignmentCardProps {
   consignment: Consignment;
@@ -101,6 +102,11 @@ export default function ConsignmentCard({ consignment, onViewDetails }: Consignm
           </div>
         </div>
         
+        {/* Animated Progress Tracking */}
+        <div className="mb-4">
+          <AnimatedProgress consignment={consignment} />
+        </div>
+
         {/* Route info with visual indicator */}
         <div className="flex items-stretch mb-4 gap-1.5">
           <div className="flex flex-col items-center">

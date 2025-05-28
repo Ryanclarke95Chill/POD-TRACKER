@@ -9,6 +9,7 @@ import {
 import { Consignment } from "@shared/schema";
 import TimelineEvent from "./timeline-event";
 import { formatToAEST } from "@/lib/utils";
+import AnimatedProgress from "./animated-progress";
 
 interface ConsignmentDetailModalProps {
   consignment: Consignment;
@@ -118,7 +119,15 @@ export default function ConsignmentDetailModal({
               </div>
             </div>
           </div>
-          
+        </div>
+        
+        {/* Animated Progress Tracking */}
+        <div className="mx-6 mt-6 p-4 bg-gradient-to-r from-blue-50 to-neutral-50 rounded-lg border">
+          <h4 className="text-sm font-semibold text-neutral-800 mb-3">Delivery Progress</h4>
+          <AnimatedProgress consignment={consignment} />
+        </div>
+        
+        <div className="px-6">
           {/* External Tracking Link Section */}
           {consignment.trackingLink && (
             <div className="mx-6 mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
