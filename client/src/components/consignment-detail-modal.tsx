@@ -79,37 +79,34 @@ export default function ConsignmentDetailModal({
     <Dialog open={!!consignment} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-5xl w-[95vw] p-0 overflow-auto max-h-[90vh] rounded-xl">
         <DialogHeader className="p-6 border-b bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Package className="h-6 w-6 text-blue-600" />
-                <div>
-                  <DialogTitle className="text-xl font-bold font-mono">
-                    {consignment.orderNumberRef || consignment.consignmentNo || `${consignment.year}-${consignment.code}-${consignment.prog}` || 'Unknown'}
-                  </DialogTitle>
-                  <DialogDescription className="text-sm text-gray-600">
-                    {consignment.shipToCompanyName || 'Unknown Customer'}
-                  </DialogDescription>
-                </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <Package className="h-6 w-6 text-blue-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <DialogTitle className="text-xl font-bold font-mono truncate">
+                  {consignment.orderNumberRef || consignment.consignmentNo || `${consignment.year}-${consignment.code}-${consignment.prog}` || 'Unknown'}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-gray-600 truncate">
+                  {consignment.shipToCompanyName || 'Unknown Customer'}
+                </DialogDescription>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge className={`px-3 py-1 ${getStatusColor(getStatusDisplay())}`}>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Badge className={`px-2 py-1 text-xs ${getStatusColor(getStatusDisplay())}`}>
                 {getStatusDisplay()}
               </Badge>
-              <Badge variant="outline" className="text-gray-600">
+              <Badge variant="outline" className="text-gray-600 text-xs px-2 py-1">
                 <Thermometer className="h-3 w-3 mr-1" />
                 {consignment.documentNote?.split('\\n')[0] || consignment.expectedTemperature || 'Standard'}
               </Badge>
               {consignment.deliveryLiveTrackLink && (
-                <Button
+                <Badge 
                   onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer px-2 py-1 text-xs"
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />
                   Track Live
-                </Button>
+                </Badge>
               )}
             </div>
           </div>
