@@ -65,7 +65,7 @@ export const consignments = pgTable("consignments", {
   pickUp_LoadDateTime: text("pick_up_load_date_time"),
   delivery_AwaitedOutcome: boolean("delivery_awaited_outcome"),
   delivery_OutcomeEnum: text("delivery_outcome_enum"),
-  delivery_Outcome: boolean("delivery_outcome"),
+  delivery_Outcome: boolean("delivery_outcome_bool"),
   delivery_NotDeliverd: boolean("delivery_not_deliverd"),
   delivery_OutcomePODReasonContextCode: text("delivery_outcome_pod_reason_context_code"),
   delivery_OutcomePODReason: text("delivery_outcome_pod_reason"),
