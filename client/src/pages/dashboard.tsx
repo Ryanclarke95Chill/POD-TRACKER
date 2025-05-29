@@ -40,13 +40,20 @@ export default function Dashboard() {
     refetch();
   }, [refetch, queryClient]);
 
-  // Filter consignments based on search term and temperature zone
+  // Get unique warehouse company names for filter dropdown
+  const warehouseCompanies = Array.from(
+    new Set((consignments as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
+  ).sort();
+
+  // Filter consignments based on search term, temperature zone, and warehouse company
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
-      (consignment.consignmentNumber && consignment.consignmentNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+      (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTempZone = selectedTempZone === "all" || 
-      consignment.temperatureZone === selectedTempZone;
-    return matchesSearch && matchesTempZone;
+      consignment.expectedTemperature === selectedTempZone;
+    const matchesWarehouse = selectedWarehouse === "all" || 
+      consignment.warehouseCompanyName === selectedWarehouse;
+    return matchesSearch && matchesTempZone && matchesWarehouse;
   });
 
   const handleViewDetails = (consignment: Consignment) => {
@@ -172,9 +179,9 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Search Filter */}
+        {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
@@ -189,6 +196,28 @@ export default function Dashboard() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            
+            <div className="relative max-w-xs">
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  Filter by Warehouse
+                </label>
+              </div>
+              <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                <SelectTrigger className="w-full border-gray-200 focus:border-primary focus:ring-primary/20">
+                  <SelectValue placeholder="All Warehouses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  {warehouseCompanies.map((warehouse) => (
+                    <SelectItem key={warehouse} value={warehouse}>
+                      {warehouse}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
