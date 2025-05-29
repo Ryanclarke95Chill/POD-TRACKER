@@ -167,7 +167,7 @@ export default function ConsignmentDetailModal({
                     <div>
                       <Button
                         onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 h-auto"
                         size="sm"
                       >
                         <ExternalLink className="h-3 w-3 mr-1" />
