@@ -101,8 +101,12 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('ItemList array length:', response.data?.itemList?.length);
     console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
 
-    console.log("=== Axylog API response sample ===");
-    console.dir(response.data.itemList?.[0], { depth: null });
+    console.log("=== FULL AXYLOG API RESPONSE ===");
+    console.dir(response.data, { depth: null });
+    
+    // Save full response to file for detailed inspection
+    fs.writeFileSync('/tmp/full_axylog_response.json', JSON.stringify(response.data, null, 2));
+    console.log('\n💾 Full Axylog response saved to /tmp/full_axylog_response.json');
 
     // Debug cargo data structure
     console.log(`\n=== CARGO DATA INSPECTION ===`);
