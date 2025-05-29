@@ -166,7 +166,17 @@ export default function ConsignmentDetailModal({
               <div className="space-y-2">
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
-                  <p className="text-sm font-medium">{consignment.deliveryLastPosition || consignment.pickupLastPosition || 'In transit'}</p>
+                  <p className="text-sm font-medium">
+                    {consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon ? 
+                      `GPS: ${consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon}` : 
+                      'In transit'
+                    }
+                  </p>
+                  {(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime) && (
+                    <p className="text-xs text-gray-400">
+                      Last updated: {formatDate(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
