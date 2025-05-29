@@ -532,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.clearUserConsignments(req.user!.id);
       
       let inserted = 0;
-      for (const delivery of deliveries.slice(0, 10)) {
+      for (const delivery of deliveries) {
         try {
           // Map axylog delivery fields to your consignment schema
           const consignmentData = {
