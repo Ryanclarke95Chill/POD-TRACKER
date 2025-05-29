@@ -54,30 +54,10 @@ router.post('/deliveries', async (req: Request, res: Response) => {
 
     const requestBody = {
       pagination: {
-        skip: 0,
-        pageSize: 500
+        pageIndex: 0,
+        pageSize: 100
       },
       filters: {
-        type: "",
-        tripNumber: [],
-        plateNumber: [],
-        documentNumber: [],
-        pickUp_Delivery_From: "2024-01-01T22:00:00.000Z",
-        pickUp_Delivery_To: "2024-06-30T21:59:00.000Z",
-        states: {
-          posOutcome: false,
-          negOutcome: false,
-          notDelOutcome: false,
-          waitingForOutcome: null,
-          inAdvance: false,
-          ot: false,
-          notOt: false,
-          deliveryLoading: false,
-          deliveryUnloading_PickupLoading: false,
-          travel: false,
-          delivery_Pickup_Complete: false,
-          unknown: false
-        },
         includeCargo: true
       }
     };
@@ -89,10 +69,11 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ContextOwner': contextOwnerId,
         'User': userId,
         'Company': companyId,
-        'SourceDeviceType': '3'
+        'ContextOwner': contextOwnerId,
+        'SourceDeviceType': '3',
+        'LanguageCode': 'EN'
       }
     });
 
@@ -102,16 +83,36 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('ItemList array length:', response.data?.itemList?.length);
     console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
 
-    console.log("=== FULL AXYLOG API RESPONSE ===");
-    console.dir(response.data, { depth: null });
-    
     // Save full response to file for detailed inspection
-    fs.writeFileSync('/tmp/full_axylog_response.json', JSON.stringify(response.data, null, 2));
-    console.log('\n💾 Full Axylog response saved to /tmp/full_axylog_response.json');
+    fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(response.data, null, 2));
+    console.log('Full Axylog response saved to /tmp/sample_delivery.json');
 
     // Debug cargo data structure
     console.log(`\n=== CARGO DATA INSPECTION ===`);
     console.log(`Total deliveries returned: ${response.data.itemList?.length}`);
+    
+    if (response.data && response.data.itemList) {
+      let recordsWithCargo = 0;
+      let recordsWithoutCargo = 0;
+      
+      response.data.itemList.forEach((delivery: any, index: number) => {
+        const hasCargo = delivery.qty1 !== null || delivery.qty2 !== null || 
+                        delivery.um1 !== null || delivery.um2 !== null || 
+                        delivery.volumeInM3 !== null || delivery.totalWeightInKg !== null;
+        
+        if (hasCargo) {
+          recordsWithCargo++;
+          console.log(`Record ${index}: HAS CARGO - qty1: ${delivery.qty1}, um1: ${delivery.um1}, qty2: ${delivery.qty2}, um2: ${delivery.um2}, volume: ${delivery.volumeInM3}, weight: ${delivery.totalWeightInKg}`);
+        } else {
+          recordsWithoutCargo++;
+          if (recordsWithoutCargo <= 3) { // Only log first 3 to avoid spam
+            console.log(`Record ${index}: NO CARGO - all cargo fields are null`);
+          }
+        }
+      });
+      
+      console.log(`Summary: ${recordsWithCargo} records WITH cargo, ${recordsWithoutCargo} records WITHOUT cargo`);
+    }
 
     response.data.itemList?.forEach((delivery: any, index: number) => {
       const {
