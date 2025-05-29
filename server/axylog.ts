@@ -119,6 +119,7 @@ export class AxylogAPI {
     pickupDateTo: string;
     deliveryEmail?: string;
     customerName?: string;
+    warehouseCompanyName?: string;
   }): Promise<Consignment[]> {
     try {
       // Authenticate if needed
@@ -132,7 +133,7 @@ export class AxylogAPI {
       // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
-          pageSize: 25,
+          pageSize: 500,
           pageNumber: 1
         },
         filters: {
@@ -205,6 +206,14 @@ export class AxylogAPI {
           delivery.receiverCompanyName?.toLowerCase().includes(filters.customerName?.toLowerCase() || '')
         );
         console.log(`Filtered to ${deliveries.length} deliveries by customer name: ${filters.customerName}`);
+      }
+      
+      // Filter by warehouse company name if provided
+      if (filters.warehouseCompanyName) {
+        deliveries = deliveries.filter((delivery: AxylogDelivery) => 
+          delivery.warehouseCompanyName?.toLowerCase().includes(filters.warehouseCompanyName?.toLowerCase() || '')
+        );
+        console.log(`Filtered to ${deliveries.length} deliveries by warehouse company name: ${filters.warehouseCompanyName}`);
       }
 
       // Convert to our format

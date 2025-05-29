@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
@@ -14,6 +15,7 @@ import { Consignment, temperatureZones } from "@shared/schema";
 export default function Dashboard() {
   const [selectedTempZone, setSelectedTempZone] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
 
 
