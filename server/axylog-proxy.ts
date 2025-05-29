@@ -54,10 +54,30 @@ router.post('/deliveries', async (req: Request, res: Response) => {
 
     const requestBody = {
       pagination: {
-        pageIndex: 0,
+        skip: 0,
         pageSize: 100
       },
       filters: {
+        type: "",
+        tripNumber: [],
+        plateNumber: [],
+        documentNumber: [],
+        pickUp_Delivery_From: "2024-01-01T22:00:00.000Z",
+        pickUp_Delivery_To: "2024-06-30T21:59:00.000Z",
+        states: {
+          posOutcome: false,
+          negOutcome: false,
+          notDelOutcome: false,
+          waitingForOutcome: null,
+          inAdvance: false,
+          ot: false,
+          notOt: false,
+          deliveryLoading: false,
+          deliveryUnloading_PickupLoading: false,
+          travel: false,
+          delivery_Pickup_Complete: false,
+          unknown: false
+        },
         includeCargo: true
       }
     };
