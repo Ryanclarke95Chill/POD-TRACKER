@@ -6,6 +6,13 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+// Ensure API routes are handled before Vite middleware
+app.use('/api', (req, res, next) => {
+  // Mark API requests for special handling
+  req.isApiRequest = true;
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

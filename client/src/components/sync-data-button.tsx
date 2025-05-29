@@ -31,9 +31,14 @@ export default function SyncDataButton() {
       queryClient.invalidateQueries({ queryKey: ["/api/consignments"] });
       
       toast({
-        title: "Sync Complete",
-        description: `Successfully synced ${data.count} consignments from axylog`,
+        title: "Sync Complete", 
+        description: "Your Chill Transport Company data has been synced successfully",
       });
+      
+      // Force page reload to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     },
     onError: (error: any) => {
       toast({
