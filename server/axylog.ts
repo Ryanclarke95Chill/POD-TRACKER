@@ -131,13 +131,17 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Make request to get deliveries using the same endpoint as Postman
+      // Make request to get deliveries using exact Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
-          pageSize: 500
+          pageSize: 100
         },
         filters: {
+          type: "",
+          tripNumber: [],
+          plateNumber: [],
+          documentNumber: [],
           pickUp_Delivery_From: filters.pickupDateFrom,
           pickUp_Delivery_To: filters.pickupDateTo
         }
