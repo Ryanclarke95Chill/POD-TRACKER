@@ -30,28 +30,56 @@ interface AxylogCredentials {
 
 // Interface for Axylog delivery (consignment)
 interface AxylogDelivery {
-  pickUpAddress: {
-    city: string;
-    country: string;
-  };
-  deliveryAddress: {
-    city: string;
-    country: string;
-    email: string;
-  };
-  receiverCompanyName: string;
+  // Core document info
   consignmentNo: string;
-  status: string;
-  estimatedDeliveryDate: string;
-  lastKnownLocation: string;
-  temperatureZone: string;
+  documentNote: string;
+  
+  // Company information
+  shipToCompanyName: string;
+  shipFromCompanyName: string;
+  shipperCompanyName: string;
+  
+  // Address information
+  shipToCity: string;
+  shipFromCity: string;
+  shipToAddress: string;
+  shipFromAddress: string;
+  shipToZipCode: string;
+  shipFromZipCode: string;
+  shipToCountry: string;
+  shipFromCountry: string;
+  
+  // Vehicle and tracking
+  vehicleDescription: string;
+  deliveryLiveTrackLink: string;
+  pickupLiveTrackLink: string;
+  
+  // Timing
+  departureDateTime: string;
+  delivery_OutcomeDateTime: string;
+  pickUp_OutcomeDateTime: string;
+  maxScheduledDeliveryTime: string;
+  minScheduledDeliveryTime: string;
+  
+  // Operational details
+  quantity: number;
+  pallets: number;
+  spaces: number;
+  volumeM3: number;
+  weightKg: number;
+  
+  // Status and outcomes
+  delivery_Outcome: boolean;
+  pickUp_Outcome: boolean;
+  delivery_OutcomeNote: string;
+  pickUp_OutcomeNote: string;
+  
   events: Array<{
     timestamp: string;
     description: string;
     location: string;
     type: string;
   }>;
-  // Add more fields as needed
 }
 
 // Class to handle Axylog API integration
@@ -275,7 +303,7 @@ export class AxylogAPI {
           type: event.type
         }));
 
-        // Convert to comprehensive Consignment format with all available fields
+        // Convert to comprehensive Consignment format with correct field names
         return {
           // Core identifiers
           id: index + 1,
@@ -283,25 +311,26 @@ export class AxylogAPI {
           consignmentNumber: delivery.consignmentNo || null,
           
           // Customer and address information
-          customerName: delivery.receiverCompanyName || null,
-          consignmentReference: delivery.customerReference || null,
-          trackingLink: delivery.pickupLivetrackLink || null,
-          pickupAddress: delivery.pickUpAddress?.city || delivery.fromAddress || null,
-          deliveryAddress: delivery.deliveryAddress?.city || delivery.toAddress || null,
+          customerName: delivery.shipToCompanyName || null,
+          consignmentReference: delivery.documentNote || null,
+          trackingLink: delivery.deliveryLiveTrackLink || delivery.pickupLiveTrackLink || null,
+          pickupAddress: delivery.shipFromCity || null,
+          deliveryAddress: delivery.shipToCity || null,
           
           // Status and timing
-          status: statusMap[delivery.status] || delivery.status || "Unknown",
-          estimatedDeliveryDate: delivery.estimatedDeliveryDate || null,
-          deliveryDate: delivery.deliveryDate || null,
-          dateDelivered: delivery.deliveryOutcomeDate || null,
-          consignmentRequiredDeliveryDate: delivery.deliveryMaximumDate || null,
+          status: delivery.delivery_Outcome ? "Delivered" : delivery.pickUp_Outcome ? "In Transit" : "Awaiting Pickup",
+          estimatedDeliveryDate: delivery.maxScheduledDeliveryTime || null,
+          deliveryDate: delivery.delivery_OutcomeDateTime || null,
+          dateDelivered: delivery.delivery_OutcomeDateTime || null,
+          consignmentRequiredDeliveryDate: delivery.maxScheduledDeliveryTime || null,
           
-          // Temperature and logistics
-          temperatureZone: tempZoneMap[delivery.temperatureZone] || delivery.temperatureZone || null,
-          lastKnownLocation: delivery.lastKnownLocation || delivery.deliveryLastPosition || null,
+          // Temperature and logistics - will be extracted from documentNote
+          temperatureZone: delivery.documentNote?.includes('Frozen') ? "Freezer (-20°C)" : 
+                          delivery.documentNote?.includes('Chilled') ? "Chiller (0–4°C)" : "Dry",
+          lastKnownLocation: delivery.shipToCity || null,
           
           // Operational details
-          deliveryRun: delivery.tripNumber || null,
+          deliveryRun: null,
           quantity: delivery.quantity || null,
           pallets: delivery.pallets || null,
           spaces: delivery.spaces || null,
@@ -309,56 +338,56 @@ export class AxylogAPI {
           weightKg: delivery.weightKg || null,
           
           // Party information
-          shipper: delivery.shipper || delivery.shipperCompanyName || null,
-          receiver: delivery.receiver || delivery.receiverCompanyName || null,
-          driver: delivery.driver || null,
-          vehicle: delivery.vehicle || delivery.vehicleDescription || null,
+          shipper: delivery.shipperCompanyName || null,
+          receiver: delivery.shipToCompanyName || null,
+          driver: null,
+          vehicle: delivery.vehicleDescription || null,
           
           // Geographic details
-          origin: delivery.origin || delivery.pickUpAddress?.city || null,
-          destination: delivery.destination || delivery.deliveryAddress?.city || null,
-          originPostalCode: delivery.fromPostalCode || null,
-          originCountry: delivery.fromCountry || null,
-          originMasterDataCode: delivery.fromMasterDataCode || null,
-          destinationPostalCode: delivery.toPostalCode || null,
-          destinationCountry: delivery.toCountry || null,
+          origin: delivery.shipFromCity || null,
+          destination: delivery.shipToCity || null,
+          originPostalCode: delivery.shipFromZipCode || null,
+          originCountry: delivery.shipFromCountry || null,
+          originMasterDataCode: null,
+          destinationPostalCode: delivery.shipToZipCode || null,
+          destinationCountry: delivery.shipToCountry || null,
           
           // Timing details
-          deliveryTime: delivery.deliveryTime || null,
-          pickupTime: delivery.pickupTime || null,
+          deliveryTime: delivery.delivery_OutcomeDateTime || null,
+          pickupTime: delivery.pickUp_OutcomeDateTime || null,
           
           // Classification
-          consignmentType: delivery.consignmentType || null,
-          priority: delivery.priority || null,
-          deliveryZone: delivery.deliveryZone || null,
-          pickupZone: delivery.pickupZone || null,
+          consignmentType: null,
+          priority: null,
+          deliveryZone: null,
+          pickupZone: null,
           
           // Additional information
-          notes: delivery.notes || delivery.documentNote || null,
-          customerReference: delivery.customerReference || delivery.shipperOrderReferenceNumber || null,
-          invoiceNumber: delivery.invoiceNumber || null,
+          notes: delivery.documentNote || null,
+          customerReference: delivery.documentNote || null,
+          invoiceNumber: null,
           
           // Proof of delivery
-          podSignature: delivery.podSignature || null,
-          deliveryProof: delivery.deliveryProof || null,
+          podSignature: null,
+          deliveryProof: delivery.delivery_OutcomeNote || null,
           
           // Vehicle information
-          vehicleCode: delivery.vehicleCode || null,
+          vehicleCode: null,
           
           // Performance metrics
-          deliveryEtaDeviation: delivery.deliveryEtaDeviation || null,
-          requiredTags: delivery.requiredTags || null,
-          receivedDeliveryPodFiles: delivery.receivedDeliveryPodFiles || null,
+          deliveryEtaDeviation: null,
+          requiredTags: null,
+          receivedDeliveryPodFiles: null,
           
           // Contact information
-          orderCarrierEmail: delivery.orderCarrierEmail || null,
+          orderCarrierEmail: null,
           
           // Route details
-          tripNumber: delivery.tripNumber || null,
-          orderNumber: delivery.orderNumber || null,
-          from: delivery.from || null,
-          to: delivery.to || null,
-          carrier: delivery.carrier || null,
+          tripNumber: null,
+          orderNumber: null,
+          from: delivery.shipFromCity || null,
+          to: delivery.shipToCity || null,
+          carrier: null,
           
           // Events data
           events: JSON.stringify(events)
