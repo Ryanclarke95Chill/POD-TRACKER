@@ -75,8 +75,8 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('Status:', response.status);
     console.log('Response keys:', Object.keys(response.data || {}));
     console.log('ItemList array length:', response.data?.itemList?.length);
-    console.log('Data array length:', response.data?.data?.length);
-    console.log('Deliveries array length:', response.data?.deliveries?.length);
+    console.log('First delivery fields:', Object.keys(response.data?.itemList?.[0] || {}));
+    console.log('Sample delivery data:', JSON.stringify(response.data?.itemList?.[0], null, 2));
     console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
 
     res.json({
