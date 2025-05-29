@@ -131,8 +131,8 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Make request to get deliveries - try different approach for cargo data
-      const response = await axios.post(`${DELIVERIES_URL}?v=2&includeDetails=true&includeCargo=true`, {
+      // Make request to get deliveries using the same endpoint as Postman
+      const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
           pageSize: 500
