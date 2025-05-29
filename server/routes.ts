@@ -175,21 +175,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // New endpoint to sync data from axylog
+  // Direct axylog sync endpoint that works immediately
+  app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      console.log("=== DIRECT AXYLOG SYNC STARTED ===");
+      console.log("User:", req.user?.email);
+      
+      // Get axylog data directly
+      const axylogConsignments = await axylogAPI.getDeliveries(req.user!.email);
+      console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
+      
+      // Clear existing consignments for this user
+      await storage.clearUserConsignments(req.user!.id);
+      
+      // Insert new consignments
+      const insertedConsignments = [];
+      for (const consignment of axylogConsignments) {
+        try {
+          const inserted = await storage.createConsignment({
+            userId: req.user!.id,
+            ...consignment
+          });
+          insertedConsignments.push(inserted);
+        } catch (insertError) {
+          console.error("Error inserting consignment:", insertError);
+        }
+      }
+      
+      res.json({
+        message: "Axylog sync completed successfully",
+        synced: insertedConsignments.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("Axylog sync error:", error);
+      res.status(500).json({ message: "Sync failed", error: String(error) });
+    }
+  });
+
+  // Keep the old endpoint for compatibility
   app.post("/api/consignments/sync", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== AXYLOG SYNC ENDPOINT HIT ===");
+    console.log("=== OLD SYNC ENDPOINT - REDIRECTING ===");
     
-    // Immediately return a response to prevent timeout/routing issues
-    res.json({ 
-      message: "Sync endpoint reached successfully", 
-      user: req.user?.email,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Process axylog sync in background
-    setTimeout(async () => {
-      try {
-        console.log("Starting background axylog sync for user:", req.user?.email);
+    try {
+      console.log("Starting axylog sync for user:", req.user?.email);
       
       if (!req.user?.email) {
         return res.status(400).json({ message: "User email not found" });
