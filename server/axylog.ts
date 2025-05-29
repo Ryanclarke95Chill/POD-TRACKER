@@ -29,57 +29,9 @@ interface AxylogCredentials {
 }
 
 // Interface for Axylog delivery (consignment)
+// Use a generic interface since we're mapping all fields directly
 interface AxylogDelivery {
-  // Core document info
-  consignmentNo: string;
-  documentNote: string;
-  
-  // Company information
-  shipToCompanyName: string;
-  shipFromCompanyName: string;
-  shipperCompanyName: string;
-  
-  // Address information
-  shipToCity: string;
-  shipFromCity: string;
-  shipToAddress: string;
-  shipFromAddress: string;
-  shipToZipCode: string;
-  shipFromZipCode: string;
-  shipToCountry: string;
-  shipFromCountry: string;
-  
-  // Vehicle and tracking
-  vehicleDescription: string;
-  deliveryLiveTrackLink: string;
-  pickupLiveTrackLink: string;
-  
-  // Timing
-  departureDateTime: string;
-  delivery_OutcomeDateTime: string;
-  pickUp_OutcomeDateTime: string;
-  maxScheduledDeliveryTime: string;
-  minScheduledDeliveryTime: string;
-  
-  // Operational details
-  quantity: number;
-  pallets: number;
-  spaces: number;
-  volumeM3: number;
-  weightKg: number;
-  
-  // Status and outcomes
-  delivery_Outcome: boolean;
-  pickUp_Outcome: boolean;
-  delivery_OutcomeNote: string;
-  pickUp_OutcomeNote: string;
-  
-  events: Array<{
-    timestamp: string;
-    description: string;
-    location: string;
-    type: string;
-  }>;
+  [key: string]: any; // This allows us to access any field from the axylog response
 }
 
 // Class to handle Axylog API integration
