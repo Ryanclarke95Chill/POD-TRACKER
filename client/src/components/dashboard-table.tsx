@@ -10,16 +10,16 @@ interface DashboardTableProps {
 }
 
 export default function DashboardTable({ consignments, onViewDetails }: DashboardTableProps) {
-  // Initial column order - can be reordered via drag and drop
+  // Column configuration for real Chill Transport Company data
   const [columns, setColumns] = useState([
-    { key: 'pickupLivetrackLink', label: 'Tracking link' },
-    { key: 'origin', label: 'Pickup from' },
-    { key: 'documentString2', label: 'Deliver to' },
-    { key: 'customerOrderNumber', label: 'Reference' },
-    { key: 'pickupCalculatedEta', label: 'ETA' },
-    { key: 'shipper', label: 'Customer Name' },
-    { key: 'pickupOutcomeDate', label: 'Delivered on' },
-    { key: 'pickupOutcome', label: 'Status' }
+    { key: 'trackingLink', label: 'Tracking Link' },
+    { key: 'consignmentNumber', label: 'Consignment #' },
+    { key: 'customerName', label: 'Customer Name' },
+    { key: 'pickupAddress', label: 'Pickup From' },
+    { key: 'deliveryAddress', label: 'Deliver To' },
+    { key: 'status', label: 'Status' },
+    { key: 'temperatureZone', label: 'Temperature Zone' },
+    { key: 'estimatedDeliveryDate', label: 'ETA' }
   ]);
 
   const [draggedColumn, setDraggedColumn] = useState<number | null>(null);
@@ -78,15 +78,11 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       return '-';
     }
 
-    // Handle ETA fields - convert from Excel serial date to AEST
-    if (fieldKey === 'pickupCalculatedEta' && typeof value === 'string') {
+    // Handle ETA fields - format ISO dates to Australian format
+    if (fieldKey === 'estimatedDeliveryDate' && typeof value === 'string') {
       try {
-        const excelDate = parseFloat(value);
-        // Excel serial date to JavaScript date (Excel epoch is 1900-01-01, but adjusted for leap year bug)
-        const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
-        // Convert to AEST (UTC+10)
-        const aestDate = new Date(jsDate.getTime() + (10 * 60 * 60 * 1000));
-        return aestDate.toLocaleString('en-AU', {
+        const date = new Date(value);
+        return date.toLocaleString('en-AU', {
           timeZone: 'Australia/Sydney',
           year: 'numeric',
           month: '2-digit',
@@ -99,21 +95,19 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       }
     }
 
-    // Handle date fields - convert from Excel serial date to AEST
-    if (fieldKey === 'pickupOutcomeDate' && typeof value === 'string') {
-      try {
-        const excelDate = parseFloat(value);
-        const jsDate = new Date((excelDate - 25569) * 86400 * 1000);
-        const aestDate = new Date(jsDate.getTime() + (10 * 60 * 60 * 1000));
-        return aestDate.toLocaleDateString('en-AU', {
-          timeZone: 'Australia/Sydney',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-      } catch {
-        return String(value);
-      }
+    // Handle status with color coding
+    if (fieldKey === 'status') {
+      return String(value);
+    }
+
+    // Handle temperature zones
+    if (fieldKey === 'temperatureZone') {
+      return String(value);
+    }
+
+    // Handle tracking links
+    if (fieldKey === 'trackingLink') {
+      return value ? 'Available' : '-';
     }
 
     // Handle JSON strings or objects
@@ -143,8 +137,8 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
   const renderCellContent = (consignment: Consignment, column: { key: string; label: string }) => {
     const value = (consignment as any)[column.key];
     
-    // Render tracking link as a button
-    if (column.key === 'pickupLivetrackLink' && value && value !== '-') {
+    // Render tracking link as a button for real axylog tracking URLs
+    if (column.key === 'trackingLink' && value && value !== '-') {
       return (
         <Button
           variant="outline"
@@ -153,8 +147,32 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
           className="h-8 px-3 text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-200"
         >
           <ExternalLink className="h-3 w-3 mr-1" />
-          Track
+          Track Live
         </Button>
+      );
+    }
+
+    // Add status badges for better visibility
+    if (column.key === 'status') {
+      const statusColor = value === 'Delivered' ? 'bg-green-100 text-green-800' :
+                         value === 'Picked Up' ? 'bg-blue-100 text-blue-800' :
+                         'bg-yellow-100 text-yellow-800';
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+          {value}
+        </span>
+      );
+    }
+
+    // Add temperature zone styling
+    if (column.key === 'temperatureZone') {
+      const tempColor = value?.includes('Frozen') ? 'text-blue-600' :
+                       value?.includes('Chilled') ? 'text-green-600' :
+                       'text-gray-600';
+      return (
+        <span className={`font-medium ${tempColor}`}>
+          {value}
+        </span>
       );
     }
     
