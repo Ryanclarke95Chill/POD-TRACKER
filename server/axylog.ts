@@ -139,7 +139,7 @@ export class AxylogAPI {
         filters: {
           type: "",
           pickUp_Delivery_From: "2025-05-30T00:00:00.000Z",
-          pickUp_Delivery_To: "2025-05-30T24:59:00.000Z"
+          pickUp_Delivery_To: "2025-05-30T23:59:59.000Z"
         }
       }, {
         headers: {
