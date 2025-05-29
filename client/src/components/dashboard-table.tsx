@@ -18,7 +18,7 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     { key: 'shipToCity', label: 'Deliver To' },
     { key: 'qty2', label: 'Pallets' },
     { key: 'qty1', label: 'Cartons' },
-    { key: 'delivery_EtaCalculated', label: 'ETA' }
+    { key: 'delivery_PlannedETA', label: 'ETA' }
   ]);
 
   const [draggedColumn, setDraggedColumn] = useState<number | null>(null);
@@ -85,7 +85,7 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     }
 
     // Handle ETA fields - format ISO dates to Australian format
-    if (fieldKey === 'delivery_EtaCalculated' && typeof value === 'string') {
+    if (fieldKey === 'delivery_PlannedETA' && typeof value === 'string') {
       try {
         const date = new Date(value);
         return date.toLocaleString('en-AU', {
