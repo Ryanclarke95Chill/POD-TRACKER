@@ -62,9 +62,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         distributionType: 2,
         documentDate_From: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         documentDate_To: new Date().toISOString().split('T')[0],
-        gridHeaderFilters: {
-          shipFromMasterDataCode: "NSW_5D"
-        }
+
       },
       sortingField: "departureDateTime_desc"
     };
