@@ -509,6 +509,16 @@ export class AxylogAPI {
           delivery_PlannedETA: delivery.delivery_PlannedETA || null,
           pickUp_PlannedETA: delivery.pickUp_PlannedETA || null,
           
+          // Location tracking fields
+          lastPositionLatLon: delivery.lastPositionLatLon || null,
+          lastPositionDateTime: delivery.lastPositionDateTime || null,
+          delivery_LastPositionLatLon: delivery.delivery_LastPositionLatLon || null,
+          delivery_LastPositionType: delivery.delivery_LastPositionType || null,
+          delivery_LastPositionDateTime: delivery.delivery_LastPositionDateTime || null,
+          pickUp_LastPositionLatLon: delivery.pickUp_LastPositionLatLon || null,
+          pickUp_LastPositionType: delivery.pickUp_LastPositionType || null,
+          pickUp_LastPositionDateTime: delivery.pickUp_LastPositionDateTime || null,
+          
           // Events data
           events: JSON.stringify(events)
         };

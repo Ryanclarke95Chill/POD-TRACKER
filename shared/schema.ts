@@ -234,6 +234,16 @@ export const consignments = pgTable("consignments", {
   pickupExternalStateDateTime: text("pickup_external_state_date_time"),
   pickupExternalStateNote: text("pickup_external_state_note"),
   
+  // Location tracking fields
+  lastPositionLatLon: text("last_position_lat_lon"),
+  lastPositionDateTime: text("last_position_date_time"),
+  delivery_LastPositionLatLon: text("delivery_last_position_lat_lon"),
+  delivery_LastPositionType: text("delivery_last_position_type"),
+  delivery_LastPositionDateTime: text("delivery_last_position_date_time"),
+  pickUp_LastPositionLatLon: text("pickup_last_position_lat_lon"),
+  pickUp_LastPositionType: text("pickup_last_position_type"),
+  pickUp_LastPositionDateTime: text("pickup_last_position_date_time"),
+  
   // Events data
   events: text("events").default('[]'),
 });
