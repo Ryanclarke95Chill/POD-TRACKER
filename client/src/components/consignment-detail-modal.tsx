@@ -166,7 +166,7 @@ export default function ConsignmentDetailModal({
               <div className="space-y-2">
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
-                  <p className="text-sm font-medium">{consignment.lastKnownLocation || 'In transit'}</p>
+                  <p className="text-sm font-medium">{consignment.deliveryLastPosition || consignment.pickupLastPosition || 'In transit'}</p>
                 </div>
               </div>
             </div>
@@ -180,7 +180,11 @@ export default function ConsignmentDetailModal({
                 <MapPin className="h-4 w-4 mr-2" />
                 Pickup Location
               </h4>
-              <p className="text-sm text-blue-700">{consignment.pickupAddress || 'Unknown'}</p>
+              <div className="text-sm text-blue-700">
+                <p className="font-medium">{consignment.shipFromCompanyName}</p>
+                <p>{consignment.shipFromAddress}</p>
+                <p>{consignment.shipFromCity} {consignment.shipFromZipCode}</p>
+              </div>
             </div>
 
             {/* Delivery Information */}
@@ -189,7 +193,11 @@ export default function ConsignmentDetailModal({
                 <MapPin className="h-4 w-4 mr-2" />
                 Delivery Location
               </h4>
-              <p className="text-sm text-green-700">{consignment.deliveryAddress || 'Unknown'}</p>
+              <div className="text-sm text-green-700">
+                <p className="font-medium">{consignment.shipToCompanyName}</p>
+                <p>{consignment.shipToAddress}</p>
+                <p>{consignment.shipToCity} {consignment.shipToZipCode}</p>
+              </div>
             </div>
           </div>
 
