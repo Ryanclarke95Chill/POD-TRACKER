@@ -163,6 +163,18 @@ export default function ConsignmentDetailModal({
                   <Badge className={`${getStatusColor(getStatusDisplay())} text-xs mb-2`}>
                     {getStatusDisplay()}
                   </Badge>
+                  {(consignment.delivery_OutcomePODReasonContextCode || consignment.pickUp_OutcomePODReasonContextCode) && (
+                    <div className="mb-2">
+                      <p className="text-xs text-red-600 font-medium">
+                        Issue: {consignment.delivery_OutcomePODReason || consignment.pickUp_OutcomePODReason}
+                      </p>
+                      {(consignment.delivery_OutcomePODReasonGroup || consignment.pickUp_OutcomePODReasonGroup) && (
+                        <p className="text-xs text-gray-500">
+                          Category: {consignment.delivery_OutcomePODReasonGroup || consignment.pickUp_OutcomePODReasonGroup}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {consignment.deliveryLiveTrackLink && (
                     <div>
                       <Button
