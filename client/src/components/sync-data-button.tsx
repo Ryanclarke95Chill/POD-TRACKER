@@ -59,7 +59,8 @@ export default function SyncDataButton() {
           throw new Error('Failed to fetch deliveries');
         }
         
-        console.log(`Retrieved ${deliveriesData.deliveries.length} deliveries from axylog`);
+        const deliveries = deliveriesData.data.itemList || [];
+        console.log(`Retrieved ${deliveries.length} deliveries from axylog`);
         
         // Step 3: Store deliveries in database via API
         const userToken = localStorage.getItem('token');
@@ -70,7 +71,7 @@ export default function SyncDataButton() {
             "Authorization": `Bearer ${userToken}`
           },
           body: JSON.stringify({
-            deliveries: deliveriesData.deliveries
+            deliveries: deliveries
           })
         });
         
