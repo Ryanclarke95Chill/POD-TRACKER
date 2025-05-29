@@ -52,7 +52,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       });
     }
 
-    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', {
+    const requestBody = {
       pagination: {
         skip: 0,
         pageSize: 25
@@ -79,7 +79,12 @@ router.post('/deliveries', async (req: Request, res: Response) => {
           unknown: false
         }
       }
-    }, {
+    };
+
+    console.log("=== Sent request payload ===");
+    console.dir(requestBody, { depth: null });
+
+    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
@@ -95,6 +100,9 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('Response keys:', Object.keys(response.data || {}));
     console.log('ItemList array length:', response.data?.itemList?.length);
     console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
+
+    console.log("=== Axylog API response sample ===");
+    console.dir(response.data.itemList?.[0], { depth: null });
 
     // Debug cargo data structure
     console.log(`\n=== CARGO DATA INSPECTION ===`);
