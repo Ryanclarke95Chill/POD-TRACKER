@@ -36,65 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ensure API routes are registered BEFORE any catch-all handlers
   console.log("Registering API routes...");
   
-  // EMERGENCY: Direct sync route that bypasses all middleware
-  app.use("/direct-sync", express.json());
-  app.post("/direct-sync", async (req: Request, res: Response) => {
-    console.log("=== DIRECT SYNC ENDPOINT ===");
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    try {
-      // Authenticate with axylog directly
-      const authResult = await axylogAPI.authenticate();
-      if (!authResult) {
-        return res.json({ success: false, message: "Axylog auth failed" });
-      }
-      
-      // Get deliveries
-      const deliveries = await axylogAPI.getDeliveries("api.chill@axylog.com");
-      console.log(`Direct sync retrieved ${deliveries.length} deliveries`);
-      
-      // Clear existing and insert new
-      await storage.clearUserConsignments(1);
-      
-      let inserted = 0;
-      for (const delivery of deliveries.slice(0, 5)) {
-        try {
-          await storage.createConsignment({
-            userId: 1,
-            consignmentNumber: delivery.consignmentNumber || "AXYLOG-" + Math.random().toString(36).substr(2, 9),
-            customerName: delivery.customerName || "Chill Transport Customer",
-            consignmentReference: null,
-            trackingLink: null,
-            pickupAddress: delivery.pickupAddress || "Melbourne, VIC",
-            deliveryAddress: delivery.deliveryAddress || "Sydney, NSW", 
-            status: delivery.status || "In Transit",
-            estimatedDeliveryDate: delivery.estimatedDeliveryDate || new Date().toISOString(),
-            deliveryDate: null,
-            dateDelivered: null,
-            consignmentRequiredDeliveryDate: null,
-            temperatureZone: delivery.temperatureZone || "Chilled (2-8°C)",
-            lastKnownLocation: delivery.lastKnownLocation || "En route",
-            events: JSON.stringify(delivery.events || [])
-          });
-          inserted++;
-        } catch (error) {
-          console.error("Insert error:", error);
-        }
-      }
-      
-      res.json({
-        success: true,
-        message: "Direct sync completed",
-        synced: inserted,
-        total: deliveries.length
-      });
-      
-    } catch (error) {
-      console.error("Direct sync error:", error);
-      res.json({ success: false, error: String(error) });
-    }
-  });
+
 
   // Axylog API Proxy - bypasses Vite dev server completely
   app.post("/axylog-proxy/sync", authenticate, async (req: AuthRequest, res: Response) => {
