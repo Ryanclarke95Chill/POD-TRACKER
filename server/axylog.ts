@@ -134,37 +134,16 @@ export class AxylogAPI {
       // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
-          skip: 0,
-          pageSize: 25
+          pageSize: 25,
+          pageNumber: 1
         },
         filters: {
           includeDeleted: false,
-          distributionType: [2, 3],
-          type: "",
-          tripNumber: [],
-          plateNumber: [],
-          documentNumber: [],
-          pickUp_Delivery_From: filters.pickupDateFrom,
-          pickUp_Delivery_To: filters.pickupDateTo,
-          includeCargo: true,
-          gridHeaderFilters: {
-            shipToCompanyName: "Chill"
-          },
-          states: {
-            posOutcome: false,
-            negOutcome: false,
-            notDelOutcome: false,
-            waitingForOutcome: null,
-            inAdvance: false,
-            ot: false,
-            notOt: false,
-            deliveryLoading: false,
-            deliveryUnloading_PickupLoading: false,
-            travel: false,
-            delivery_Pickup_Complete: false,
-            unknown: false
-          }
-        }
+          distributionType: 2,
+          documentDate_From: filters.pickupDateFrom,
+          documentDate_To: filters.pickupDateTo
+        },
+        sortingField: "departureDateTime_desc"
       }, {
         headers: {
           "Authorization": `Bearer ${this.credentials!.token}`,
@@ -292,7 +271,7 @@ export class AxylogAPI {
         };
 
         // Convert events to our format
-        const events: ConsignmentEvent[] = delivery.events.map(event => ({
+        const events: ConsignmentEvent[] = delivery.events.map((event: any) => ({
           timestamp: new Date(event.timestamp).toLocaleString('en-AU', {
             month: 'short',
             day: 'numeric',
@@ -525,6 +504,10 @@ export class AxylogAPI {
           pickupExternalStateReceptionDateTime: delivery.pickupExternalStateReceptionDateTime || null,
           pickupExternalStateDateTime: delivery.pickupExternalStateDateTime || null,
           pickupExternalStateNote: delivery.pickupExternalStateNote || null,
+          
+          // Planned ETA fields
+          delivery_PlannedETA: delivery.delivery_PlannedETA || null,
+          pickUp_PlannedETA: delivery.pickUp_PlannedETA || null,
           
           // Events data
           events: JSON.stringify(events)
