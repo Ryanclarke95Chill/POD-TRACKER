@@ -162,9 +162,9 @@ export class AxylogAPI {
       console.log("Full payload written to /tmp/axylog_response.json");
       
       // If there are deliveries, show the structure of the first delivery
-      if (response.data && response.data.deliveries && response.data.deliveries.length > 0) {
+      if (response.data && response.data.itemList && response.data.itemList.length > 0) {
         console.log("=== FIRST DELIVERY SAMPLE ===");
-        const firstDelivery = response.data.deliveries[0];
+        const firstDelivery = response.data.itemList[0];
         fs.writeFileSync('/tmp/first_delivery.json', JSON.stringify(firstDelivery, null, 2));
         console.log("First delivery structure written to /tmp/first_delivery.json");
         
@@ -177,16 +177,16 @@ export class AxylogAPI {
         console.log("totalWeightInKg:", firstDelivery.totalWeightInKg);
       }
       
-      if (!response.data || !response.data.deliveries) {
+      if (!response.data || !response.data.itemList) {
         console.warn("No deliveries found in Axylog response");
         console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");
         return [];
       }
       
-      console.log(`Received ${response.data.deliveries.length} deliveries from Axylog API`);
+      console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
 
       // Apply additional filters and convert to our format
-      let deliveries = response.data.deliveries;
+      let deliveries = response.data.itemList;
       
       // Filter by email if provided and not empty
       if (filters.deliveryEmail && filters.deliveryEmail.trim() !== '') {
