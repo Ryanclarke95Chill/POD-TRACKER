@@ -105,8 +105,8 @@ export class AxylogAPI {
 
       const filters = {
         pickupDateFrom: sixMonthsAgo.toISOString().split('T')[0], // YYYY-MM-DD format
-        pickupDateTo: sixMonthsAhead.toISOString().split('T')[0],  // YYYY-MM-DD format
-        deliveryEmail: userEmail
+        pickupDateTo: sixMonthsAhead.toISOString().split('T')[0]  // YYYY-MM-DD format
+        // Removed deliveryEmail filter to cast wider net for your data
       };
 
       console.log("Using date filters:", filters);
