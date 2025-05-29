@@ -38,49 +38,7 @@ export default function ConsignmentDetailModal({
   const deliveryCoords = parseCoordinates(consignment.shipToLatLon);
   const currentCoords = parseCoordinates(consignment.delivery_LastPositionLatLon);
 
-  // Simple location formatting using existing address data
-  const getLocationDisplay = () => {
-    // Use delivery city and state if available
-    if (consignment.shipToCity && consignment.shipToZipCode) {
-      const cityParts = consignment.shipToCity.split(' ');
-      const mainCity = cityParts[0]; // Take the first word as the main city
-      const state = consignment.shipToZipCode.includes('NSW') ? 'NSW' : 
-                   consignment.shipToZipCode.includes('VIC') ? 'VIC' :
-                   consignment.shipToZipCode.includes('QLD') ? 'QLD' :
-                   consignment.shipToZipCode.includes('WA') ? 'WA' : '';
-      
-      if (state) {
-        return `Near ${mainCity}, ${state}`;
-      }
-      return `Near ${mainCity}`;
-    }
-    
-    // Fallback to basic coordinate-based area if we have coords but no address
-    if (currentCoords) {
-      const { lat, lon } = currentCoords;
-      
-      // Basic Sydney area detection
-      if (lat >= -34.0 && lat <= -33.4 && lon >= 150.5 && lon <= 151.5) {
-        return 'Sydney Metro Area';
-      }
-      // Basic Melbourne area detection
-      if (lat >= -38.0 && lat <= -37.4 && lon >= 144.5 && lon <= 145.5) {
-        return 'Melbourne Metro Area';
-      }
-      // Basic Brisbane area detection
-      if (lat >= -27.8 && lat <= -27.0 && lon >= 152.5 && lon <= 153.5) {
-        return 'Brisbane Metro Area';
-      }
-      // Basic Perth area detection
-      if (lat >= -32.2 && lat <= -31.6 && lon >= 115.5 && lon <= 116.2) {
-        return 'Perth Metro Area';
-      }
-      
-      return 'In transit';
-    }
-    
-    return 'In transit';
-  };
+
 
   // Format date helper
   const formatDate = (dateString: string | null) => {
@@ -239,7 +197,7 @@ export default function ConsignmentDetailModal({
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
                   <p className="text-xs font-medium">
-                    {getLocationDisplay()}
+                    {currentCoords ? `${currentCoords.lat}, ${currentCoords.lon}` : 'In transit'}
                   </p>
                   {(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime) && (
                     <p className="text-xs text-gray-400 truncate">
