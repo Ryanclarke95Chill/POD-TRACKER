@@ -78,12 +78,6 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       value = value || consignment.orderNumberRef || `REF-${consignment.id}`;
     }
     
-    // Special handling for ETA - use pickup or delivery ETA based on the order type
-    if (fieldKey === 'delivery_PlannedETA') {
-      // Use delivery ETA if available, otherwise use pickup ETA for pickup orders
-      value = consignment.delivery_PlannedETA || consignment.pickUp_PlannedETA;
-    }
-    
 
     
     if (value === null || value === undefined || value === '') {
