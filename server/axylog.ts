@@ -245,15 +245,14 @@ export class AxylogAPI {
     return deliveries.map((delivery, index) => {
         console.log(`Converting delivery ${index + 1}: ${delivery.consignmentNo || 'Unknown'}`);
         
-        // Extract cargo data from cargoList array
-        const cargo = delivery.cargoList?.[0] || {};
+        // Extract cargo data directly from delivery object (not from cargoList)
         console.log(`Cargo data for delivery ${index + 1}:`, {
-          qty1: cargo.qty1,
-          um1: cargo.um1,
-          qty2: cargo.qty2,
-          um2: cargo.um2,
-          volumeInM3: cargo.volumeInM3,
-          totalWeightInKg: cargo.totalWeightInKg
+          qty1: delivery.qty1,
+          um1: delivery.um1,
+          qty2: delivery.qty2,
+          um2: delivery.um2,
+          volumeInM3: delivery.volumeInM3,
+          totalWeightInKg: delivery.totalWeightInKg
         });
         
         // Map status from Axylog to our status types
@@ -306,13 +305,13 @@ export class AxylogAPI {
           prog: delivery.prog || null,
           consignmentNo: delivery.consignmentNo || null,
           
-          // Cargo fields extracted from cargoList[0]
-          qty1: cargo.qty1 || null,
-          um1: cargo.um1 || null,
-          qty2: cargo.qty2 || null,
-          um2: cargo.um2 || null,
-          volumeInM3: cargo.volumeInM3 || null,
-          totalWeightInKg: cargo.totalWeightInKg || null,
+          // Cargo fields extracted directly from delivery object
+          qty1: delivery.qty1 || null,
+          um1: delivery.um1 || null,
+          qty2: delivery.qty2 || null,
+          um2: delivery.um2 || null,
+          volumeInM3: delivery.volumeInM3 || null,
+          totalWeightInKg: delivery.totalWeightInKg || null,
           departureDateTime: delivery.departureDateTime || null,
           contextPlannedDepartureDateTime: delivery.contextPlannedDepartureDateTime || null,
           delivery_OutcomeDateTime: delivery.delivery_OutcomeDateTime || null,
