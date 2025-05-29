@@ -43,14 +43,14 @@ export default function ConsignmentDetailModal({
     const deliveryStateLabel = (consignment as any).delivery_StateLabel;
     const pickupStateLabel = (consignment as any).pickUp_StateLabel;
     
-    const mapStatus = (status: string | null) => {
+    const mapStatus = (status: string | null, isPickup: boolean = false) => {
       if (!status) return null;
       if (status === 'Traveling') return 'In Transit';
-      if (status === 'Positive Outcome') return 'Delivered';
+      if (status === 'Positive outcome') return isPickup ? 'Picked Up' : 'Delivered';
       return status; // Return exact value for anything else
     };
     
-    return mapStatus(deliveryStateLabel) || mapStatus(pickupStateLabel) || 'In Transit';
+    return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
 
