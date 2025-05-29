@@ -63,7 +63,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         documentDate_From: "2024-01-01",
         documentDate_To: "2025-12-31",
         gridHeaderFilters: {
-          shipFromMasterDataCode: "CHILL NSW"
+          shipFromMasterDataCode: "NSW_5D"
         }
       },
       sortingField: "departureDateTime_desc"
