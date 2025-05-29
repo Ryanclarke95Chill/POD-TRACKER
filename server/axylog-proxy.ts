@@ -43,7 +43,11 @@ router.post('/deliveries', async (req: Request, res: Response) => {
   try {
     console.log('=== AXYLOG PROXY DELIVERIES ===');
     
-    const { token, userId, companyId, contextOwnerId } = req.body;
+    // Get credentials from headers or body
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token;
+    const userId = req.headers.user || req.body.userId;
+    const companyId = req.headers.company || req.body.companyId;
+    const contextOwnerId = req.headers.contextowner || req.body.contextOwnerId;
 
     if (!token || !userId || !companyId || !contextOwnerId) {
       return res.status(400).json({
@@ -58,10 +62,15 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         pageNumber: 1
       },
       filters: {
-        departureDate_From: '2025-05-22',
-        departureDate_To: '2025-05-29',
-        includeCargo: true
-      }
+        includeDeleted: false,
+        distributionType: 3,
+        documentDate_From: "2024-01-01",
+        documentDate_To: "2025-12-31",
+        gridHeaderFilters: {
+          shipFromMasterDataCode: "CHILL NSW"
+        }
+      },
+      sortingField: "departureDateTime_desc"
     };
 
     console.log("=== Sent request payload ===");
@@ -69,13 +78,13 @@ router.post('/deliveries', async (req: Request, res: Response) => {
 
     const response = await axios.post('https://api.axylog.com/Deliveries?v=2', requestBody, {
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
         'User': userId,
         'Company': companyId,
         'ContextOwner': contextOwnerId,
         'SourceDeviceType': '2',
-        'LanguageCode': 'EN'
+        'LanguageCode': 'EN',
+        'Content-Type': 'application/json'
       }
     });
 
@@ -85,60 +94,28 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('ItemList array length:', response.data?.itemList?.length);
     console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
 
-    // Save full response to file for detailed inspection
-    fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(response.data, null, 2));
-    console.log('Full Axylog response saved to /tmp/sample_delivery.json');
-
-    // Debug cargo data structure
-    console.log(`\n=== CARGO DATA INSPECTION ===`);
-    console.log(`Total deliveries returned: ${response.data.itemList?.length}`);
-    
-    if (response.data && response.data.itemList) {
-      let recordsWithCargo = 0;
-      let recordsWithoutCargo = 0;
+    // Log specific delivery fields for debugging
+    if (response.data && response.data.itemList && response.data.itemList.length > 0) {
+      console.log('\n=== DELIVERY FIELDS INSPECTION ===');
       
-      response.data.itemList.forEach((delivery: any, index: number) => {
-        const hasCargo = delivery.qty1 !== null || delivery.qty2 !== null || 
-                        delivery.um1 !== null || delivery.um2 !== null || 
-                        delivery.volumeInM3 !== null || delivery.totalWeightInKg !== null;
-        
-        if (hasCargo) {
-          recordsWithCargo++;
-          console.log(`Record ${index}: HAS CARGO - qty1: ${delivery.qty1}, um1: ${delivery.um1}, qty2: ${delivery.qty2}, um2: ${delivery.um2}, volume: ${delivery.volumeInM3}, weight: ${delivery.totalWeightInKg}`);
-        } else {
-          recordsWithoutCargo++;
-          if (recordsWithoutCargo <= 3) { // Only log first 3 to avoid spam
-            console.log(`Record ${index}: NO CARGO - all cargo fields are null`);
-          }
-        }
+      response.data.itemList.slice(0, 3).forEach((delivery: any, index: number) => {
+        console.log(`\nDelivery ${index + 1}:`);
+        console.log(`  orderNumberRef: ${delivery.orderNumberRef}`);
+        console.log(`  shipperOrderReferenceNumber: ${delivery.shipperOrderReferenceNumber}`);
+        console.log(`  documentReference: ${delivery.documentReference}`);
+        console.log(`  qty1: ${delivery.qty1}, um1: ${delivery.um1}`);
+        console.log(`  qty2: ${delivery.qty2}, um2: ${delivery.um2}`);
+        console.log(`  volumeInM3: ${delivery.volumeInM3}`);
+        console.log(`  delivery_PlannedETA: ${delivery.delivery_PlannedETA}`);
+        console.log(`  delivery_EtaCalculated: ${delivery.delivery_EtaCalculated}`);
       });
-      
-      console.log(`Summary: ${recordsWithCargo} records WITH cargo, ${recordsWithoutCargo} records WITHOUT cargo`);
     }
 
-    response.data.itemList?.forEach((delivery: any, index: number) => {
-      const {
-        deliveryNumber,
-        qty1,
-        um1,
-        qty2,
-        um2,
-        volumeInM3,
-        totalWeightInKg
-      } = delivery;
-
-      console.log(`\n📦 Delivery #${index + 1}: ${deliveryNumber}`);
-      console.log(`   Cartons (qty1): ${qty1} ${um1}`);
-      console.log(`   Pallets (qty2): ${qty2} ${um2}`);
-      console.log(`   Volume (m³): ${volumeInM3}`);
-      console.log(`   Weight (kg): ${totalWeightInKg}`);
-    });
-
-    // Save first delivery to file for inspection
+    // Save first delivery to file for debugging purposes
     const firstDelivery = response.data.itemList?.[0];
     if (firstDelivery) {
       fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(firstDelivery, null, 2));
-      console.log('\n💾 Sample delivery saved to /tmp/sample_delivery.json');
+      console.log('\nFirst delivery saved to /tmp/sample_delivery.json for debugging');
     }
 
     res.json({
