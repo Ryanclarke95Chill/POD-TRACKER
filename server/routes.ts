@@ -537,20 +537,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Map axylog delivery fields to your consignment schema
           const consignmentData = {
             userId: req.user!.id,
-            consignmentNumber: delivery.consignmentNo || `CHILL-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            customerName: delivery.receiverCompanyName || "Chill Transport Customer",
-            consignmentReference: delivery.documentNumber || null,
-            trackingLink: delivery.trackingUrl || null,
-            pickupAddress: delivery.pickUpAddress ? `${delivery.pickUpAddress.city}, ${delivery.pickUpAddress.country}` : "Melbourne, VIC",
-            deliveryAddress: delivery.deliveryAddress ? `${delivery.deliveryAddress.city}, ${delivery.deliveryAddress.country}` : "Sydney, NSW",
-            status: delivery.status || "In Transit",
-            estimatedDeliveryDate: delivery.estimatedDeliveryDate || new Date().toISOString(),
-            deliveryDate: null,
-            dateDelivered: null,
-            consignmentRequiredDeliveryDate: null,
-            temperatureZone: delivery.temperatureZone || "Chilled (2-8°C)",
-            lastKnownLocation: delivery.lastKnownLocation || "En route",
-            events: JSON.stringify(delivery.events || [])
+            // Map directly from axylog field names to our database schema
+            ...delivery,
+            events: JSON.stringify([])
           };
           
           await storage.createConsignment(consignmentData);
