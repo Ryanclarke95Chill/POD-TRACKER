@@ -144,6 +144,8 @@ export const consignments = pgTable("consignments", {
   pickupLiveTrackLink: text("pickup_live_track_link"),
   delivery_EtaCalculated: text("delivery_eta_calculated"),
   pickUp_EtaCalculated: text("pick_up_eta_calculated"),
+  delivery_PlannedETA: text("delivery_planned_eta"),
+  pickUp_PlannedETA: text("pickup_planned_eta"),
   deliveryLiveDistanceKm: text("delivery_live_distance_km"),
   pickupLiveDistanceKm: text("pickup_live_distance_km"),
   deliveryDistanceKm: text("delivery_distance_km"),
