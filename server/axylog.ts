@@ -95,18 +95,16 @@ export class AxylogAPI {
   // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Consignment[]> {
     try {
-      // Use the date format that matches your Postman collection: YYYY-MM-DD
-      const today = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      // Use broader date range that worked before - last 30 days to future 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const sixMonthsAhead = new Date();
-      sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
+      const thirtyDaysAhead = new Date();
+      thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
 
       const filters = {
-        pickupDateFrom: sixMonthsAgo.toISOString().split('T')[0], // YYYY-MM-DD format
-        pickupDateTo: sixMonthsAhead.toISOString().split('T')[0]  // YYYY-MM-DD format
-        // Removed deliveryEmail filter to cast wider net for your data
+        pickupDateFrom: thirtyDaysAgo.toISOString().split('T')[0],
+        pickupDateTo: thirtyDaysAhead.toISOString().split('T')[0]
       };
 
       console.log("Using date filters:", filters);
@@ -137,7 +135,7 @@ export class AxylogAPI {
       const response = await axios.post(`${DELIVERIES_URL}?v=2`, {
         pagination: {
           skip: 0,
-          pageSize: 100
+          pageSize: 500
         },
         filters: {
           pickUp_Delivery_From: filters.pickupDateFrom,
