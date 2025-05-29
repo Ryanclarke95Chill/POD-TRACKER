@@ -303,7 +303,12 @@ export class AxylogAPI {
           year: delivery.year || null,
           code: delivery.code || null,
           prog: delivery.prog || null,
-          consignmentNo: delivery.consignmentNo || null,
+          consignmentNo: delivery.consignmentNo || 
+                        delivery.documentReference || 
+                        delivery.orderNumberRef || 
+                        delivery.shipperOrderReferenceNumber || 
+                        `${delivery.year}-${delivery.code}-${delivery.prog}` || 
+                        null,
           
           // Cargo fields extracted directly from delivery object
           qty1: delivery.qty1 || null,
