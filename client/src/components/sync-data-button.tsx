@@ -11,20 +11,79 @@ export default function SyncDataButton() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch("/axylog-proxy/sync", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+      try {
+        console.log('Starting axylog sync...');
+        
+        // Get base URL for the current environment
+        const baseUrl = window.location.origin;
+        
+        // Step 1: Authenticate with axylog
+        const authResponse = await fetch(`${baseUrl}/axylog-proxy/auth`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!authResponse.ok) {
+          throw new Error(`Auth failed: ${authResponse.status}`);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const authData = await authResponse.json();
+        if (!authData.success) {
+          throw new Error('Axylog authentication failed');
+        }
+        
+        console.log('Axylog authentication successful');
+        
+        // Step 2: Fetch deliveries using auth credentials
+        const deliveriesResponse = await fetch(`${baseUrl}/axylog-proxy/deliveries`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            token: authData.token,
+            userId: authData.userId,
+            companyId: authData.companyId,
+            contextOwnerId: authData.contextOwnerId
+          })
+        });
+        
+        if (!deliveriesResponse.ok) {
+          throw new Error(`Deliveries fetch failed: ${deliveriesResponse.status}`);
+        }
+        
+        const deliveriesData = await deliveriesResponse.json();
+        if (!deliveriesData.success) {
+          throw new Error('Failed to fetch deliveries');
+        }
+        
+        console.log(`Retrieved ${deliveriesData.deliveries.length} deliveries from axylog`);
+        
+        // Step 3: Store deliveries in database via API
+        const userToken = localStorage.getItem('token');
+        const storeResponse = await fetch(`${baseUrl}/api/consignments/sync-from-axylog`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${userToken}`
+          },
+          body: JSON.stringify({
+            deliveries: deliveriesData.deliveries
+          })
+        });
+        
+        if (!storeResponse.ok) {
+          throw new Error(`Store failed: ${storeResponse.status}`);
+        }
+        
+        return await storeResponse.json();
+        
+      } catch (error) {
+        console.error('Sync error:', error);
+        throw error;
       }
-      
-      return response.json();
     },
     onSuccess: (data) => {
       // Invalidate consignments cache to refresh the table

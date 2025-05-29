@@ -565,6 +565,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Keep the old endpoint for compatibility
+  // New endpoint to store axylog deliveries
+  app.post("/api/consignments/sync-from-axylog", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      console.log("=== STORING AXYLOG DELIVERIES ===");
+      
+      const { deliveries } = req.body;
+      if (!deliveries || !Array.isArray(deliveries)) {
+        return res.status(400).json({ message: "Invalid deliveries data" });
+      }
+      
+      // Clear existing consignments for this user
+      await storage.clearUserConsignments(req.user!.id);
+      
+      let inserted = 0;
+      for (const delivery of deliveries.slice(0, 10)) {
+        try {
+          // Map axylog delivery fields to your consignment schema
+          const consignmentData = {
+            userId: req.user!.id,
+            consignmentNumber: delivery.consignmentNo || `CHILL-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            customerName: delivery.receiverCompanyName || "Chill Transport Customer",
+            consignmentReference: delivery.documentNumber || null,
+            trackingLink: delivery.trackingUrl || null,
+            pickupAddress: delivery.pickUpAddress ? `${delivery.pickUpAddress.city}, ${delivery.pickUpAddress.country}` : "Melbourne, VIC",
+            deliveryAddress: delivery.deliveryAddress ? `${delivery.deliveryAddress.city}, ${delivery.deliveryAddress.country}` : "Sydney, NSW",
+            status: delivery.status || "In Transit",
+            estimatedDeliveryDate: delivery.estimatedDeliveryDate || new Date().toISOString(),
+            deliveryDate: null,
+            dateDelivered: null,
+            consignmentRequiredDeliveryDate: null,
+            temperatureZone: delivery.temperatureZone || "Chilled (2-8°C)",
+            lastKnownLocation: delivery.lastKnownLocation || "En route",
+            events: JSON.stringify(delivery.events || [])
+          };
+          
+          await storage.createConsignment(consignmentData);
+          inserted++;
+        } catch (insertError) {
+          console.error("Insert error:", insertError);
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: "Axylog deliveries stored successfully",
+        synced: inserted,
+        total: deliveries.length
+      });
+      
+    } catch (error) {
+      console.error("Store deliveries error:", error);
+      res.status(500).json({ message: "Failed to store deliveries", error: String(error) });
+    }
+  });
+
   app.post("/api/consignments/sync", authenticate, async (req: AuthRequest, res: Response) => {
     console.log("=== OLD SYNC ENDPOINT - REDIRECTING ===");
     
