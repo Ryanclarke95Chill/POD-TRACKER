@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Consignment } from "@shared/schema";
 import { ExternalLink, Package, Clock, MapPin, Thermometer, AlertTriangle, CheckCircle, Map } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ConsignmentDetailModalProps {
   consignment: Consignment;
@@ -21,6 +21,8 @@ export default function ConsignmentDetailModal({
   onClose,
 }: ConsignmentDetailModalProps) {
   const [showMap, setShowMap] = useState(false);
+  const [locationName, setLocationName] = useState<string>('');
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   // Parse events from JSON string if needed
   const events = typeof consignment.events === 'string' 
@@ -37,6 +39,36 @@ export default function ConsignmentDetailModal({
 
   const deliveryCoords = parseCoordinates(consignment.shipToLatLon);
   const currentCoords = parseCoordinates(consignment.delivery_LastPositionLatLon);
+
+  // Reverse geocoding function
+  const getLocationName = async (lat: number, lon: number) => {
+    try {
+      setIsLoadingLocation(true);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const { suburb, city, town, village, state, postcode } = data.address;
+        const locationParts = [suburb, city || town || village, state].filter(Boolean);
+        return locationParts.join(', ') || 'Unknown location';
+      }
+      return 'Unknown location';
+    } catch (error) {
+      console.error('Reverse geocoding failed:', error);
+      return 'Location unavailable';
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  // Fetch location name when coordinates are available
+  useEffect(() => {
+    if (currentCoords) {
+      getLocationName(currentCoords.lat, currentCoords.lon).then(setLocationName);
+    }
+  }, [currentCoords]);
 
   // Format date helper
   const formatDate = (dateString: string | null) => {
@@ -194,11 +226,12 @@ export default function ConsignmentDetailModal({
               <div className="space-y-1 min-w-0">
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
-                  <p className="text-xs font-medium break-all">
-                    {consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon ? 
-                      `GPS: ${consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon}` : 
-                      'In transit'
-                    }
+                  <p className="text-xs font-medium">
+                    {isLoadingLocation ? (
+                      'Loading location...'
+                    ) : locationName || (
+                      currentCoords ? 'Location unavailable' : 'In transit'
+                    )}
                   </p>
                   {(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime) && (
                     <p className="text-xs text-gray-400 truncate">
