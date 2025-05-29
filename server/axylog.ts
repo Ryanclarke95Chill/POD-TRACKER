@@ -155,7 +155,24 @@ export class AxylogAPI {
       console.log("=== FULL AXYLOG RESPONSE ===");
       console.log("Response status:", response.status);
       console.log("Response data keys:", Object.keys(response.data || {}));
-      console.log("Response data:", JSON.stringify(response.data, null, 2));
+      
+      // Log the complete response structure
+      console.log("COMPLETE RESPONSE:", JSON.stringify(response.data, null, 2));
+      
+      // If there are deliveries, show the structure of the first few
+      if (response.data && response.data.deliveries && response.data.deliveries.length > 0) {
+        console.log("=== FIRST DELIVERY STRUCTURE ===");
+        console.log(JSON.stringify(response.data.deliveries[0], null, 2));
+        
+        console.log("=== CHECKING FOR CARGO FIELDS ===");
+        const firstDelivery = response.data.deliveries[0];
+        console.log("qty1:", firstDelivery.qty1);
+        console.log("qty2:", firstDelivery.qty2);
+        console.log("um1:", firstDelivery.um1);
+        console.log("um2:", firstDelivery.um2);
+        console.log("volumeInM3:", firstDelivery.volumeInM3);
+        console.log("totalWeightInKg:", firstDelivery.totalWeightInKg);
+      }
       
       if (!response.data || !response.data.deliveries) {
         console.warn("No deliveries found in Axylog response");
