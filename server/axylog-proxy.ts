@@ -51,27 +51,14 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       });
     }
 
-    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', {
+    const response = await axios.post('https://axylog.azurewebsites.net/deliveries?v=2', {
       pagination: {
         skip: 0,
-        pageSize: 25
+        pageSize: 500
       },
       filters: {
-        type: "",
-        tripNumber: [],
-        plateNumber: [],
-        documentNumber: [],
-        pickUp_Delivery_From: "2024-01-01T22:00:00.000Z",
-        pickUp_Delivery_To: "2024-12-31T21:59:00.000Z",
-        states: {
-          posOutcome: false,
-          negOutcome: false,
-          notDelOutcome: false,
-          waitingForOutcome: null,
-          inAdvance: false,
-          inDelay: false,
-          inTime: false
-        }
+        pickUp_Delivery_From: "2025-04-29",
+        pickUp_Delivery_To: "2025-06-29"
       }
     }, {
       headers: {
