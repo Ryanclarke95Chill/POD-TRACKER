@@ -139,7 +139,6 @@ export class AxylogAPI {
         },
         filters: {
           includeDeleted: false,
-          distributionType: 3,
           type: "",
           tripNumber: [],
           plateNumber: [],
