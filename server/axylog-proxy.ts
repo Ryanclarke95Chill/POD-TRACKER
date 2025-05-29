@@ -52,60 +52,98 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       });
     }
 
-    const requestBody = {
-      pagination: {
-        pageSize: 500,
-        pageNumber: 1
-      },
-      filters: {
-        includeDeleted: false,
-        distributionType: 2,
-        documentDate_From: (() => {
-          const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
-          return new Date(todayAEST).toISOString().split('T')[0];
-        })(),
-        documentDate_To: (() => {
-          const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
-          return new Date(todayAEST).toISOString().split('T')[0];
-        })(),
-      },
-      sortingField: "departureDateTime_desc"
+    const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
+    const todayString = new Date(todayAEST).toISOString().split('T')[0];
+
+    let allDeliveries = [];
+    let pageNumber = 1;
+    let hasMorePages = true;
+    const pageSize = 500;
+
+    console.log(`Starting pagination for date: ${todayString}`);
+
+    while (hasMorePages) {
+      const requestBody = {
+        pagination: {
+          pageSize: pageSize,
+          pageNumber: pageNumber
+        },
+        filters: {
+          includeDeleted: false,
+          distributionType: 2,
+          documentDate_From: todayString,
+          documentDate_To: todayString,
+        },
+        sortingField: "departureDateTime_desc"
+      };
+
+      console.log(`=== Fetching page ${pageNumber} ===`);
+
+      const response = await axios.post('https://api.axylog.com/Deliveries?v=2', requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'User': userId,
+          'Company': companyId,
+          'ContextOwner': contextOwnerId,
+          'SourceDeviceType': '2',
+          'LanguageCode': 'EN'
+        }
+      });
+
+      if (response.data && response.data.itemList) {
+        const deliveries = response.data.itemList;
+        allDeliveries.push(...deliveries);
+        console.log(`Page ${pageNumber}: Retrieved ${deliveries.length} deliveries`);
+        
+        // Check if we got fewer results than page size (indicates last page)
+        if (deliveries.length < pageSize) {
+          hasMorePages = false;
+          console.log('Last page reached');
+        } else {
+          pageNumber++;
+        }
+      } else {
+        hasMorePages = false;
+        console.log('No more data available');
+      }
+
+      // Safety check to prevent infinite loops
+      if (pageNumber > 10) {
+        console.log('Maximum pages reached (10), stopping pagination');
+        break;
+      }
+    }
+
+    console.log(`=== PAGINATION COMPLETE ===`);
+    console.log(`Total deliveries retrieved: ${allDeliveries.length}`);
+
+    // Create response object with all deliveries
+    const paginatedResponse = {
+      itemList: allDeliveries,
+      totalItems: allDeliveries.length,
+      pagesRetrieved: pageNumber
     };
 
-    console.log("=== Sent request payload ===");
-    console.dir(requestBody, { depth: null });
-
-    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', requestBody, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'User': userId,
-        'Company': companyId,
-        'ContextOwner': contextOwnerId,
-        'SourceDeviceType': '2',
-        'LanguageCode': 'EN'
-      }
-    });
-
     console.log('=== AXYLOG DELIVERIES RESPONSE ===');
-    console.log('Status:', response.status);
-    console.log('Response keys:', Object.keys(response.data || {}));
-    console.log('ItemList array length:', response.data?.itemList?.length);
-    console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
+    console.log('Status: 200 (paginated)');
+    console.log('Response keys:', Object.keys(paginatedResponse || {}));
+    console.log('ItemList array length:', paginatedResponse?.itemList?.length);
+    console.log(`Retrieved ${paginatedResponse?.itemList?.length || 0} deliveries from axylog via pagination`);
 
     // Save full response to file for detailed inspection
-    fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(response.data, null, 2));
-    console.log('Full Axylog response saved to /tmp/sample_delivery.json');
+    fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(paginatedResponse, null, 2));
+    console.log('Full paginated Axylog response saved to /tmp/sample_delivery.json');
 
     // Debug cargo data structure
     console.log(`\n=== CARGO DATA INSPECTION ===`);
-    console.log(`Total deliveries returned: ${response.data.itemList?.length}`);
+    console.log(`Total deliveries returned: ${allDeliveries.length}`);
     
-    if (response.data && response.data.itemList) {
+    if (allDeliveries && allDeliveries.length > 0) {
       let recordsWithCargo = 0;
       let recordsWithoutCargo = 0;
       
-      response.data.itemList.forEach((delivery: any, index: number) => {
+      allDeliveries.forEach((delivery: any, index: number) => {
         const hasCargo = delivery.qty1 !== null || delivery.qty2 !== null || 
                         delivery.um1 !== null || delivery.um2 !== null || 
                         delivery.volumeInM3 !== null || delivery.totalWeightInKg !== null;
@@ -124,7 +162,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       console.log(`Summary: ${recordsWithCargo} records WITH cargo, ${recordsWithoutCargo} records WITHOUT cargo`);
     }
 
-    response.data.itemList?.forEach((delivery: any, index: number) => {
+    allDeliveries.slice(0, 5).forEach((delivery: any, index: number) => {
       const {
         deliveryNumber,
         qty1,
@@ -143,7 +181,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     });
 
     // Save first delivery to file for inspection
-    const firstDelivery = response.data.itemList?.[0];
+    const firstDelivery = allDeliveries?.[0];
     if (firstDelivery) {
       fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(firstDelivery, null, 2));
       console.log('\n💾 Sample delivery saved to /tmp/sample_delivery.json');
@@ -151,7 +189,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      deliveries: response.data.itemList || []
+      data: paginatedResponse
     });
 
   } catch (error) {
