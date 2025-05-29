@@ -245,6 +245,17 @@ export class AxylogAPI {
     return deliveries.map((delivery, index) => {
         console.log(`Converting delivery ${index + 1}: ${delivery.consignmentNo || 'Unknown'}`);
         
+        // Extract cargo data from cargoList array
+        const cargo = delivery.cargoList?.[0] || {};
+        console.log(`Cargo data for delivery ${index + 1}:`, {
+          qty1: cargo.qty1,
+          um1: cargo.um1,
+          qty2: cargo.qty2,
+          um2: cargo.um2,
+          volumeInM3: cargo.volumeInM3,
+          totalWeightInKg: cargo.totalWeightInKg
+        });
+        
         // Map status from Axylog to our status types
         const statusMap: Record<string, string> = {
           "In Transit": "In Transit",
@@ -294,6 +305,14 @@ export class AxylogAPI {
           code: delivery.code || null,
           prog: delivery.prog || null,
           consignmentNo: delivery.consignmentNo || null,
+          
+          // Cargo fields extracted from cargoList[0]
+          qty1: cargo.qty1 || null,
+          um1: cargo.um1 || null,
+          qty2: cargo.qty2 || null,
+          um2: cargo.um2 || null,
+          volumeInM3: cargo.volumeInM3 || null,
+          totalWeightInKg: cargo.totalWeightInKg || null,
           departureDateTime: delivery.departureDateTime || null,
           contextPlannedDepartureDateTime: delivery.contextPlannedDepartureDateTime || null,
           delivery_OutcomeDateTime: delivery.delivery_OutcomeDateTime || null,
