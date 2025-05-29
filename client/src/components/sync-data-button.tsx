@@ -11,7 +11,8 @@ export default function SyncDataButton() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/consignments/sync", "POST");
+      const response = await apiRequest("/api/consignments/sync", "POST");
+      return response.json();
     },
     onSuccess: (data) => {
       // Invalidate consignments cache to refresh the table
