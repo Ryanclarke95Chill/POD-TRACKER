@@ -145,12 +145,6 @@ export default function ConsignmentDetailModal({
                     {getStatusDisplay()}
                   </Badge>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Temperature Zone</p>
-                  <p className="text-sm font-medium">
-                    {consignment.documentNote?.split('\\n')[0] || consignment.expectedTemperature || 'Standard'}
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -161,6 +155,12 @@ export default function ConsignmentDetailModal({
                 Package Details
               </h3>
               <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Temperature Zone</p>
+                  <p className="text-sm font-medium">
+                    {consignment.documentNote?.split('\\n')[0] || consignment.expectedTemperature || 'Standard'}
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Items</p>
