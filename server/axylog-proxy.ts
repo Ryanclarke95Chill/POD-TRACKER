@@ -65,16 +65,14 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     while (hasMorePages) {
       const requestBody = {
         pagination: {
-          pageSize: pageSize,
-          pageNumber: pageNumber
+          skip: 0,
+          pageSize: 200
         },
         filters: {
-          includeDeleted: false,
-          distributionType: 2,
-          documentDate_From: todayString,
-          documentDate_To: todayString,
-        },
-        sortingField: "departureDateTime_desc"
+          type: "",
+          pickUp_Delivery_From: "2025-05-30T00:00:00.000Z",
+          pickUp_Delivery_To: "2025-05-30T24:59:00.000Z"
+        }
       };
 
       console.log(`=== Fetching page ${pageNumber} ===`);

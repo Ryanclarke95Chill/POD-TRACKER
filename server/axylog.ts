@@ -133,16 +133,14 @@ export class AxylogAPI {
       // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
-          pageSize: 500,
-          pageNumber: 1
+          skip: 0,
+          pageSize: 200
         },
         filters: {
-          includeDeleted: false,
-          distributionType: 2,
-          documentDate_From: filters.pickupDateFrom,
-          documentDate_To: filters.pickupDateTo
-        },
-        sortingField: "departureDateTime_desc"
+          type: "",
+          pickUp_Delivery_From: "2025-05-30T00:00:00.000Z",
+          pickUp_Delivery_To: "2025-05-30T24:59:00.000Z"
+        }
       }, {
         headers: {
           "Authorization": `Bearer ${this.credentials!.token}`,
