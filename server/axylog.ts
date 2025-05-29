@@ -152,20 +152,23 @@ export class AxylogAPI {
         }
       });
 
-      console.log("=== FULL AXYLOG RESPONSE ===");
+      // Write the complete response to a file for inspection
+      const fs = require('fs');
+      fs.writeFileSync('/tmp/axylog_response.json', JSON.stringify(response.data, null, 2));
+      
+      console.log("=== AXYLOG RESPONSE SUMMARY ===");
       console.log("Response status:", response.status);
       console.log("Response data keys:", Object.keys(response.data || {}));
+      console.log("Full payload written to /tmp/axylog_response.json");
       
-      // Log the complete response structure
-      console.log("COMPLETE RESPONSE:", JSON.stringify(response.data, null, 2));
-      
-      // If there are deliveries, show the structure of the first few
+      // If there are deliveries, show the structure of the first delivery
       if (response.data && response.data.deliveries && response.data.deliveries.length > 0) {
-        console.log("=== FIRST DELIVERY STRUCTURE ===");
-        console.log(JSON.stringify(response.data.deliveries[0], null, 2));
-        
-        console.log("=== CHECKING FOR CARGO FIELDS ===");
+        console.log("=== FIRST DELIVERY SAMPLE ===");
         const firstDelivery = response.data.deliveries[0];
+        fs.writeFileSync('/tmp/first_delivery.json', JSON.stringify(firstDelivery, null, 2));
+        console.log("First delivery structure written to /tmp/first_delivery.json");
+        
+        console.log("=== CARGO FIELD CHECK ===");
         console.log("qty1:", firstDelivery.qty1);
         console.log("qty2:", firstDelivery.qty2);
         console.log("um1:", firstDelivery.um1);
