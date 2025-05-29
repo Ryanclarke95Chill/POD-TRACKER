@@ -164,7 +164,7 @@ export default function ConsignmentDetailModal({
                 <div>
                   <p className="text-xs text-purple-600">Temperature Zone</p>
                   <p className="text-xs font-medium text-purple-800">
-                    {consignment.expectedTemperature || 'Standard'}
+                    {consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard'}
                   </p>
                 </div>
                 <div>

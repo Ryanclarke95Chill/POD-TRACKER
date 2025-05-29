@@ -45,12 +45,17 @@ export default function Dashboard() {
     new Set((consignments as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
   ).sort();
 
+  // Helper function to extract temperature from documentNote
+  const getTemperatureZone = (consignment: Consignment) => {
+    return consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
+  };
+
   // Filter consignments based on search term, temperature zone, and warehouse company
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
       (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesTempZone = selectedTempZone === "all" || 
-      consignment.expectedTemperature === selectedTempZone;
+    const tempZone = getTemperatureZone(consignment);
+    const matchesTempZone = selectedTempZone === "all" || tempZone === selectedTempZone;
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
     return matchesSearch && matchesTempZone && matchesWarehouse;
