@@ -78,7 +78,10 @@ router.post('/deliveries', async (req: Request, res: Response) => {
           delivery_Pickup_Complete: false,
           unknown: false
         }
-      }
+      },
+      includeCargo: true,
+      viewMode: "Detailed",
+      includeReferences: true
     };
 
     console.log("=== Sent request payload ===");
