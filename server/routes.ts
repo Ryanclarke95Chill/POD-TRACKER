@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { pool, db } from "./db";
 import { consignments } from "@shared/schema";
 import { sql } from "drizzle-orm";
+import { axylogAPI } from "./axylog";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -134,6 +135,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching consignment:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // New endpoint to sync data from axylog
+  app.post("/api/consignments/sync", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      console.log("=== AXYLOG SYNC ENDPOINT ===");
+      console.log("Syncing axylog data for user:", req.user?.email);
+      
+      if (!req.user?.email) {
+        return res.status(400).json({ message: "User email not found" });
+      }
+
+      // Authenticate with axylog
+      const authSuccess = await axylogAPI.authenticate();
+      if (!authSuccess) {
+        return res.status(500).json({ message: "Failed to authenticate with axylog API" });
+      }
+
+      // Fetch deliveries from axylog for this user's email
+      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
+      console.log(`Fetched ${axylogConsignments.length} consignments from axylog`);
+
+      // Clear existing consignments for this user to avoid duplicates
+      await storage.clearUserConsignments(req.user.id);
+
+      // Insert new consignments from axylog
+      const insertedConsignments = [];
+      for (const consignment of axylogConsignments) {
+        const insertData = {
+          ...consignment,
+          userId: req.user.id,
+          events: JSON.stringify(consignment.events || [])
+        };
+        delete insertData.id; // Remove id so database can auto-generate it
+        
+        const inserted = await storage.createConsignment(insertData);
+        insertedConsignments.push(inserted);
+      }
+
+      console.log(`Successfully synced ${insertedConsignments.length} consignments`);
+      res.json({ 
+        message: "Consignments synced successfully", 
+        count: insertedConsignments.length,
+        consignments: insertedConsignments
+      });
+    } catch (error) {
+      console.error("Error syncing axylog data:", error);
+      res.status(500).json({ message: "Failed to sync axylog data" });
     }
   });
 

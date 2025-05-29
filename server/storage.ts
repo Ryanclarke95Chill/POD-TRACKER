@@ -15,6 +15,7 @@ export interface IStorage {
   updateConsignment(consignment: Consignment): Promise<Consignment>;
   seedDemoConsignments(userId: number): Promise<void>;
   clearAllConsignments(): Promise<void>;
+  clearUserConsignments(userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -156,6 +157,10 @@ export class DatabaseStorage implements IStorage {
 
   async clearAllConsignments(): Promise<void> {
     await db.delete(consignments);
+  }
+
+  async clearUserConsignments(userId: number): Promise<void> {
+    await db.delete(consignments).where(eq(consignments.userId, userId));
   }
 }
 
