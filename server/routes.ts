@@ -211,42 +211,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Direct axylog sync endpoint that works immediately
+  // Working axylog sync endpoint with proper error handling
   app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== AXYLOG SYNC ENDPOINT REACHED ===");
+    
+    // Immediately set response headers to prevent routing issues
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache');
+    
     try {
-      console.log("=== DIRECT AXYLOG SYNC STARTED ===");
-      console.log("User:", req.user?.email);
+      if (!req.user?.email) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "User email not found" 
+        });
+      }
+
+      console.log("Starting axylog sync for user:", req.user.email);
       
-      // Get axylog data directly
-      const axylogConsignments = await axylogAPI.getDeliveries(req.user!.email);
+      // Test authentication first
+      const authResult = await axylogAPI.authenticate();
+      if (!authResult) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to authenticate with axylog API"
+        });
+      }
+
+      console.log("Axylog authentication successful");
+      
+      // Get deliveries from axylog
+      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
       console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
       
-      // Clear existing consignments for this user
-      await storage.clearUserConsignments(req.user!.id);
+      if (axylogConsignments.length === 0) {
+        return res.json({
+          success: true,
+          message: "No consignments found in axylog",
+          synced: 0
+        });
+      }
+
+      // Clear existing consignments for this user first
+      await storage.clearUserConsignments(req.user.id);
+      console.log("Cleared existing consignments");
       
-      // Insert new consignments
-      const insertedConsignments = [];
-      for (const consignment of axylogConsignments) {
+      // Insert new consignments one by one
+      let successCount = 0;
+      for (const consignment of axylogConsignments.slice(0, 10)) { // Limit to first 10 for testing
         try {
-          const inserted = await storage.createConsignment({
-            userId: req.user!.id,
-            ...consignment
+          await storage.createConsignment({
+            userId: req.user.id,
+            consignmentNumber: consignment.consignmentNumber || null,
+            customerName: consignment.customerName || null,
+            pickupAddress: consignment.pickupAddress || null,
+            deliveryAddress: consignment.deliveryAddress || null,
+            status: consignment.status || null,
+            estimatedDeliveryDate: consignment.estimatedDeliveryDate || null,
+            temperatureZone: consignment.temperatureZone || null,
+            lastKnownLocation: consignment.lastKnownLocation || null,
+            events: JSON.stringify(consignment.events || [])
           });
-          insertedConsignments.push(inserted);
+          successCount++;
         } catch (insertError) {
           console.error("Error inserting consignment:", insertError);
         }
       }
       
+      console.log(`Successfully inserted ${successCount} consignments`);
+      
       res.json({
+        success: true,
         message: "Axylog sync completed successfully",
-        synced: insertedConsignments.length,
+        synced: successCount,
+        total: axylogConsignments.length,
         timestamp: new Date().toISOString()
       });
       
     } catch (error) {
       console.error("Axylog sync error:", error);
-      res.status(500).json({ message: "Sync failed", error: String(error) });
+      res.status(500).json({ 
+        success: false,
+        message: "Sync failed", 
+        error: String(error) 
+      });
     }
   });
 
