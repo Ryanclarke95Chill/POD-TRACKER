@@ -363,7 +363,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const consignments = await storage.getConsignmentsByUserId(req.user!.id);
       console.log(`Storage returned ${consignments.length} consignments`);
-      console.log("First consignment sample:", consignments[0]?.consignmentNumber);
+      
+      if (consignments.length > 0) {
+        console.log("=== COMPLETE PAYLOAD SAMPLE ===");
+        console.log("Full consignment record:");
+        console.log(JSON.stringify(consignments[0], null, 2));
+        
+        console.log("\n=== FIELD BREAKDOWN ===");
+        const sample = consignments[0];
+        Object.keys(sample).forEach(key => {
+          console.log(`${key}:`, sample[key as keyof typeof sample]);
+        });
+      }
       
       res.json(consignments);
     } catch (error) {
