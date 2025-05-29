@@ -54,7 +54,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
 
     const requestBody = {
       pagination: {
-        pageSize: 500,
+        pageSize: 1000,
         pageNumber: 1
       },
       filters: {
