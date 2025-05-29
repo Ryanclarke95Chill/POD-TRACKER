@@ -12,7 +12,6 @@ interface DashboardTableProps {
 export default function DashboardTable({ consignments, onViewDetails }: DashboardTableProps) {
   // Column configuration for real Chill Transport Company data
   const [columns, setColumns] = useState([
-    { key: 'trackingLink', label: 'Tracking Link' },
     { key: 'consignmentNumber', label: 'Consignment #' },
     { key: 'customerName', label: 'Customer Name' },
     { key: 'pickupAddress', label: 'Pickup From' },
@@ -136,21 +135,6 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
 
   const renderCellContent = (consignment: Consignment, column: { key: string; label: string }) => {
     const value = (consignment as any)[column.key];
-    
-    // Render tracking link as a button for real axylog tracking URLs
-    if (column.key === 'trackingLink' && value && value !== '-') {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(value, '_blank')}
-          className="h-8 px-3 text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-200"
-        >
-          <ExternalLink className="h-3 w-3 mr-1" />
-          Track Live
-        </Button>
-      );
-    }
 
     // Add status badges for better visibility
     if (column.key === 'status') {
@@ -202,7 +186,7 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
                 </div>
               </TableHead>
             ))}
-            <TableHead className="font-semibold text-gray-700">Actions</TableHead>
+            <TableHead className="font-semibold text-gray-700">View Details</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -222,12 +206,13 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
                 ))}
                 <TableCell className="py-3">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => onViewDetails(consignment)}
-                    className="h-8 w-8 p-0"
+                    className="h-8 px-3 text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-200"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
                   </Button>
                 </TableCell>
               </TableRow>
