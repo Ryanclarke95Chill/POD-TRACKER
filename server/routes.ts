@@ -33,10 +33,46 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Add immediate debug route to test routing
-  app.all("/api/test-routing", (req: Request, res: Response) => {
-    console.log("TEST ROUTING ENDPOINT HIT!");
-    res.json({ message: "Routing working", method: req.method, path: req.path });
+  // Ensure API routes are registered BEFORE any catch-all handlers
+  console.log("Registering API routes...");
+
+  // Emergency axylog sync route that bypasses routing issues
+  app.all("/axylog-sync", async (req: Request, res: Response) => {
+    console.log("=== EMERGENCY AXYLOG SYNC ===");
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      // Direct test of axylog connection
+      const result = await axylogAPI.authenticate();
+      console.log("Axylog auth result:", result);
+      
+      if (result) {
+        const deliveries = await axylogAPI.getDeliveries("api.chill@axylog.com");
+        console.log(`Retrieved ${deliveries.length} deliveries from axylog`);
+        
+        res.json({
+          success: true,
+          authenticated: true,
+          deliveries: deliveries.length,
+          sample: deliveries.slice(0, 2),
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        res.json({
+          success: false,
+          authenticated: false,
+          error: "Failed to authenticate with axylog",
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error("Emergency sync error:", error);
+      res.json({
+        success: false,
+        error: String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   app.post("/api/login", async (req: Request, res: Response) => {
