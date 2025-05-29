@@ -138,12 +138,18 @@ export class AxylogAPI {
           pageSize: 25
         },
         filters: {
+          includeDeleted: false,
+          distributionType: 3,
           type: "",
           tripNumber: [],
           plateNumber: [],
           documentNumber: [],
           pickUp_Delivery_From: filters.pickupDateFrom,
           pickUp_Delivery_To: filters.pickupDateTo,
+          includeCargo: true,
+          gridHeaderFilters: {
+            shipToCompanyName: "Chill"
+          },
           states: {
             posOutcome: false,
             negOutcome: false,
