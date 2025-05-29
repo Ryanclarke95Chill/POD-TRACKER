@@ -58,8 +58,8 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         pageNumber: 1
       },
       filters: {
-        departureDate_From: '2024-01-01',
-        departureDate_To: '2024-12-31',
+        departureDate_From: '2025-05-22',
+        departureDate_To: '2025-05-29',
         includeCargo: true
       }
     };
