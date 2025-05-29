@@ -152,8 +152,14 @@ export class AxylogAPI {
         }
       });
 
+      console.log("=== FULL AXYLOG RESPONSE ===");
+      console.log("Response status:", response.status);
+      console.log("Response data keys:", Object.keys(response.data || {}));
+      console.log("Response data:", JSON.stringify(response.data, null, 2));
+      
       if (!response.data || !response.data.deliveries) {
         console.warn("No deliveries found in Axylog response");
+        console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");
         return [];
       }
       
