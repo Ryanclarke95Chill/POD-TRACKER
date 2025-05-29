@@ -131,8 +131,8 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Make request to get deliveries - enhanced to include cargo details
-      const response = await axios.post(`${DELIVERIES_URL}?v=2`, {
+      // Make request to get deliveries - try different approach for cargo data
+      const response = await axios.post(`${DELIVERIES_URL}?v=2&includeDetails=true&includeCargo=true`, {
         pagination: {
           skip: 0,
           pageSize: 500
@@ -140,9 +140,7 @@ export class AxylogAPI {
         filters: {
           pickUp_Delivery_From: filters.pickupDateFrom,
           pickUp_Delivery_To: filters.pickupDateTo
-        },
-        includeCargoDetails: true,
-        includeMeasurements: true
+        }
       }, {
         headers: {
           "Authorization": `Bearer ${this.credentials!.token}`,
