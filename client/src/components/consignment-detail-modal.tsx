@@ -160,11 +160,11 @@ export default function ConsignmentDetailModal({
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Status</p>
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${getStatusColor(getStatusDisplay())} text-xs`}>
-                      {getStatusDisplay()}
-                    </Badge>
-                    {consignment.deliveryLiveTrackLink && (
+                  <Badge className={`${getStatusColor(getStatusDisplay())} text-xs mb-2`}>
+                    {getStatusDisplay()}
+                  </Badge>
+                  {consignment.deliveryLiveTrackLink && (
+                    <div>
                       <Button
                         onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -173,8 +173,8 @@ export default function ConsignmentDetailModal({
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Track Live
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
