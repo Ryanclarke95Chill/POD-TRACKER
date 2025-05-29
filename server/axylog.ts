@@ -246,6 +246,15 @@ export class AxylogAPI {
 
     console.log("=== CONVERTING AXYLOG DATA TO FULL PAYLOAD ===");
     console.log(`Processing ${deliveries.length} deliveries from axylog`);
+    
+    // Check first delivery for orderNumberRef
+    if (deliveries.length > 0) {
+      console.log("=== FIRST DELIVERY ORDERNUMBERREF CHECK ===");
+      console.log("orderNumberRef:", deliveries[0].orderNumberRef);
+      console.log("Reference fields available:", Object.keys(deliveries[0]).filter(key => 
+        key.toLowerCase().includes('order') || key.toLowerCase().includes('reference') || key.toLowerCase().includes('consignment')
+      ));
+    }
 
     // Return all deliveries without email filtering to get all data
     return deliveries.map((delivery, index) => {
