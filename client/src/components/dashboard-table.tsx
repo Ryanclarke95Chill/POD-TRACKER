@@ -71,7 +71,12 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
   };
 
   const getFieldValue = (consignment: Consignment, fieldKey: string): string => {
-    const value = (consignment as any)[fieldKey];
+    let value = (consignment as any)[fieldKey];
+    
+    // Special handling for consignment number - use fallback logic if needed
+    if (fieldKey === 'consignmentNo') {
+      value = value || consignment.orderNumberRef || `REF-${consignment.id}`;
+    }
     
     if (value === null || value === undefined || value === '') {
       return '-';
