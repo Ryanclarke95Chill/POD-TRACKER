@@ -95,16 +95,17 @@ export class AxylogAPI {
   // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Consignment[]> {
     try {
-      // Get only today's deliveries
-      const today = new Date();
-      const todayString = today.toISOString().split('T')[0];
+      // Get only today's deliveries in AEST timezone
+      const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
+      const todayDate = new Date(todayAEST);
+      const todayString = todayDate.toISOString().split('T')[0];
 
       const filters = {
         pickupDateFrom: todayString,
         pickupDateTo: todayString
       };
 
-      console.log("Using today's date filters:", filters);
+      console.log("Using today's date filters (AEST):", filters, "AEST date:", todayAEST);
       return this.getConsignmentsWithFilters(filters);
     } catch (error) {
       console.error("Failed to get deliveries from Axylog API:", error);
