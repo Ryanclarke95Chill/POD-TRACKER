@@ -75,11 +75,11 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('Status:', response.status);
     console.log('Response keys:', Object.keys(response.data || {}));
     console.log('Full response data:', JSON.stringify(response.data, null, 2));
-    console.log(`Retrieved ${response.data.deliveries?.length || 0} deliveries from axylog`);
+    console.log(`Retrieved ${response.data.data?.length || 0} deliveries from axylog`);
 
     res.json({
       success: true,
-      deliveries: response.data.deliveries || []
+      deliveries: response.data.data || []
     });
 
   } catch (error) {
