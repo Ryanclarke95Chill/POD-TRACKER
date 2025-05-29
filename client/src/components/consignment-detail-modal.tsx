@@ -239,11 +239,7 @@ export default function ConsignmentDetailModal({
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
                   <p className="text-xs font-medium">
-                    {isLoadingLocation ? (
-                      'Loading location...'
-                    ) : locationName || (
-                      currentCoords ? 'Location unavailable' : 'In transit'
-                    )}
+                    {getLocationDisplay()}
                   </p>
                   {(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime) && (
                     <p className="text-xs text-gray-400 truncate">
