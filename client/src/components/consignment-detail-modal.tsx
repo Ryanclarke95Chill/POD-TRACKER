@@ -78,7 +78,7 @@ export default function ConsignmentDetailModal({
 
   return (
     <Dialog open={!!consignment} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-5xl p-0 overflow-auto max-h-[90vh] rounded-xl">
+      <DialogContent className="sm:max-w-4xl p-0 overflow-auto max-h-[85vh] rounded-xl">
         <DialogHeader className="p-6 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -106,13 +106,13 @@ export default function ConsignmentDetailModal({
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
           {/* Live Tracking Link */}
           {consignment.deliveryLiveTrackLink && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <ExternalLink className="h-5 w-5 text-blue-600" />
+                  <ExternalLink className="h-4 w-4 text-blue-600" />
                   <div>
                     <h4 className="text-sm font-semibold text-blue-800">Live Tracking Available</h4>
                     <p className="text-xs text-blue-600">View real-time tracking from carrier</p>
@@ -120,9 +120,10 @@ export default function ConsignmentDetailModal({
                 </div>
                 <Button
                   onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2"
+                  size="sm"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <ExternalLink className="h-3 w-3 mr-2" />
                   Open Live Tracking
                 </Button>
               </div>
@@ -130,7 +131,7 @@ export default function ConsignmentDetailModal({
           )}
 
           {/* Key Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             {/* ETA Comparison */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -273,19 +274,19 @@ export default function ConsignmentDetailModal({
 
           </div>
 
-          {/* Events Timeline */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-              <Clock className="h-4 w-4 mr-2" />
-              Tracking Events
-            </h4>
-            <div className="max-h-64 overflow-y-auto space-y-3">
-              {events.length > 0 ? (
-                events.map((event: any, index: number) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="h-2 w-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+          {/* Events Timeline - Only show if there are events */}
+          {events.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg p-3">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <Clock className="h-3 w-3 mr-2" />
+                Tracking Events
+              </h4>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {events.map((event: any, index: number) => (
+                  <div key={index} className="flex items-start gap-2 p-2 bg-gray-50 rounded text-sm">
+                    <div className="h-1.5 w-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="font-medium text-gray-800">
                         {event.description || 'Event occurred'}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -293,16 +294,10 @@ export default function ConsignmentDetailModal({
                       </p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <AlertTriangle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No tracking events available</p>
-                  <p className="text-xs text-gray-400">Events will appear here as the shipment progresses</p>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
