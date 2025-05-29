@@ -59,7 +59,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       },
       filters: {
         includeDeleted: false,
-        distributionType: 3,
+        distributionType: [2, 3],
         documentDate_From: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         documentDate_To: new Date().toISOString().split('T')[0],
         gridHeaderFilters: {
