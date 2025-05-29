@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import axylogProxy from "./axylog-proxy";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -44,24 +46,35 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Register API routes FIRST
+  // Mount axylog proxy routes FIRST to bypass all middleware
+  app.use('/axylog-proxy', axylogProxy);
+  
+  // Register all other API routes
   const server = await registerRoutes(app);
+  
+  // In production, serve built frontend files
+  if (app.get("env") === "production") {
+    // Serve static files from client/dist
+    app.use(express.static(path.join(__dirname, '../client/dist')));
+    
+    // Catch-all handler for SPA routing
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    });
+  } else {
+    // Development mode - use Vite dev server
+    await setupVite(app, server);
+  }
 
-  // Error handler for API routes
+  // Global error handler (after Vite setup)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
-
-  // Setup Vite AFTER all API routes are registered
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.

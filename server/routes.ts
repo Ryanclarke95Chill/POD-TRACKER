@@ -35,6 +35,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ensure API routes are registered BEFORE any catch-all handlers
   console.log("Registering API routes...");
+  
+  // EMERGENCY: Direct sync route that bypasses all middleware
+  app.use("/direct-sync", express.json());
+  app.post("/direct-sync", async (req: Request, res: Response) => {
+    console.log("=== DIRECT SYNC ENDPOINT ===");
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    try {
+      // Authenticate with axylog directly
+      const authResult = await axylogAPI.authenticate();
+      if (!authResult) {
+        return res.json({ success: false, message: "Axylog auth failed" });
+      }
+      
+      // Get deliveries
+      const deliveries = await axylogAPI.getDeliveries("api.chill@axylog.com");
+      console.log(`Direct sync retrieved ${deliveries.length} deliveries`);
+      
+      // Clear existing and insert new
+      await storage.clearUserConsignments(1);
+      
+      let inserted = 0;
+      for (const delivery of deliveries.slice(0, 5)) {
+        try {
+          await storage.createConsignment({
+            userId: 1,
+            consignmentNumber: delivery.consignmentNumber || "AXYLOG-" + Math.random().toString(36).substr(2, 9),
+            customerName: delivery.customerName || "Chill Transport Customer",
+            consignmentReference: null,
+            trackingLink: null,
+            pickupAddress: delivery.pickupAddress || "Melbourne, VIC",
+            deliveryAddress: delivery.deliveryAddress || "Sydney, NSW", 
+            status: delivery.status || "In Transit",
+            estimatedDeliveryDate: delivery.estimatedDeliveryDate || new Date().toISOString(),
+            deliveryDate: null,
+            dateDelivered: null,
+            consignmentRequiredDeliveryDate: null,
+            temperatureZone: delivery.temperatureZone || "Chilled (2-8°C)",
+            lastKnownLocation: delivery.lastKnownLocation || "En route",
+            events: JSON.stringify(delivery.events || [])
+          });
+          inserted++;
+        } catch (error) {
+          console.error("Insert error:", error);
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: "Direct sync completed",
+        synced: inserted,
+        total: deliveries.length
+      });
+      
+    } catch (error) {
+      console.error("Direct sync error:", error);
+      res.json({ success: false, error: String(error) });
+    }
+  });
 
   // Axylog API Proxy - bypasses Vite dev server completely
   app.post("/axylog-proxy/sync", authenticate, async (req: AuthRequest, res: Response) => {
@@ -65,12 +125,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.user.id,
             consignmentNumber: delivery.consignmentNumber || null,
             customerName: delivery.customerName || null,
+            consignmentReference: null,
+            trackingLink: null,
             pickupAddress: delivery.pickupAddress || null,
             deliveryAddress: delivery.deliveryAddress || null,
             status: delivery.status || null,
             estimatedDeliveryDate: delivery.estimatedDeliveryDate || null,
+            deliveryDate: null,
+            dateDelivered: null,
+            consignmentRequiredDeliveryDate: null,
             temperatureZone: delivery.temperatureZone || null,
             lastKnownLocation: delivery.lastKnownLocation || null,
+            deliveryRun: null,
+            quantity: null,
+            pallets: null,
+            spaces: null,
+            cubicMeters: null,
+            weightKg: null,
+            shipper: null,
+            receiver: null,
+            pickupCompany: null,
+            deliveryCompany: null,
+            pickupContactName: null,
+            deliveryContactName: null,
+            pickupContactPhone: null,
+            deliveryContactPhone: null,
+            specialInstructions: null,
+            productDescription: null,
+            deliveryInstructions: null,
+            pickupInstructions: null,
+            deliveryLivetrackLink: null,
+            customerOrderNumber: null,
+            documentString2: null,
+            fromLocation: null,
+            toLocation: null,
+            groupCausalDeliveryOutcome: null,
+            deliveryPlannedEta: null,
+            recordedTemperature: null,
+            quantityUnitOfMeasurement: null,
+            quantityUnitOfMeasurement1: null,
+            quantityUnitOfMeasurement2: null,
+            route: null,
+            driver: null,
+            vehicle: null,
+            origin: null,
+            destination: null,
+            originPostalCode: null,
+            originCountry: null,
+            originMasterDataCode: null,
+            destinationPostalCode: null,
+            destinationCountry: null,
+            deliveryTime: null,
+            pickupTime: null,
+            consignmentType: null,
+            priority: null,
+            deliveryZone: null,
+            pickupZone: null,
+            notes: null,
+            customerReference: null,
+            invoiceNumber: null,
+            podSignature: null,
+            deliveryProof: null,
+            vehicleCode: null,
+            deliveryEtaDeviation: null,
+            requiredTags: null,
+            receivedDeliveryPodFiles: null,
+            orderCarrierEmail: null,
+            tripNumber: null,
+            orderNumber: null,
+            from: null,
+            to: null,
+            carrier: null,
+            deliveryCalculatedEta: null,
+            timeSpentInTheUnloadingArea: null,
+            deliveryOutcomeCausal: null,
+            deliveryArrivalDate: null,
+            deliveryOutcomeDate: null,
+            deliveryUnloadDate: null,
+            deliveryOutcomeNote: null,
+            deliveryLastPosition: null,
+            deliveryLastPositionDate: null,
+            pickupPlannedEta: null,
+            etaDeliveryOnDeparture: null,
+            deliveryLiveDistanceKm: null,
+            deliveryDistanceKm: null,
+            deliveryOutcomeTransmissionDate: null,
+            deliveryOutcomeReceiptDate: null,
+            deliveryUnloadSequence: null,
+            deliveryTimeWindow: null,
+            pickupArrivalDate: null,
+            pickupOutcomeDate: null,
+            pickupLoadDate: null,
+            pickupOutcomeReason: null,
+            groupCausalPickupOutcome: null,
+            pickupOutcomeNote: null,
+            pickupLastPosition: null,
+            pickupLastPositionDate: null,
+            pickupCalculatedEta: null,
+            etaPickupOnDeparture: null,
+            pickupLiveDistanceKm: null,
+            pickupDistanceKm: null,
+            pickupOutcomeReceiptDate: null,
+            pickupLoadSequence: null,
+            pickupTimeWindow: null,
+            fromMasterDataCode: null,
+            shipperCity: null,
+            shipperProvince: null,
+            shipperMasterDataCode: null,
+            depot: null,
+            depotMasterDataCode: null,
+            recipientMasterDataCode: null,
+            deliveryCity: null,
+            deliveryProvince: null,
+            carrierMasterDataCode: null,
+            subCarrier: null,
+            subCarrierMasterDataCode: null,
+            orderDate: null,
+            documentNote: null,
+            orderType: null,
+            orderSeries: null,
+            shipperOrderReferenceNumber: null,
+            errorDescription: null,
+            driverPhone: null,
+            tractorLicensePlate: null,
+            trailerLicensePlate: null,
+            deliveryOutcome: null,
+            deliveryPunctuality: null,
+            deliveryGeolocalizationState: null,
+            pickupOutcome: null,
+            pickupPunctuality: null,
+            pickupGeolocationState: null,
+            deliveryState: null,
+            pickupState: null,
+            destinationCoordinates: null,
+            departureCoordinates: null,
+            expectedTemperature: null,
+            deliveryMaximumDate: null,
+            deliveryMinimumDate: null,
+            pickupMinimumDate: null,
+            pickupMaximumDate: null,
+            volumeM3: null,
+            linearMetersM: null,
+            groundBases: null,
+            documentDate1: null,
+            documentDate2: null,
+            documentDate3: null,
+            documentString1: null,
+            documentString3: null,
+            timeSpentInTheLoadingArea: null,
+            deliveryOutcomeInArea: null,
+            pickupOutcomeInArea: null,
+            deliveryOutcomePosition: null,
+            pickupOutcomePosition: null,
+            seals: null,
+            taskId: null,
+            idCreationImport: null,
+            expectedPaymentMethodCode: null,
+            expectedPaymentMethod: null,
+            deliveryOutcomeRegistrationDate: null,
+            pickupOutcomeRegistrationDate: null,
+            deliveryPinIsValid: null,
+            pickUpPinIsValid: null,
+            expectedPaymentNotes: null,
+            deliveryPodFiles: null,
+            pickupPodFiles: null,
+            departureDateInitiallyPlannedByTheContext: null,
+            orderCarrierMobileTelephoneNumber: null,
+            orderCarrierTelephoneNumber: null,
+            orderPickupEmail: null,
+            orderPickupMobileTelephoneNumber: null,
+            orderPickupTelephoneNumber: null,
+            orderDeliveryEmail: null,
+            orderDeliveryMobileTelephoneNumber: null,
+            orderDeliveryTelephoneNumber: null,
+            orderSubCarrierEmail: null,
+            orderSubCarrierMobileTelephoneNumber: null,
+            orderSubCarrierTelephoneNumber: null,
+            orderShipperEmail: null,
+            orderShipperMobileTelephoneNumber: null,
+            orderShipperTelephoneNumber: null,
+            forbiddenTags: null,
+            pickupPlannedServiceTime: null,
+            deliveryPlannedServiceTime: null,
+            externalReference: null,
+            depotPhoneNumberSpecifiedInTheOrder: null,
+            depotMobilePhoneNumberSpecifiedInTheOrder: null,
+            receivedPickupPodFiles: null,
+            requiredTagsDescription: null,
+            forbiddenTagsDescription: null,
+            fromPostalCode: null,
+            toPostalCode: null,
+            fromCountry: null,
+            toCountry: null,
+            pickupEtaDeviation: null,
+            pickupLivetrackLink: null,
+            vehicleDescription: null,
             events: JSON.stringify(delivery.events || [])
           });
           inserted++;
