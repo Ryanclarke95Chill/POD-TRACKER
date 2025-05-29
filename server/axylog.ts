@@ -133,7 +133,7 @@ export class AxylogAPI {
       // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
-          pageSize: 1000,
+          pageSize: 500,
           pageNumber: 1
         },
         filters: {
