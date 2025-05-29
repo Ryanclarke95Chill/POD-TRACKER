@@ -38,6 +38,24 @@ export default function ConsignmentDetailModal({
   const deliveryCoords = parseCoordinates(consignment.shipToLatLon);
   const currentCoords = parseCoordinates(consignment.delivery_LastPositionLatLon);
 
+  // Status mapping function
+  const getStatusDisplay = () => {
+    const deliveryState = consignment.deliveryState;
+    const pickupState = consignment.pickupState;
+    const deliveryPositionType = (consignment as any).delivery_LastPositionType;
+    const pickupPositionType = (consignment as any).pickUp_LastPositionType;
+    
+    const mapStatus = (status: string | null) => {
+      if (!status) return null;
+      if (status === 'Traveling' || status === 'App_Traveling') return 'In Transit';
+      if (status === 'Positive Outcome') return 'Delivered';
+      return status; // Return exact value for anything else
+    };
+    
+    return mapStatus(deliveryState) || mapStatus(pickupState) || 
+           mapStatus(deliveryPositionType) || mapStatus(pickupPositionType) || 'In Transit';
+  };
+
 
 
   // Format date helper
@@ -169,7 +187,7 @@ export default function ConsignmentDetailModal({
                 </div>
                 <div>
                   <p className="text-xs text-purple-600">Status</p>
-                  <p className="text-xs font-medium text-purple-800 break-words">{consignment.deliveryState || consignment.pickupState || 'In Transit'}</p>
+                  <p className="text-xs font-medium text-purple-800 break-words">{getStatusDisplay()}</p>
                 </div>
               </div>
             </div>

@@ -50,6 +50,24 @@ export default function Dashboard() {
     return consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
   };
 
+  // Helper function to map status labels
+  const getStatusDisplay = (consignment: Consignment) => {
+    const deliveryState = consignment.deliveryState;
+    const pickupState = consignment.pickupState;
+    const deliveryPositionType = (consignment as any).delivery_LastPositionType;
+    const pickupPositionType = (consignment as any).pickUp_LastPositionType;
+    
+    const mapStatus = (status: string | null) => {
+      if (!status) return null;
+      if (status === 'Traveling' || status === 'App_Traveling') return 'In Transit';
+      if (status === 'Positive Outcome') return 'Delivered';
+      return status; // Return exact value for anything else
+    };
+    
+    return mapStatus(deliveryState) || mapStatus(pickupState) || 
+           mapStatus(deliveryPositionType) || mapStatus(pickupPositionType) || 'In Transit';
+  };
+
   // Filter consignments based on search term, temperature zone, and warehouse company
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
@@ -255,6 +273,7 @@ export default function Dashboard() {
             <DashboardTable
               consignments={filteredConsignments}
               onViewDetails={handleViewDetails}
+              getStatusDisplay={getStatusDisplay}
             />
           ) : (
             /* No consignments found */
