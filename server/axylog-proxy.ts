@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import axios from 'axios';
+import * as fs from 'fs';
 
 const router = express.Router();
 
@@ -100,21 +101,23 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log(`Total deliveries returned: ${response.data.itemList?.length}`);
 
     response.data.itemList?.forEach((delivery: any, index: number) => {
-      const cargo = delivery.cargoList?.[0];
-      if (cargo) {
-        console.log(`\n📦 Delivery #${index + 1} (${delivery.consignmentNo})`);
-        console.dir(cargo, { depth: null });
-      } else {
-        console.log(`\n🚫 Delivery #${index + 1} (${delivery.consignmentNo}) has no cargo data`);
-      }
+      console.log(`\n🔍 Delivery #${index + 1} (${delivery.consignmentNo}):`);
+      console.log('Cargo fields:', {
+        qty1: delivery.qty1,
+        um1: delivery.um1,
+        qty2: delivery.qty2,
+        um2: delivery.um2,
+        volumeInM3: delivery.volumeInM3,
+        totalWeightInKg: delivery.totalWeightInKg,
+        cargoList: delivery.cargoList
+      });
     });
 
-    // Save first delivery with cargo to file for inspection
-    const fs = require('fs');
-    const firstWithCargo = response.data.itemList.find((d: any) => d.cargoList?.length > 0);
-    if (firstWithCargo) {
-      fs.writeFileSync('/tmp/sample_cargo_delivery.json', JSON.stringify(firstWithCargo, null, 2));
-      console.log('\n💾 Sample delivery with cargo saved to /tmp/sample_cargo_delivery.json');
+    // Save first delivery to file for inspection
+    const firstDelivery = response.data.itemList?.[0];
+    if (firstDelivery) {
+      fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(firstDelivery, null, 2));
+      console.log('\n💾 Sample delivery saved to /tmp/sample_delivery.json');
     }
 
     res.json({
