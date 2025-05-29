@@ -101,6 +101,16 @@ export default function ConsignmentDetailModal({
                 <Thermometer className="h-3 w-3 mr-1" />
                 {consignment.documentNote?.split('\\n')[0] || consignment.expectedTemperature || 'Standard'}
               </Badge>
+              {consignment.deliveryLiveTrackLink && (
+                <Button
+                  onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Track Live
+                </Button>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -145,19 +155,7 @@ export default function ConsignmentDetailModal({
             </div>
           </div>
 
-          {/* Live Tracking Button */}
-          {consignment.deliveryLiveTrackLink && (
-            <div className="flex justify-center">
-              <Button
-                onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                size="lg"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Track Live
-              </Button>
-            </div>
-          )}
+
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
