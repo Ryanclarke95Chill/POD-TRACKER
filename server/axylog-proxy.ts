@@ -62,11 +62,11 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         pageNumber: 1
       },
       filters: {
-        departureDate_From: '2025-05-22',
-        departureDate_To: '2025-05-29',
-        includeCargo: true,
+        distributionType: 3,
+        documentDate_From: "2024-01-01",
+        documentDate_To: "2025-12-31",
         gridHeaderFilters: {
-          shipFromMasterDataCode: "NSW_5"
+          shipFromMasterDataCode: "CHILL NSW"
         }
       }
     };
