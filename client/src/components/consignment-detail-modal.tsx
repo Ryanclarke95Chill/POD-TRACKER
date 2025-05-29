@@ -106,23 +106,56 @@ export default function ConsignmentDetailModal({
         </DialogHeader>
 
         <div className="p-6 space-y-6">
-          {/* Live Tracking Link */}
-          {consignment.deliveryLiveTrackLink && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <ExternalLink className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Live Tracking Available</span>
-                </div>
-                <Button
-                  onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  size="sm"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Track Live
-                </Button>
+          {/* Address Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Pickup Address */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Truck className="h-4 w-4 text-orange-600" />
+                Pickup Address
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">{consignment.shipFromCompanyName || 'Not specified'}</p>
+                <p className="text-gray-600">
+                  {[
+                    consignment.shipFromAddress,
+                    consignment.shipFromCity,
+                    consignment.shipFromZipCode
+                  ].filter(Boolean).join(', ') || 'Address not available'}
+                </p>
               </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-600" />
+                Delivery Address
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">{consignment.shipToCompanyName || 'Not specified'}</p>
+                <p className="text-gray-600">
+                  {[
+                    consignment.shipToAddress,
+                    consignment.shipToCity,
+                    consignment.shipToZipCode
+                  ].filter(Boolean).join(', ') || 'Address not available'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Tracking Button */}
+          {consignment.deliveryLiveTrackLink && (
+            <div className="flex justify-center">
+              <Button
+                onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="lg"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Track Live
+              </Button>
             </div>
           )}
 
@@ -236,44 +269,6 @@ export default function ConsignmentDetailModal({
             )}
           </div>
 
-          {/* Address Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pickup Address */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Truck className="h-4 w-4 text-orange-600" />
-                Pickup Address
-              </h3>
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">{consignment.shipFromCompanyName || 'Not specified'}</p>
-                <p className="text-gray-600">
-                  {[
-                    consignment.shipFromAddress,
-                    consignment.shipFromCity,
-                    consignment.shipFromZipCode
-                  ].filter(Boolean).join(', ') || 'Address not available'}
-                </p>
-              </div>
-            </div>
-
-            {/* Delivery Address */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-green-600" />
-                Delivery Address
-              </h3>
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">{consignment.shipToCompanyName || 'Not specified'}</p>
-                <p className="text-gray-600">
-                  {[
-                    consignment.shipToAddress,
-                    consignment.shipToCity,
-                    consignment.shipToZipCode
-                  ].filter(Boolean).join(', ') || 'Address not available'}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </DialogContent>
     </Dialog>
