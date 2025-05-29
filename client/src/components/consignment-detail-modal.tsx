@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Consignment } from "@shared/schema";
-import { ExternalLink, Package, Clock, MapPin, Thermometer, AlertTriangle, CheckCircle } from "lucide-react";
+import { ExternalLink, Package, Clock, MapPin, Thermometer, AlertTriangle, CheckCircle, Map } from "lucide-react";
+import { useState } from "react";
 
 interface ConsignmentDetailModalProps {
   consignment: Consignment;
@@ -19,10 +20,23 @@ export default function ConsignmentDetailModal({
   consignment,
   onClose,
 }: ConsignmentDetailModalProps) {
+  const [showMap, setShowMap] = useState(false);
+  
   // Parse events from JSON string if needed
   const events = typeof consignment.events === 'string' 
     ? JSON.parse(consignment.events || '[]') 
     : consignment.events || [];
+
+  // Parse coordinates from lat,lon string
+  const parseCoordinates = (latLonString: string | null) => {
+    if (!latLonString) return null;
+    const [lat, lon] = latLonString.split(',').map(s => parseFloat(s.trim()));
+    if (isNaN(lat) || isNaN(lon)) return null;
+    return { lat, lon };
+  };
+
+  const deliveryCoords = parseCoordinates(consignment.shipToLatLon);
+  const currentCoords = parseCoordinates(consignment.delivery_LastPositionLatLon);
 
   // Format date helper
   const formatDate = (dateString: string | null) => {
@@ -199,15 +213,74 @@ export default function ConsignmentDetailModal({
 
             {/* Delivery Information */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
-                <MapPin className="h-4 w-4 mr-2" />
-                Delivery Location
-              </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-green-800 flex items-center">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Delivery Location
+                </h4>
+                {deliveryCoords && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMap(!showMap)}
+                    className="text-green-700 border-green-300 hover:bg-green-100"
+                  >
+                    <Map className="h-3 w-3 mr-1" />
+                    {showMap ? 'Hide Map' : 'Show Map'}
+                  </Button>
+                )}
+              </div>
               <div className="text-sm text-green-700">
                 <p className="font-medium">{consignment.shipToCompanyName}</p>
                 <p>{consignment.shipToAddress}</p>
                 <p>{consignment.shipToCity} {consignment.shipToZipCode}</p>
+                {deliveryCoords && (
+                  <p className="text-xs text-green-600 mt-1">
+                    📍 {deliveryCoords.lat.toFixed(4)}, {deliveryCoords.lon.toFixed(4)}
+                  </p>
+                )}
               </div>
+              
+              {/* Map View */}
+              {showMap && deliveryCoords && (
+                <div className="mt-4 border border-green-300 rounded-lg overflow-hidden">
+                  <iframe
+                    width="100%"
+                    height="300"
+                    frameBorder="0"
+                    scrolling="no"
+                    marginHeight={0}
+                    marginWidth={0}
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${deliveryCoords.lon-0.01},${deliveryCoords.lat-0.01},${deliveryCoords.lon+0.01},${deliveryCoords.lat+0.01}&layer=mapnik&marker=${deliveryCoords.lat},${deliveryCoords.lon}`}
+                    style={{ border: 0 }}
+                    title="Delivery Location Map"
+                  />
+                  <div className="bg-white p-2 text-xs text-gray-600 border-t border-green-300">
+                    <a 
+                      href={`https://www.openstreetmap.org/?mlat=${deliveryCoords.lat}&mlon=${deliveryCoords.lon}&zoom=15`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-800 flex items-center"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View larger map
+                    </a>
+                  </div>
+                </div>
+              )}
+              
+              {/* Current Vehicle Position */}
+              {currentCoords && (
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-xs font-medium text-blue-800">Current Vehicle Position</p>
+                  <p className="text-xs text-blue-600">
+                    📍 {currentCoords.lat.toFixed(4)}, {currentCoords.lon.toFixed(4)}
+                  </p>
+                  <p className="text-xs text-blue-500">
+                    Last updated: {formatDate(consignment.delivery_LastPositionDateTime)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
