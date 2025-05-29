@@ -78,6 +78,11 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       value = value || consignment.orderNumberRef || `REF-${consignment.id}`;
     }
     
+    // Special handling for ETA - use fallback to scheduled times if calculated ETA isn't available
+    if (fieldKey === 'delivery_EtaCalculated') {
+      value = value || consignment.maxScheduledDeliveryTime || consignment.minScheduledDeliveryTime;
+    }
+    
     if (value === null || value === undefined || value === '') {
       return '-';
     }
