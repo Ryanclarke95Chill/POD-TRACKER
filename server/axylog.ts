@@ -309,12 +309,26 @@ export class AxylogAPI {
           year: delivery.year || null,
           code: delivery.code || null,
           prog: delivery.prog || null,
-          consignmentNo: delivery.consignmentNo || 
-                        delivery.documentReference || 
-                        delivery.orderNumberRef || 
-                        delivery.shipperOrderReferenceNumber || 
-                        `${delivery.year}-${delivery.code}-${delivery.prog}` || 
-                        null,
+          consignmentNo: (() => {
+            // Debug reference fields to see what's available
+            console.log("=== REFERENCE DEBUG ===");
+            console.log("consignmentNo:", delivery.consignmentNo);
+            console.log("documentReference:", delivery.documentReference);
+            console.log("orderNumberRef:", delivery.orderNumberRef);
+            console.log("shipperOrderReferenceNumber:", delivery.shipperOrderReferenceNumber);
+            console.log("year-code-prog:", delivery.year, delivery.code, delivery.prog);
+            console.log("externalReference:", delivery.externalReference);
+            console.log("documentNumber:", delivery.documentNumber);
+            
+            return delivery.consignmentNo || 
+                   delivery.documentReference || 
+                   delivery.orderNumberRef || 
+                   delivery.shipperOrderReferenceNumber || 
+                   delivery.externalReference ||
+                   delivery.documentNumber ||
+                   `${delivery.year}-${delivery.code}-${delivery.prog}` || 
+                   `REF-${delivery.id || Math.random().toString(36).substr(2, 9)}`;
+          })(),
           
           // Cargo fields extracted directly from delivery object
           qty1: delivery.qty1 || null,
