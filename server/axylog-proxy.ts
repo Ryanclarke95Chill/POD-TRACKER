@@ -51,7 +51,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       });
     }
 
-    const response = await axios.post('https://axylog.azurewebsites.net/deliveries?v=2', {
+    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', {
       pagination: {
         skip: 0,
         pageSize: 500
