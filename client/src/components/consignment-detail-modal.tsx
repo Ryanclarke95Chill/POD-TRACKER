@@ -77,7 +77,7 @@ export default function ConsignmentDetailModal({
 
   return (
     <Dialog open={!!consignment} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-auto max-h-[90vh] rounded-xl">
+      <DialogContent className="sm:max-w-5xl w-[95vw] p-0 overflow-auto max-h-[90vh] rounded-xl">
         <DialogHeader className="p-6 border-b bg-gray-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
