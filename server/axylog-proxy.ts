@@ -101,16 +101,21 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log(`Total deliveries returned: ${response.data.itemList?.length}`);
 
     response.data.itemList?.forEach((delivery: any, index: number) => {
-      console.log(`\n🔍 Delivery #${index + 1} (${delivery.consignmentNo}):`);
-      console.log('Cargo fields:', {
-        qty1: delivery.qty1,
-        um1: delivery.um1,
-        qty2: delivery.qty2,
-        um2: delivery.um2,
-        volumeInM3: delivery.volumeInM3,
-        totalWeightInKg: delivery.totalWeightInKg,
-        cargoList: delivery.cargoList
-      });
+      const {
+        deliveryNumber,
+        qty1,
+        um1,
+        qty2,
+        um2,
+        volumeInM3,
+        totalWeightInKg
+      } = delivery;
+
+      console.log(`\n📦 Delivery #${index + 1}: ${deliveryNumber}`);
+      console.log(`   Cartons (qty1): ${qty1} ${um1}`);
+      console.log(`   Pallets (qty2): ${qty2} ${um2}`);
+      console.log(`   Volume (m³): ${volumeInM3}`);
+      console.log(`   Weight (kg): ${totalWeightInKg}`);
     });
 
     // Save first delivery to file for inspection
