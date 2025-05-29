@@ -72,21 +72,21 @@ export default function ConsignmentDetailModal({
                 <Package className="h-6 w-6 text-blue-600" />
                 <div>
                   <DialogTitle className="text-xl font-bold font-mono">
-                    {consignment.consignmentNumber || 'Unknown'}
+                    {consignment.orderNumberRef || consignment.consignmentNo || `${consignment.year}-${consignment.code}-${consignment.prog}` || 'Unknown'}
                   </DialogTitle>
                   <DialogDescription className="text-sm text-gray-600">
-                    {consignment.customerName || 'Unknown Customer'}
+                    {consignment.shipToCompanyName || 'Unknown Customer'}
                   </DialogDescription>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className={`px-3 py-1 ${getStatusColor(consignment.status)}`}>
-                {consignment.status || 'Unknown'}
+              <Badge className={`px-3 py-1 ${getStatusColor(consignment.deliveryState || consignment.pickupState)}`}>
+                {consignment.deliveryState || consignment.pickupState || 'In Transit'}
               </Badge>
-              <Badge variant="outline" className={getTempColor(consignment.temperatureZone)}>
+              <Badge variant="outline" className={getTempColor(consignment.expectedTemperature)}>
                 <Thermometer className="h-3 w-3 mr-1" />
-                {consignment.temperatureZone || 'Standard'}
+                {consignment.expectedTemperature || 'Standard'}
               </Badge>
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function ConsignmentDetailModal({
 
         <div className="p-6 space-y-6">
           {/* Live Tracking Link */}
-          {consignment.trackingLink && (
+          {consignment.deliveryLiveTrackLink && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export default function ConsignmentDetailModal({
                   </div>
                 </div>
                 <Button
-                  onClick={() => window.open(consignment.trackingLink || '', '_blank')}
+                  onClick={() => window.open(consignment.deliveryLiveTrackLink || '', '_blank')}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
@@ -125,10 +125,10 @@ export default function ConsignmentDetailModal({
               </div>
               <div className="space-y-2">
                 <div>
-                  <p className="text-xs text-gray-500">Estimated Delivery</p>
-                  <p className="text-sm font-medium">{formatDate(consignment.estimatedDeliveryDate)}</p>
+                  <p className="text-xs text-gray-500">Planned Delivery ETA</p>
+                  <p className="text-sm font-medium">{formatDate(consignment.delivery_PlannedETA)}</p>
                 </div>
-                {consignment.status === 'Delivered' && (
+                {consignment.deliveryState === 'Delivered' && (
                   <div className="flex items-center gap-1 text-green-600">
                     <CheckCircle className="h-3 w-3" />
                     <span className="text-xs">Delivered on time</span>
@@ -146,13 +146,13 @@ export default function ConsignmentDetailModal({
               <div className="space-y-2">
                 <div>
                   <p className="text-xs text-gray-500">Temperature Zone</p>
-                  <p className={`text-sm font-medium ${getTempColor(consignment.temperatureZone)}`}>
-                    {consignment.temperatureZone || 'Standard'}
+                  <p className={`text-sm font-medium ${getTempColor(consignment.expectedTemperature)}`}>
+                    {consignment.expectedTemperature || 'Standard'}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Current Status</p>
-                  <p className="text-sm font-medium">{consignment.status || 'Unknown'}</p>
+                  <p className="text-sm font-medium">{consignment.deliveryState || consignment.pickupState || 'In Transit'}</p>
                 </div>
               </div>
             </div>
