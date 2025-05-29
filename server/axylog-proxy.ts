@@ -67,7 +67,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log("=== Sent request payload ===");
     console.dir(requestBody, { depth: null });
 
-    const response = await axios.post('https://api.axylog.net/deliveries?v=2', requestBody, {
+    const response = await axios.post('https://api.axylog.com/Deliveries?v=2', requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
