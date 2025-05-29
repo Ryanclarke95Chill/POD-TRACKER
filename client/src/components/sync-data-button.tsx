@@ -12,7 +12,7 @@ export default function SyncDataButton() {
   const syncMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem('token');
-      const response = await fetch("/api/sync-axylog-now", {
+      const response = await fetch("/axylog-proxy/sync", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

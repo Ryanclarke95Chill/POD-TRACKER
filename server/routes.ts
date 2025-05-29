@@ -36,42 +36,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ensure API routes are registered BEFORE any catch-all handlers
   console.log("Registering API routes...");
 
-  // Emergency axylog sync route that bypasses routing issues
-  app.all("/axylog-sync", async (req: Request, res: Response) => {
-    console.log("=== EMERGENCY AXYLOG SYNC ===");
+  // Axylog API Proxy - bypasses Vite dev server completely
+  app.post("/axylog-proxy/sync", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== AXYLOG PROXY SYNC ===");
     res.setHeader('Content-Type', 'application/json');
     
     try {
-      // Direct test of axylog connection
-      const result = await axylogAPI.authenticate();
-      console.log("Axylog auth result:", result);
-      
-      if (result) {
-        const deliveries = await axylogAPI.getDeliveries("api.chill@axylog.com");
-        console.log(`Retrieved ${deliveries.length} deliveries from axylog`);
-        
-        res.json({
-          success: true,
-          authenticated: true,
-          deliveries: deliveries.length,
-          sample: deliveries.slice(0, 2),
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        res.json({
-          success: false,
-          authenticated: false,
-          error: "Failed to authenticate with axylog",
-          timestamp: new Date().toISOString()
-        });
+      if (!req.user?.email) {
+        return res.status(400).json({ success: false, message: "User email required" });
       }
-    } catch (error) {
-      console.error("Emergency sync error:", error);
+
+      // Direct axylog authentication and data fetch
+      const authResult = await axylogAPI.authenticate();
+      if (!authResult) {
+        return res.status(500).json({ success: false, message: "Axylog authentication failed" });
+      }
+
+      const deliveries = await axylogAPI.getDeliveries(req.user.email);
+      console.log(`Proxy retrieved ${deliveries.length} deliveries from axylog`);
+      
+      // Clear and insert consignments
+      await storage.clearUserConsignments(req.user.id);
+      
+      let inserted = 0;
+      for (const delivery of deliveries.slice(0, 10)) {
+        try {
+          await storage.createConsignment({
+            userId: req.user.id,
+            consignmentNumber: delivery.consignmentNumber || null,
+            customerName: delivery.customerName || null,
+            pickupAddress: delivery.pickupAddress || null,
+            deliveryAddress: delivery.deliveryAddress || null,
+            status: delivery.status || null,
+            estimatedDeliveryDate: delivery.estimatedDeliveryDate || null,
+            temperatureZone: delivery.temperatureZone || null,
+            lastKnownLocation: delivery.lastKnownLocation || null,
+            events: JSON.stringify(delivery.events || [])
+          });
+          inserted++;
+        } catch (insertError) {
+          console.error("Insert error:", insertError);
+        }
+      }
+      
       res.json({
-        success: false,
-        error: String(error),
-        timestamp: new Date().toISOString()
+        success: true,
+        message: "Sync completed via proxy",
+        synced: inserted,
+        total: deliveries.length
       });
+      
+    } catch (error) {
+      console.error("Proxy sync error:", error);
+      res.status(500).json({ success: false, error: String(error) });
     }
   });
 
