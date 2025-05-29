@@ -190,14 +190,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'To': 'destination',
         'Carrier': 'carrier',
         'Driver': 'driver',
-        'Customer order number': 'customer_order_number',
-        'Shipper': 'shipper',
-        
-        // Critical dashboard field mappings
-        'Delivery Livetrack link': 'pickup_livetrack_link', // For tracking link button
-        'Customer order number': 'consignment_reference', // For reference column
+        // Map Excel columns to dashboard display fields (avoid duplicates)
+        'Customer order number': 'consignment_reference', // For reference column  
         'Shipper': 'customer_name', // For customer name column
+        'Delivery Livetrack link': 'pickup_livetrack_link', // For tracking link button
         'Pickup planned ETA': 'estimated_delivery_date', // For ETA column
+        'Pickup outcome reason': 'status', // For status column
         'Weight [kg]': 'weight_kg',
         'document_string2': 'document_string2',
         'Delivery last position': 'delivery_last_position',
