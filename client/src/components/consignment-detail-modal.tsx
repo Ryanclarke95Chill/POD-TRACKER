@@ -132,76 +132,76 @@ export default function ConsignmentDetailModal({
 
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-3 gap-3">
-            {/* ETA Comparison */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="h-4 w-4 text-orange-600" />
-                <h4 className="text-sm font-semibold text-gray-700">ETA Status</h4>
+            {/* ETA Status */}
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-3 w-3 text-orange-600 flex-shrink-0" />
+                <h4 className="text-xs font-semibold text-orange-800">ETA Status</h4>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div>
-                  <p className="text-xs text-gray-500">Planned Delivery ETA</p>
-                  <p className="text-sm font-medium">{formatDate(consignment.delivery_PlannedETA)}</p>
+                  <p className="text-xs text-orange-600">Planned Delivery ETA</p>
+                  <p className="text-xs font-medium text-orange-800 break-words">{formatDate(consignment.delivery_PlannedETA) || 'Not available'}</p>
                 </div>
                 {consignment.deliveryState === 'Delivered' && (
                   <div className="flex items-center gap-1 text-green-600">
-                    <CheckCircle className="h-3 w-3" />
+                    <CheckCircle className="h-3 w-3 flex-shrink-0" />
                     <span className="text-xs">Delivered on time</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Package Information */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="h-4 w-4 text-purple-600" />
-                <h4 className="text-sm font-semibold text-gray-700">Package Details</h4>
+            {/* Package Details */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-3 w-3 text-purple-600 flex-shrink-0" />
+                <h4 className="text-xs font-semibold text-purple-800">Package Details</h4>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div>
-                  <p className="text-xs text-gray-500">Temperature Zone</p>
-                  <p className={`text-sm font-medium ${getTempColor(consignment.expectedTemperature)}`}>
+                  <p className="text-xs text-purple-600">Temperature Zone</p>
+                  <p className="text-xs font-medium text-purple-800">
                     {consignment.expectedTemperature || 'Standard'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Current Status</p>
-                  <p className="text-sm font-medium">{consignment.deliveryState || consignment.pickupState || 'In Transit'}</p>
+                  <p className="text-xs text-purple-600">Status</p>
+                  <p className="text-xs font-medium text-purple-800 break-words">{consignment.deliveryState || consignment.pickupState || 'In Transit'}</p>
                 </div>
               </div>
             </div>
 
             {/* Location Information */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-green-600" />
-                  <h4 className="text-sm font-semibold text-gray-700">Location</h4>
+            <div className="bg-white border border-gray-200 rounded-lg p-3 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-3 w-3 text-green-600 flex-shrink-0" />
+                  <h4 className="text-xs font-semibold text-gray-700">Location</h4>
                 </div>
                 {currentCoords && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowMap(!showMap)}
-                    className="text-gray-700 border-gray-300 hover:bg-gray-100"
+                    className="text-gray-700 border-gray-300 hover:bg-gray-100 text-xs px-2 py-1 h-6 flex-shrink-0"
                   >
-                    <Map className="h-3 w-3 mr-1" />
-                    {showMap ? 'Hide Map' : 'Show Map'}
+                    <Map className="h-2 w-2 mr-1" />
+                    {showMap ? 'Hide' : 'Map'}
                   </Button>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1 min-w-0">
                 <div>
                   <p className="text-xs text-gray-500">Last Known Location</p>
-                  <p className="text-sm font-medium">
+                  <p className="text-xs font-medium break-all">
                     {consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon ? 
                       `GPS: ${consignment.delivery_LastPositionLatLon || consignment.pickUp_LastPositionLatLon || consignment.lastPositionLatLon}` : 
                       'In transit'
                     }
                   </p>
                   {(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime) && (
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-400 truncate">
                       Last updated: {formatDate(consignment.delivery_LastPositionDateTime || consignment.pickUp_LastPositionDateTime || consignment.lastPositionDateTime)}
                     </p>
                   )}
