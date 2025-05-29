@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
+import SyncDataButton from "@/components/sync-data-button";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
 import { Consignment, temperatureZones } from "@shared/schema";
@@ -163,6 +164,9 @@ export default function Dashboard() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Consignment Overview</h2>
             <p className="text-gray-600 mt-1">Monitor and track your temperature-controlled shipments</p>
+          </div>
+          <div className="flex gap-2">
+            <SyncDataButton />
           </div>
         </div>
         

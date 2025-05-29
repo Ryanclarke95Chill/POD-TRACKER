@@ -164,14 +164,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Insert new consignments from axylog
       const insertedConsignments = [];
       for (const consignment of axylogConsignments) {
-        const insertData = {
-          ...consignment,
+        const { id, ...insertData } = consignment;
+        const finalData = {
+          ...insertData,
           userId: req.user.id,
           events: JSON.stringify(consignment.events || [])
         };
-        delete insertData.id; // Remove id so database can auto-generate it
         
-        const inserted = await storage.createConsignment(insertData);
+        const inserted = await storage.createConsignment(finalData);
         insertedConsignments.push(inserted);
       }
 
