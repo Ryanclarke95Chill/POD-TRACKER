@@ -151,16 +151,33 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Make request to get deliveries
-      const response = await axios.post(DELIVERIES_URL, {
+      // Make request to get deliveries - enhanced to match your Postman collection
+      const response = await axios.post(`${DELIVERIES_URL}?v=2`, {
         pagination: {
           skip: 0,
           pageSize: 100
         },
         filters: {
+          type: "",
+          tripNumber: [],
+          plateNumber: [],
+          documentNumber: [],
           pickUp_Delivery_From: filters.pickupDateFrom,
           pickUp_Delivery_To: filters.pickupDateTo,
-          // Add any other Axylog specific filters here
+          states: {
+            posOutcome: false,
+            negOutcome: false,
+            notDelOutcome: false,
+            waitingForOutcome: null,
+            inAdvance: false,
+            ot: false,
+            notOt: false,
+            deliveryLoading: false,
+            deliveryUnloading_PickupLoading: false,
+            travel: false,
+            delivery_Pickup_Complete: false,
+            unknown: false
+          }
         }
       }, {
         headers: {
@@ -215,16 +232,20 @@ export class AxylogAPI {
       return [];
     }
 
-    // Filter by delivery email matching user email
-    return deliveries
-      .filter(delivery => delivery.deliveryAddress.email.toLowerCase() === userEmail.toLowerCase())
-      .map((delivery, index) => {
+    console.log("=== CONVERTING AXYLOG DATA TO FULL PAYLOAD ===");
+    console.log(`Processing ${deliveries.length} deliveries from axylog`);
+
+    // Return all deliveries without email filtering to get all data
+    return deliveries.map((delivery, index) => {
+        console.log(`Converting delivery ${index + 1}: ${delivery.consignmentNo || 'Unknown'}`);
+        
         // Map status from Axylog to our status types
         const statusMap: Record<string, string> = {
           "In Transit": "In Transit",
           "Delivered": "Delivered",
           "Created": "Awaiting Pickup",
           "Picked Up": "In Transit",
+          "Back to depot": "Delivered",
           // Add more status mappings as needed
         };
 
@@ -254,23 +275,93 @@ export class AxylogAPI {
           type: event.type
         }));
 
-        // Convert to our Consignment format
+        // Convert to comprehensive Consignment format with all available fields
         return {
+          // Core identifiers
           id: index + 1,
-          consignmentNumber: delivery.consignmentNo,
           userId: 1, // This will be replaced with the actual user ID
-          customerName: delivery.receiverCompanyName,
-          pickupAddress: delivery.pickUpAddress.city,
-          deliveryAddress: delivery.deliveryAddress.city,
-          status: statusMap[delivery.status] || "In Transit",
-          estimatedDeliveryDate: new Date(delivery.estimatedDeliveryDate).toLocaleDateString('en-AU', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          }),
-          temperatureZone: tempZoneMap[delivery.temperatureZone] || "Dry",
-          lastKnownLocation: delivery.lastKnownLocation,
-          events: events
+          consignmentNumber: delivery.consignmentNo || null,
+          
+          // Customer and address information
+          customerName: delivery.receiverCompanyName || null,
+          consignmentReference: delivery.customerReference || null,
+          trackingLink: delivery.pickupLivetrackLink || null,
+          pickupAddress: delivery.pickUpAddress?.city || delivery.fromAddress || null,
+          deliveryAddress: delivery.deliveryAddress?.city || delivery.toAddress || null,
+          
+          // Status and timing
+          status: statusMap[delivery.status] || delivery.status || "Unknown",
+          estimatedDeliveryDate: delivery.estimatedDeliveryDate || null,
+          deliveryDate: delivery.deliveryDate || null,
+          dateDelivered: delivery.deliveryOutcomeDate || null,
+          consignmentRequiredDeliveryDate: delivery.deliveryMaximumDate || null,
+          
+          // Temperature and logistics
+          temperatureZone: tempZoneMap[delivery.temperatureZone] || delivery.temperatureZone || null,
+          lastKnownLocation: delivery.lastKnownLocation || delivery.deliveryLastPosition || null,
+          
+          // Operational details
+          deliveryRun: delivery.tripNumber || null,
+          quantity: delivery.quantity || null,
+          pallets: delivery.pallets || null,
+          spaces: delivery.spaces || null,
+          cubicMeters: delivery.volumeM3 || null,
+          weightKg: delivery.weightKg || null,
+          
+          // Party information
+          shipper: delivery.shipper || delivery.shipperCompanyName || null,
+          receiver: delivery.receiver || delivery.receiverCompanyName || null,
+          driver: delivery.driver || null,
+          vehicle: delivery.vehicle || delivery.vehicleDescription || null,
+          
+          // Geographic details
+          origin: delivery.origin || delivery.pickUpAddress?.city || null,
+          destination: delivery.destination || delivery.deliveryAddress?.city || null,
+          originPostalCode: delivery.fromPostalCode || null,
+          originCountry: delivery.fromCountry || null,
+          originMasterDataCode: delivery.fromMasterDataCode || null,
+          destinationPostalCode: delivery.toPostalCode || null,
+          destinationCountry: delivery.toCountry || null,
+          
+          // Timing details
+          deliveryTime: delivery.deliveryTime || null,
+          pickupTime: delivery.pickupTime || null,
+          
+          // Classification
+          consignmentType: delivery.consignmentType || null,
+          priority: delivery.priority || null,
+          deliveryZone: delivery.deliveryZone || null,
+          pickupZone: delivery.pickupZone || null,
+          
+          // Additional information
+          notes: delivery.notes || delivery.documentNote || null,
+          customerReference: delivery.customerReference || delivery.shipperOrderReferenceNumber || null,
+          invoiceNumber: delivery.invoiceNumber || null,
+          
+          // Proof of delivery
+          podSignature: delivery.podSignature || null,
+          deliveryProof: delivery.deliveryProof || null,
+          
+          // Vehicle information
+          vehicleCode: delivery.vehicleCode || null,
+          
+          // Performance metrics
+          deliveryEtaDeviation: delivery.deliveryEtaDeviation || null,
+          requiredTags: delivery.requiredTags || null,
+          receivedDeliveryPodFiles: delivery.receivedDeliveryPodFiles || null,
+          
+          // Contact information
+          orderCarrierEmail: delivery.orderCarrierEmail || null,
+          
+          // Route details
+          tripNumber: delivery.tripNumber || null,
+          orderNumber: delivery.orderNumber || null,
+          from: delivery.from || null,
+          to: delivery.to || null,
+          carrier: delivery.carrier || null,
+          
+          // Events data
+          events: JSON.stringify(events)
         };
       });
   }
