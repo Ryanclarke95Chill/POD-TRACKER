@@ -74,14 +74,14 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     console.log('=== AXYLOG DELIVERIES RESPONSE ===');
     console.log('Status:', response.status);
     console.log('Response keys:', Object.keys(response.data || {}));
+    console.log('ItemList array length:', response.data?.itemList?.length);
     console.log('Data array length:', response.data?.data?.length);
     console.log('Deliveries array length:', response.data?.deliveries?.length);
-    console.log('Response.data.data type:', Array.isArray(response.data?.data));
-    console.log(`Retrieved ${response.data?.data?.length || 0} deliveries from axylog`);
+    console.log(`Retrieved ${response.data?.itemList?.length || 0} deliveries from axylog`);
 
     res.json({
       success: true,
-      deliveries: response.data.data || []
+      deliveries: response.data.itemList || []
     });
 
   } catch (error) {
