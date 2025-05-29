@@ -21,8 +21,6 @@ export default function ConsignmentDetailModal({
   onClose,
 }: ConsignmentDetailModalProps) {
   const [showMap, setShowMap] = useState(false);
-  const [locationName, setLocationName] = useState<string>('');
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   // Parse events from JSON string if needed
   const events = typeof consignment.events === 'string' 
@@ -40,35 +38,49 @@ export default function ConsignmentDetailModal({
   const deliveryCoords = parseCoordinates(consignment.shipToLatLon);
   const currentCoords = parseCoordinates(consignment.delivery_LastPositionLatLon);
 
-  // Reverse geocoding function
-  const getLocationName = async (lat: number, lon: number) => {
-    try {
-      setIsLoadingLocation(true);
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`
-      );
-      const data = await response.json();
+  // Simple location formatting using existing address data
+  const getLocationDisplay = () => {
+    // Use delivery city and state if available
+    if (consignment.shipToCity && consignment.shipToZipCode) {
+      const cityParts = consignment.shipToCity.split(' ');
+      const mainCity = cityParts[0]; // Take the first word as the main city
+      const state = consignment.shipToZipCode.includes('NSW') ? 'NSW' : 
+                   consignment.shipToZipCode.includes('VIC') ? 'VIC' :
+                   consignment.shipToZipCode.includes('QLD') ? 'QLD' :
+                   consignment.shipToZipCode.includes('WA') ? 'WA' : '';
       
-      if (data && data.address) {
-        const { suburb, city, town, village, state, postcode } = data.address;
-        const locationParts = [suburb, city || town || village, state].filter(Boolean);
-        return locationParts.join(', ') || 'Unknown location';
+      if (state) {
+        return `Near ${mainCity}, ${state}`;
       }
-      return 'Unknown location';
-    } catch (error) {
-      console.error('Reverse geocoding failed:', error);
-      return 'Location unavailable';
-    } finally {
-      setIsLoadingLocation(false);
+      return `Near ${mainCity}`;
     }
-  };
-
-  // Fetch location name when coordinates are available
-  useEffect(() => {
+    
+    // Fallback to basic coordinate-based area if we have coords but no address
     if (currentCoords) {
-      getLocationName(currentCoords.lat, currentCoords.lon).then(setLocationName);
+      const { lat, lon } = currentCoords;
+      
+      // Basic Sydney area detection
+      if (lat >= -34.0 && lat <= -33.4 && lon >= 150.5 && lon <= 151.5) {
+        return 'Sydney Metro Area';
+      }
+      // Basic Melbourne area detection
+      if (lat >= -38.0 && lat <= -37.4 && lon >= 144.5 && lon <= 145.5) {
+        return 'Melbourne Metro Area';
+      }
+      // Basic Brisbane area detection
+      if (lat >= -27.8 && lat <= -27.0 && lon >= 152.5 && lon <= 153.5) {
+        return 'Brisbane Metro Area';
+      }
+      // Basic Perth area detection
+      if (lat >= -32.2 && lat <= -31.6 && lon >= 115.5 && lon <= 116.2) {
+        return 'Perth Metro Area';
+      }
+      
+      return 'In transit';
     }
-  }, [currentCoords]);
+    
+    return 'In transit';
+  };
 
   // Format date helper
   const formatDate = (dateString: string | null) => {

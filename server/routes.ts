@@ -352,6 +352,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reverse geocoding endpoint
+  app.get("/api/geocode/:lat/:lon", async (req: Request, res: Response) => {
+    try {
+      const { lat, lon } = req.params;
+      
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'ChillTrack/1.0'
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const { suburb, city, town, village, state, postcode } = data.address;
+        const locationParts = [suburb, city || town || village, state].filter(Boolean);
+        const locationName = locationParts.join(', ') || 'Unknown location';
+        
+        res.json({ location: locationName });
+      } else {
+        res.json({ location: 'Unknown location' });
+      }
+    } catch (error: any) {
+      console.error('Reverse geocoding failed:', error);
+      res.status(500).json({ location: 'Location unavailable' });
+    }
+  });
+
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
       console.log("=== CONSIGNMENTS ENDPOINT DEBUG ===");
