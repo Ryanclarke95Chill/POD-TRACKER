@@ -95,7 +95,8 @@ export class AxylogAPI {
   // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Consignment[]> {
     try {
-      // Prepare date range for last 6 months to future 6 months
+      // Use the date format that matches your Postman collection: YYYY-MM-DD
+      const today = new Date();
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
@@ -103,11 +104,12 @@ export class AxylogAPI {
       sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
 
       const filters = {
-        pickupDateFrom: sixMonthsAgo.toISOString(),
-        pickupDateTo: sixMonthsAhead.toISOString(),
+        pickupDateFrom: sixMonthsAgo.toISOString().split('T')[0], // YYYY-MM-DD format
+        pickupDateTo: sixMonthsAhead.toISOString().split('T')[0],  // YYYY-MM-DD format
         deliveryEmail: userEmail
       };
 
+      console.log("Using date filters:", filters);
       return this.getConsignmentsWithFilters(filters);
     } catch (error) {
       console.error("Failed to get deliveries from Axylog API:", error);
@@ -138,26 +140,8 @@ export class AxylogAPI {
           pageSize: 100
         },
         filters: {
-          type: "",
-          tripNumber: [],
-          plateNumber: [],
-          documentNumber: [],
           pickUp_Delivery_From: filters.pickupDateFrom,
-          pickUp_Delivery_To: filters.pickupDateTo,
-          states: {
-            posOutcome: false,
-            negOutcome: false,
-            notDelOutcome: false,
-            waitingForOutcome: null,
-            inAdvance: false,
-            ot: false,
-            notOt: false,
-            deliveryLoading: false,
-            deliveryUnloading_PickupLoading: false,
-            travel: false,
-            delivery_Pickup_Complete: false,
-            unknown: false
-          }
+          pickUp_Delivery_To: filters.pickupDateTo
         }
       }, {
         headers: {
