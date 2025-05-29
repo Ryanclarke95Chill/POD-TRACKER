@@ -66,7 +66,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         departureDate_To: '2025-05-29',
         includeCargo: true,
         gridHeaderFilters: {
-          shipToCompanyName: "Chill"
+          shipFromMasterDataCode: "NSW_5"
         }
       }
     };
