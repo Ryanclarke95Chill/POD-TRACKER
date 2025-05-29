@@ -95,19 +95,16 @@ export class AxylogAPI {
   // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Consignment[]> {
     try {
-      // Use broader date range that worked before - last 30 days to future 30 days
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const thirtyDaysAhead = new Date();
-      thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
+      // Get only today's deliveries
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
 
       const filters = {
-        pickupDateFrom: thirtyDaysAgo.toISOString().split('T')[0],
-        pickupDateTo: thirtyDaysAhead.toISOString().split('T')[0]
+        pickupDateFrom: todayString,
+        pickupDateTo: todayString
       };
 
-      console.log("Using date filters:", filters);
+      console.log("Using today's date filters:", filters);
       return this.getConsignmentsWithFilters(filters);
     } catch (error) {
       console.error("Failed to get deliveries from Axylog API:", error);
