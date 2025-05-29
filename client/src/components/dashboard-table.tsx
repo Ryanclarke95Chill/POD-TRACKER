@@ -16,8 +16,8 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     { key: 'shipperCompanyName', label: 'Customer Name' },
     { key: 'shipFromCity', label: 'Pickup From' },
     { key: 'shipToCity', label: 'Deliver To' },
-    { key: 'status', label: 'Status' },
-    { key: 'temperatureZone', label: 'Temperature Zone' },
+    { key: 'pallets', label: 'Pallets' },
+    { key: 'quantity', label: 'Cartons' },
     { key: 'estimatedDeliveryDate', label: 'ETA' }
   ]);
 
