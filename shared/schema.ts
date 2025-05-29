@@ -167,6 +167,7 @@ export const consignments = pgTable("consignments", {
   orderDate: text("order_date"),
   orderType: text("order_type"),
   orderSeries: text("order_series"),
+  orderNumberRef: text("order_number_ref"),
   shipperOrderReferenceNumber: text("shipper_order_reference_number"),
   externalReference: text("external_reference"),
   expectedPaymentMethod: text("expected_payment_method"),

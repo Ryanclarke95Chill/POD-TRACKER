@@ -461,6 +461,7 @@ export class AxylogAPI {
           orderDate: delivery.orderDate || null,
           orderType: delivery.orderType || null,
           orderSeries: delivery.orderSeries || null,
+          orderNumberRef: delivery.orderNumberRef || null,
           shipperOrderReferenceNumber: delivery.shipperOrderReferenceNumber || null,
           externalReference: delivery.externalReference || null,
           expectedPaymentMethod: delivery.expectedPaymentMethod || null,
