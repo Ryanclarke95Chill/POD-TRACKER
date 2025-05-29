@@ -11,7 +11,19 @@ export default function SyncDataButton() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/consignments/sync", "POST");
+      const token = localStorage.getItem('token');
+      const response = await fetch("/api/consignments/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       return response.json();
     },
     onSuccess: (data) => {

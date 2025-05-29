@@ -138,6 +138,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test endpoint to verify axylog connection
+  app.post("/api/test-axylog", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      console.log("=== TESTING AXYLOG CONNECTION ===");
+      
+      // Test authentication
+      const authSuccess = await axylogAPI.authenticate();
+      console.log("Axylog authentication result:", authSuccess);
+      
+      if (!authSuccess) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to authenticate with axylog API. Please check your credentials." 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Successfully authenticated with axylog API",
+        credentials: "Connected"
+      });
+    } catch (error) {
+      console.error("Axylog test error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error testing axylog connection",
+        error: error.message 
+      });
+    }
+  });
+
   // New endpoint to sync data from axylog
   app.post("/api/consignments/sync", authenticate, async (req: AuthRequest, res: Response) => {
     try {
