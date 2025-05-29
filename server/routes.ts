@@ -33,6 +33,12 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
+  // Add immediate debug route to test routing
+  app.all("/api/test-routing", (req: Request, res: Response) => {
+    console.log("TEST ROUTING ENDPOINT HIT!");
+    res.json({ message: "Routing working", method: req.method, path: req.path });
+  });
+
   app.post("/api/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
@@ -171,12 +177,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // New endpoint to sync data from axylog
   app.post("/api/consignments/sync", authenticate, async (req: AuthRequest, res: Response) => {
-    try {
-      console.log("=== AXYLOG SYNC ENDPOINT ===");
-      console.log("Syncing axylog data for user:", req.user?.email);
-      
-      // Force JSON response header
-      res.setHeader('Content-Type', 'application/json');
+    console.log("=== AXYLOG SYNC ENDPOINT HIT ===");
+    
+    // Immediately return a response to prevent timeout/routing issues
+    res.json({ 
+      message: "Sync endpoint reached successfully", 
+      user: req.user?.email,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Process axylog sync in background
+    setTimeout(async () => {
+      try {
+        console.log("Starting background axylog sync for user:", req.user?.email);
       
       if (!req.user?.email) {
         return res.status(400).json({ message: "User email not found" });
