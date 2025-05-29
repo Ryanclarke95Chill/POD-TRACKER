@@ -52,23 +52,17 @@ export default function Dashboard() {
 
   // Helper function to map status labels
   const getStatusDisplay = (consignment: Consignment) => {
-    const deliveryOutcomeEnum = (consignment as any).delivery_OutcomeEnum;
-    const pickupOutcomeEnum = (consignment as any).pickUp_OutcomeEnum;
-    const deliveryOutcomeReason = (consignment as any).delivery_OutcomePODReason;
-    const deliveryPositionType = (consignment as any).delivery_LastPositionType;
-    const pickupPositionType = (consignment as any).pickUp_LastPositionType;
+    const deliveryStateLabel = (consignment as any).delivery_StateLabel;
+    const pickupStateLabel = (consignment as any).pickUp_StateLabel;
     
     const mapStatus = (status: string | null) => {
       if (!status) return null;
-      if (status === 'Traveling' || status === 'App_Traveling') return 'In Transit';
+      if (status === 'Traveling') return 'In Transit';
       if (status === 'Positive Outcome') return 'Delivered';
-      if (status.includes('On Time') || status.includes('Completed')) return 'Delivered';
       return status; // Return exact value for anything else
     };
     
-    return mapStatus(deliveryOutcomeEnum) || mapStatus(pickupOutcomeEnum) || 
-           mapStatus(deliveryOutcomeReason) || mapStatus(deliveryPositionType) || 
-           mapStatus(pickupPositionType) || 'In Transit';
+    return mapStatus(deliveryStateLabel) || mapStatus(pickupStateLabel) || 'In Transit';
   };
 
   // Filter consignments based on search term, temperature zone, and warehouse company
