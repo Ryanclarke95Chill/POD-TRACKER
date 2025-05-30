@@ -589,7 +589,7 @@ export default function Analytics() {
     const customerStats = data.reduce((acc, c) => {
       const customer = (c as any).shipperCompanyName || c.warehouseCompanyName || 'Unknown';
       if (!acc[customer]) {
-        acc[customer] = { total: 0, delivered: 0 };
+        acc[customer] = { total: 0, completed: 0 };
       }
       acc[customer].total++;
       if (getStatusDisplay(c) === "Completed") {
@@ -607,7 +607,7 @@ export default function Analytics() {
       if (!acc[driverName]) {
         acc[driverName] = { 
           total: 0, 
-          delivered: 0, 
+          completed: 0, 
           inTransit: 0, 
           driverId: driverId,
           vehicle: vehicleCode
@@ -615,8 +615,8 @@ export default function Analytics() {
       }
       acc[driverName].total++;
       const status = getStatusDisplay(c);
-      if (status === "Delivered") {
-        acc[driverName].delivered++;
+      if (status === "Completed") {
+        acc[driverName].completed++;
       } else if (status === "In Transit") {
         acc[driverName].inTransit++;
       }
@@ -627,11 +627,11 @@ export default function Analytics() {
     const tempZoneStats = data.reduce((acc, c) => {
       const tempZone = c.documentNote?.split('\\')[0] || c.expectedTemperature || 'Standard';
       if (!acc[tempZone]) {
-        acc[tempZone] = { total: 0, delivered: 0 };
+        acc[tempZone] = { total: 0, completed: 0 };
       }
       acc[tempZone].total++;
-      if (getStatusDisplay(c) === "Delivered") {
-        acc[tempZone].delivered++;
+      if (getStatusDisplay(c) === "Completed") {
+        acc[tempZone].completed++;
       }
       return acc;
     }, {} as Record<string, any>);
@@ -835,7 +835,7 @@ export default function Analytics() {
                       <div className="text-right">
                         <div className="text-sm font-medium">{(stats as any).total}</div>
                         <div className="text-xs text-muted-foreground">
-                          {(stats as any).delivered} delivered, {(stats as any).inTransit} active
+                          {(stats as any).completed} completed, {(stats as any).inTransit} active
                         </div>
                       </div>
                     </button>
