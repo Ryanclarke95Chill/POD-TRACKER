@@ -290,6 +290,31 @@ export class DatabaseStorage implements IStorage {
     
     return adminUser;
   }
+
+  async createSampleUsers(): Promise<void> {
+    const roles = [
+      { username: 'manager', password: 'manager123', name: 'Fleet Manager', role: 'manager', department: 'Operations' },
+      { username: 'supervisor', password: 'super123', name: 'Depot Supervisor', role: 'supervisor', department: 'Sydney Depot' },
+      { username: 'driver', password: 'driver123', name: 'John Driver', role: 'driver', department: 'Sydney Depot' },
+      { username: 'viewer', password: 'viewer123', name: 'Analytics Viewer', role: 'viewer', department: 'Management' }
+    ];
+
+    for (const roleData of roles) {
+      const existingUser = await this.getUserByUsername(roleData.username);
+      if (!existingUser) {
+        const hashedPassword = await bcrypt.hash(roleData.password, 10);
+        await db.insert(users).values({
+          username: roleData.username,
+          password: hashedPassword,
+          email: `${roleData.username}@chilltrack.com`,
+          name: roleData.name,
+          role: roleData.role,
+          department: roleData.department,
+          isActive: true,
+        });
+      }
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

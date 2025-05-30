@@ -111,7 +111,7 @@ export default function Login() {
               </Button>
 
               <div className="text-center text-sm text-neutral-500 space-y-3">
-                <div className="flex gap-2 justify-center">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -122,7 +122,7 @@ export default function Login() {
                     }}
                     className="text-xs"
                   >
-                    Login as Demo
+                    Demo User
                   </Button>
                   <Button
                     type="button"
@@ -134,26 +134,66 @@ export default function Login() {
                     }}
                     className="text-xs"
                   >
-                    Login as Admin
+                    Admin
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "manager");
+                      form.setValue("password", "manager123");
+                    }}
+                    className="text-xs"
+                  >
+                    Manager
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "supervisor");
+                      form.setValue("password", "super123");
+                    }}
+                    className="text-xs"
+                  >
+                    Supervisor
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "driver");
+                      form.setValue("password", "driver123");
+                    }}
+                    className="text-xs"
+                  >
+                    Driver
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "viewer");
+                      form.setValue("password", "viewer123");
+                    }}
+                    className="text-xs"
+                  >
+                    Viewer
                   </Button>
                 </div>
                 
-                <div className="text-xs text-neutral-400">
-                  <div className="grid grid-cols-2 gap-2 text-left">
-                    <div>
-                      <strong>Admin:</strong> Full system control, user management
-                    </div>
-                    <div>
-                      <strong>Manager:</strong> All analytics, driver management
-                    </div>
-                    <div>
-                      <strong>Supervisor:</strong> Department analytics only
-                    </div>
-                    <div>
-                      <strong>Driver:</strong> Own deliveries only
-                    </div>
+                <div className="text-xs text-neutral-400 text-left">
+                  <div className="space-y-1">
+                    <div><strong>Admin:</strong> Full system control, user management</div>
+                    <div><strong>Manager:</strong> All analytics, driver management</div>
+                    <div><strong>Supervisor:</strong> Department analytics only</div>
+                    <div><strong>Driver:</strong> Own deliveries only</div>
+                    <div><strong>Viewer:</strong> Read-only analytics access</div>
                   </div>
-                  <p className="mt-2 text-center"><strong>Viewer:</strong> Read-only analytics access</p>
                 </div>
               </div>
             </form>

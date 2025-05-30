@@ -46,12 +46,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log("Registering API routes...");
   
-  // Create admin user on startup
+  // Create admin user and sample users on startup
   try {
     const adminUser = await storage.createAdminUser();
-    console.log("Admin user ready:", adminUser.username);
+    await storage.createSampleUsers();
+    console.log("Admin user and sample users ready:", adminUser.username);
   } catch (error) {
-    console.error("Error creating admin user:", error);
+    console.error("Error creating users:", error);
   }
 
   // Login endpoint
