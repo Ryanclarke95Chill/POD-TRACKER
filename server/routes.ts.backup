@@ -87,6 +87,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/login", async (req: Request, res: Response) => {
+            documentDate3: null,
+            documentString1: null,
+            documentString3: null,
+            timeSpentInTheLoadingArea: null,
             deliveryOutcomeInArea: null,
             pickupOutcomeInArea: null,
             deliveryOutcomePosition: null,

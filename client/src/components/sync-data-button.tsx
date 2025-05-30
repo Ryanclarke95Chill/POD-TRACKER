@@ -29,24 +29,19 @@ export default function SyncDataButton() {
         // Get base URL for the current environment
         const baseUrl = window.location.origin;
         
-        // Step 1: Authenticate with axylog
-        const authResponse = await fetch(`${baseUrl}/axylog-proxy/auth`, {
-          method: "POST",
+        // Direct axylog sync (removed proxy for better performance)
+        const response = await apiRequest('/api/axylog-sync', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json"
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            syncFromDate,
+            syncToDate
+          })
         });
         
-        if (!authResponse.ok) {
-          throw new Error(`Auth failed: ${authResponse.status}`);
-        }
-        
-        const authData = await authResponse.json();
-        if (!authData.success) {
-          throw new Error('Axylog authentication failed');
-        }
-        
-        console.log('Axylog authentication successful');
+        console.log(`Retrieved ${response.consignments} deliveries from axylog`);
         
         // Step 2: Fetch deliveries using auth credentials
         const deliveriesResponse = await fetch(`${baseUrl}/axylog-proxy/deliveries`, {
