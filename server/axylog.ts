@@ -136,7 +136,7 @@ export class AxylogAPI {
       
       console.log(`Requesting data from ${fromDate} to ${toDate}`);
 
-      // Make request using exact working Postman structure
+      // Make request using exact working Postman structure (without ETA filters initially)
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
@@ -145,9 +145,7 @@ export class AxylogAPI {
         filters: {
           type: "",
           departureDate_From: fromDate,
-          departureDate_To: toDate,
-          delivery_EtaCalculated: true,
-          pickUp_EtaCalculated: true
+          departureDate_To: toDate
         }
       }, {
         headers: {
