@@ -458,7 +458,9 @@ export default function Analytics() {
         <Card>
           <CardHeader>
             <CardTitle>Driver Performance Analysis</CardTitle>
-            <CardDescription>Detailed breakdown by driver efficiency and workload</CardDescription>
+            <CardDescription>
+              Shows each driver's delivery statistics: completed deliveries, active shipments, and success rate (percentage of total deliveries completed)
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -480,13 +482,13 @@ export default function Analytics() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="text-green-600">
-                      Delivered: {(stats as any).delivered}
+                      Completed: {(stats as any).delivered}
                     </div>
                     <div className="text-blue-600">
-                      In Transit: {(stats as any).inTransit}
+                      Active: {(stats as any).inTransit}
                     </div>
                     <div className="text-amber-600">
-                      Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%
+                      Success Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
