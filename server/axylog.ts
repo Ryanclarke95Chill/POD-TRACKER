@@ -227,7 +227,10 @@ export class AxylogAPI {
         );
         
         if (isChillToChillTransfer) {
-          console.log(`Filtering auto-generated consignment: ${delivery.shipFromCompanyName} → ${delivery.shipToCompanyName}`);
+          console.log(`=== FILTERING CHILL-TO-CHILL TRANSFER ===`);
+          console.log(`From: ${delivery.shipFromCompanyName} → To: ${delivery.shipToCompanyName}`);
+          console.log(`Full payload:`, JSON.stringify(delivery, null, 2));
+          console.log(`=== END FILTERED CONSIGNMENT ===`);
         }
         
         return !isChillToChillTransfer;
