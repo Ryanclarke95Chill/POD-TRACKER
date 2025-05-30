@@ -38,9 +38,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
 
 
-  // Axylog API Proxy - bypasses Vite dev server completely
-  app.post("/axylog-proxy/sync", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== AXYLOG PROXY SYNC ===");
+  // Direct Axylog integration - removed proxy for better performance
+  app.post("/api/axylog-sync", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== DIRECT AXYLOG SYNC ===");
     res.setHeader('Content-Type', 'application/json');
     
     try {
@@ -54,114 +54,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ success: false, message: "Axylog authentication failed" });
       }
 
-      const deliveries = await axylogAPI.getDeliveries(req.user.email);
-      console.log(`Proxy retrieved ${deliveries.length} deliveries from axylog`);
+      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
+      console.log(`Direct sync retrieved ${axylogConsignments.length} deliveries from axylog`);
       
-      // Clear and insert consignments
+      // Clear and insert consignments using batch operation for better performance
       await storage.clearUserConsignments(req.user.id);
       
-      let inserted = 0;
-      for (const delivery of deliveries) {
-        try {
-          await storage.createConsignment({
-            userId: req.user.id,
-            consignmentNumber: delivery.consignmentNumber || null,
-            customerName: delivery.customerName || null,
-            consignmentReference: null,
-            trackingLink: null,
-            pickupAddress: delivery.pickupAddress || null,
-            deliveryAddress: delivery.deliveryAddress || null,
-            status: delivery.status || null,
-            estimatedDeliveryDate: delivery.estimatedDeliveryDate || null,
-            deliveryDate: null,
-            dateDelivered: null,
-            consignmentRequiredDeliveryDate: null,
-            temperatureZone: delivery.temperatureZone || null,
-            lastKnownLocation: delivery.lastKnownLocation || null,
-            deliveryRun: null,
-            quantity: null,
-            pallets: null,
-            spaces: null,
-            cubicMeters: null,
-            weightKg: null,
-            shipper: null,
-            receiver: null,
-            pickupCompany: null,
-            deliveryCompany: null,
-            pickupContactName: null,
-            deliveryContactName: null,
-            pickupContactPhone: null,
-            deliveryContactPhone: null,
-            specialInstructions: null,
-            productDescription: null,
-            deliveryInstructions: null,
-            pickupInstructions: null,
-            deliveryLivetrackLink: null,
-            customerOrderNumber: null,
-            documentString2: null,
-            fromLocation: null,
-            toLocation: null,
-            groupCausalDeliveryOutcome: null,
-            deliveryPlannedEta: null,
-            recordedTemperature: null,
-            quantityUnitOfMeasurement: null,
-            quantityUnitOfMeasurement1: null,
-            quantityUnitOfMeasurement2: null,
-            route: null,
-            driver: null,
-            vehicle: null,
-            origin: null,
-            destination: null,
-            originPostalCode: null,
-            originCountry: null,
-            originMasterDataCode: null,
-            destinationPostalCode: null,
-            destinationCountry: null,
-            deliveryTime: null,
-            pickupTime: null,
-            consignmentType: null,
-            priority: null,
-            deliveryZone: null,
-            pickupZone: null,
-            notes: null,
-            customerReference: null,
-            invoiceNumber: null,
-            podSignature: null,
-            deliveryProof: null,
-            vehicleCode: null,
-            deliveryEtaDeviation: null,
-            requiredTags: null,
-            receivedDeliveryPodFiles: null,
-            orderCarrierEmail: null,
-            tripNumber: null,
-            orderNumber: null,
-            from: null,
-            to: null,
-            carrier: null,
-            deliveryCalculatedEta: null,
-            timeSpentInTheUnloadingArea: null,
-            deliveryOutcomeCausal: null,
-            deliveryArrivalDate: null,
-            deliveryOutcomeDate: null,
-            deliveryUnloadDate: null,
-            deliveryOutcomeNote: null,
-            deliveryLastPosition: null,
-            deliveryLastPositionDate: null,
-            pickupPlannedEta: null,
-            etaDeliveryOnDeparture: null,
-            deliveryLiveDistanceKm: null,
-            deliveryDistanceKm: null,
-            deliveryOutcomeTransmissionDate: null,
-            deliveryOutcomeReceiptDate: null,
-            deliveryUnloadSequence: null,
-            deliveryTimeWindow: null,
-            pickupArrivalDate: null,
-            pickupOutcomeDate: null,
-            pickupLoadDate: null,
-            pickupOutcomeReason: null,
-            groupCausalPickupOutcome: null,
-            pickupOutcomeNote: null,
-            pickupLastPosition: null,
+      if (axylogConsignments.length > 0) {
+        // Use batch insert for better performance
+        const consignmentsToInsert = axylogConsignments.map(consignment => ({
+          ...consignment,
+          userId: req.user.id
+        }));
+        
+        await storage.createConsignmentsBatch(consignmentsToInsert);
+        console.log(`Successfully inserted ${axylogConsignments.length} consignments via batch operation`);
+      }
+      
+      res.json({
+        success: true,
+        message: `Direct sync completed: ${axylogConsignments.length} consignments synced`,
+        consignments: axylogConsignments.length
+      });
+    } catch (error) {
+      console.error("Direct axylog sync error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error during direct axylog sync",
+        error: error.message 
+      });
+    }
+  });
             pickupLastPositionDate: null,
             pickupCalculatedEta: null,
             etaPickupOnDeparture: null,
