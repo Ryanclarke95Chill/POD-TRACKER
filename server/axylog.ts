@@ -170,18 +170,12 @@ export class AxylogAPI {
       
       console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
 
-      // Debug: Check shipper data in first few raw deliveries
-      console.log("=== RAW SHIPPER DATA DEBUG ===");
-      for (let i = 0; i < Math.min(3, response.data.itemList.length); i++) {
-        const delivery = response.data.itemList[i];
-        console.log(`Delivery ${i+1}:`);
-        console.log(`  orderNumberRef: ${delivery.orderNumberRef}`);
-        console.log(`  shipperCompanyName: ${delivery.shipperCompanyName}`);
-        console.log(`  shipperCode: ${delivery.shipperCode}`);
-        console.log(`  shipperMasterDataCode: ${delivery.shipperMasterDataCode}`);
-        console.log(`  shipFromCompanyName: ${delivery.shipFromCompanyName}`);
-        console.log(`  shipToCompanyName: ${delivery.shipToCompanyName}`);
+      // Debug: Check full first delivery record
+      console.log("=== FULL FIRST DELIVERY RECORD ===");
+      if (response.data.itemList.length > 0) {
+        console.log('First delivery:', JSON.stringify(response.data.itemList[0], null, 2));
       }
+      console.log("=== END FULL DELIVERY RECORD ===");
 
       // Apply additional filters and convert to our format
       let deliveries = response.data.itemList;
