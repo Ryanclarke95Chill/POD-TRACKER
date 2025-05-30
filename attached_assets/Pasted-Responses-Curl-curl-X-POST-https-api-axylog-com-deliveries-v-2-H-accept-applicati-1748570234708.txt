@@ -1,0 +1,137 @@
+Responses
+Curl
+
+curl -X 'POST' \
+  'https://api.axylog.com/deliveries?v=2' \
+  -H 'accept: application/json' \
+  -H 'LanguageCode: json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "pagination": {
+    "pageSize": 500,
+    "pageNumber": 2147483647,
+    "skip": 2147483647,
+    "totalPages": 0,
+    "totalItems": 0
+  },
+  "filters": {
+    "gridHeaderFilters": {
+      "tripNumber": "string",
+      "docNumber": "string",
+      "driverName": "string",
+      "shipToCompanyName": "string",
+      "shipFromMasterDataCode": "string",
+      "shipFromCompanyName": "string",
+      "shipToMasterDataCode": "string",
+      "carrierMasterDataCode": "string",
+      "carrierCompanyName": "string",
+      "subCarrierMasterDataCode": "string",
+      "subCarrierCompanyName": "string",
+      "warehouseMasterDataCode": "string",
+      "warehouseCompanyName": "string",
+      "shipperMasterDataCode": "string",
+      "shipperCompanyName": "string",
+      "vehicleCode": "string"
+    },
+    "serializableProperties": "string",
+    "type": "string",
+    "documentDate_From": "2025-05-30",
+    "documentDate_To": "2025-05-30",
+    "pickUp_Delivery_From": "2025-05-30T01:56:22.455Z",
+    "pickUp_Delivery_To": "2025-05-30T01:56:22.455Z",
+    "departureDate_From": "2025-05-30T01:56:22.455Z",
+    "departureDate_To": "2025-05-30T01:56:22.455Z",
+    "tripNumber": [
+      "string"
+    ],
+    "documentNumber": [
+      "string"
+    ],
+    "documentSeries": [
+      "string"
+    ],
+    "documentType": [
+      "string"
+    ],
+    "documentOrderReferenceNumber": [
+      "string"
+    ],
+    "documentShipperOrderReferenceNumber": [
+      "string"
+    ],
+    "documentReference": [
+      "string"
+    ],
+    "plateNumber": [
+      "string"
+    ],
+    "carrierCode": [
+      0
+    ],
+    "carrierMasterDataCode": [
+      "string"
+    ],
+    "warehouseCode": [
+      0
+    ],
+    "warehouseMasterDataCode": [
+      "string"
+    ],
+    "shipFromCode": [
+      0
+    ],
+    "shipFromMasterDataCode": [
+      "string"
+    ],
+    "shipToCode": [
+      0
+    ],
+    "shipToMasterDataCode": [
+      "string"
+    ],
+    "shipperCode": [
+      0
+    ],
+    "shipperMasterDataCode": [
+      "string"
+    ],
+    "outcomeReceptionConfirmed": true,
+    "delivery_EtaCalculated": true,
+    "pickUp_EtaCalculated": true,
+    "distributionType": 0,
+    "driverId": [
+      0
+    ],
+    "pickupDeliveryKey": {
+      "year": 32767,
+      "code": 2147483647,
+      "prog": 32767
+    },
+    "states": {
+      "deliveryLoading": true,
+      "deliveryUnloading_PickupLoading": true,
+      "travel": true,
+      "unknown": true,
+      "delivery_Pickup_Complete": true,
+      "inAdvance": true,
+      "ot": true,
+      "notOT": true,
+      "waitingForOutcome": true,
+      "posOutcome": true,
+      "negOutcome": true,
+      "notDelOutcome": true
+    },
+    "lastUpdateFrom": "2025-05-30T01:56:22.455Z",
+    "lastUpdateTo": "2025-05-30T01:56:22.455Z",
+    "includeDeleted": true,
+    "pickupDeliveryKeys": {
+      "year": 32767,
+      "codes": [
+        0
+      ]
+    }
+  },
+  "sortingField": "string"
+}'
+Request URL
+https://api.axylog.com/deliveries?v=2
