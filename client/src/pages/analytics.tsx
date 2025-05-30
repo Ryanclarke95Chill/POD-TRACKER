@@ -812,23 +812,34 @@ export default function Analytics() {
           <CardContent>
             <div className="space-y-4">
               {analytics.topDrivers.map(([driverName, stats]) => (
-                <div key={driverName} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <span className="font-medium text-sm">{driverName}</span>
-                      {(stats as any).vehicle && (stats as any).vehicle !== 'No Vehicle' && (
-                        <div className="text-xs text-muted-foreground">{(stats as any).vehicle}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">{(stats as any).total}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {(stats as any).delivered} delivered, {(stats as any).inTransit} active
-                    </div>
-                  </div>
-                </div>
+                <Dialog key={driverName}>
+                  <DialogTrigger asChild>
+                    <button className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <span className="font-medium text-sm">{driverName}</span>
+                          {(stats as any).vehicle && (stats as any).vehicle !== 'No Vehicle' && (
+                            <div className="text-xs text-muted-foreground">{(stats as any).vehicle}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium">{(stats as any).total}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {(stats as any).delivered} delivered, {(stats as any).inTransit} active
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Driver Performance - {driverName}</DialogTitle>
+                      <DialogDescription>Complete breakdown of all deliveries</DialogDescription>
+                    </DialogHeader>
+                    <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} filterType="all" />
+                  </DialogContent>
+                </Dialog>
               ))}
             </div>
           </CardContent>
