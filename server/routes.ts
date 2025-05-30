@@ -129,7 +129,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Consignments endpoint
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      const consignments = await storage.getConsignmentsByUserId(req.user!.id);
+      const user = req.user!;
+      const userWithRole = {
+        id: user.id,
+        username: user.email.split('@')[0],
+        password: '', // Not needed for permissions
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        department: user.department || null,
+        isActive: true
+      };
+      const permissions = getUserPermissions(userWithRole);
+      
+      let consignments;
+      
+      if (permissions.canViewAllConsignments) {
+        // Admin and Manager can see all data
+        consignments = await storage.getAllConsignments();
+      } else if (permissions.canViewDepartmentConsignments) {
+        // Supervisor can see department data
+        consignments = await storage.getConsignmentsByDepartment(user.department || '');
+      } else if (permissions.canViewOwnConsignments) {
+        // Driver can see their own assigned deliveries
+        consignments = await storage.getConsignmentsByDriver(user.email);
+      } else {
+        // Viewer gets limited access
+        consignments = await storage.getConsignmentsByUserId(user.id);
+      }
+      
       res.json(consignments);
     } catch (error) {
       console.error("Error fetching consignments:", error);

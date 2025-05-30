@@ -113,6 +113,38 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(consignments).where(eq(consignments.userId, userId));
   }
 
+  async getConsignmentsByDepartment(department: string): Promise<Consignment[]> {
+    // Get admin's consignments and filter by department
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return [];
+    
+    const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
+    
+    // Filter by department based on depot codes (NSW, QLD, VIC, etc.)
+    return allConsignments.filter(consignment => {
+      const deliveryLocation = consignment.deliveryLocation || '';
+      const pickupLocation = consignment.pickupLocation || '';
+      return deliveryLocation.toLowerCase().includes(department.toLowerCase()) ||
+             pickupLocation.toLowerCase().includes(department.toLowerCase());
+    });
+  }
+
+  async getConsignmentsByDriver(driverEmail: string): Promise<Consignment[]> {
+    // Get admin's consignments and filter by driver
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return [];
+    
+    const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
+    
+    // Filter by driver name or vehicle information
+    return allConsignments.filter(consignment => {
+      const driverInfo = consignment.driverName || '';
+      const vehicleInfo = consignment.vehicleCode || '';
+      return driverInfo.toLowerCase().includes(driverEmail.split('@')[0].toLowerCase()) ||
+             vehicleInfo.toLowerCase().includes(driverEmail.split('@')[0].toLowerCase());
+    });
+  }
+
   async getConsignmentById(id: number): Promise<Consignment | undefined> {
     const [consignment] = await db.select().from(consignments).where(eq(consignments.id, id));
     return consignment || undefined;
