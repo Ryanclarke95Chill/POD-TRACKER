@@ -551,31 +551,36 @@ export default function Analytics() {
     
     // Basic metrics
     const totalConsignments = data.length;
-    const delivered = data.filter(c => getStatusDisplay(c) === "Delivered").length;
+    const completed = data.filter(c => getStatusDisplay(c) === "Completed").length;
     const inTransit = data.filter(c => getStatusDisplay(c) === "In Transit").length;
+    const failed = data.filter(c => {
+      const status = getStatusDisplay(c);
+      return status.includes("Failed") || status === "GPS Issue" || status === "Not delivered";
+    }).length;
     const pending = data.filter(c => {
       const status = getStatusDisplay(c);
-      return status !== "In Transit" && status !== "Delivered";
+      return status !== "In Transit" && status !== "Completed" && !status.includes("Failed") && status !== "GPS Issue" && status !== "Not delivered";
     }).length;
 
     // Performance metrics
-    const deliveryRate = totalConsignments > 0 ? (delivered / totalConsignments * 100) : 0;
+    const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
     const onTimeDeliveries = data.filter(c => {
       const status = getStatusDisplay(c);
-      return status === "Delivered"; // Simplified - in real scenario would check ETA vs actual
+      return status === "Completed"; // Simplified - in real scenario would check ETA vs actual
     }).length;
-    const onTimeRate = delivered > 0 ? (onTimeDeliveries / delivered * 100) : 0;
+    const onTimeRate = completed > 0 ? (onTimeDeliveries / completed * 100) : 0;
 
     // Depot analysis
     const depotStats = data.reduce((acc, c) => {
       const depot = (c as any).shipFromMasterDataCode || 'Unknown';
       if (!acc[depot]) {
-        acc[depot] = { total: 0, delivered: 0, inTransit: 0, pending: 0 };
+        acc[depot] = { total: 0, completed: 0, inTransit: 0, pending: 0, failed: 0 };
       }
       acc[depot].total++;
       const status = getStatusDisplay(c);
-      if (status === "Delivered") acc[depot].delivered++;
+      if (status === "Completed") acc[depot].completed++;
       else if (status === "In Transit") acc[depot].inTransit++;
+      else if (status.includes("Failed") || status === "GPS Issue") acc[depot].failed++;
       else acc[depot].pending++;
       return acc;
     }, {} as Record<string, any>);
@@ -587,8 +592,8 @@ export default function Analytics() {
         acc[customer] = { total: 0, delivered: 0 };
       }
       acc[customer].total++;
-      if (getStatusDisplay(c) === "Delivered") {
-        acc[customer].delivered++;
+      if (getStatusDisplay(c) === "Completed") {
+        acc[customer].completed++;
       }
       return acc;
     }, {} as Record<string, any>);
@@ -641,10 +646,11 @@ export default function Analytics() {
 
     return {
       totalConsignments,
-      delivered,
+      completed,
       inTransit,
       pending,
-      deliveryRate,
+      failed,
+      completionRate,
       onTimeRate,
       depotStats,
       customerStats,
@@ -725,9 +731,9 @@ export default function Analytics() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</div>
+                <div className="text-2xl font-bold">{analytics.completionRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground">
-                  {analytics.delivered} of {analytics.totalConsignments} completed
+                  {analytics.completed} of {analytics.totalConsignments} completed
                 </p>
               </CardContent>
             </Card>
@@ -988,9 +994,9 @@ export default function Analytics() {
                 <CardTitle className="text-sm">Completion Rate</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(2)}%</div>
+                <div className="text-2xl font-bold">{analytics.completionRate.toFixed(2)}%</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {analytics.delivered} / {analytics.totalConsignments}
+                  {analytics.completed} / {analytics.totalConsignments}
                 </div>
               </CardContent>
             </Card>
