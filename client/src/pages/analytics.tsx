@@ -172,6 +172,16 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
           <div className="text-muted-foreground">Pending</div>
         </div>
       </div>
+      {/* Combined View Option */}
+      <div className="text-center pb-4 border-b mb-4">
+        <div className="text-sm font-medium mb-2">Want to see all data together?</div>
+        <Link href="/view-all?type=all&status=all">
+          <Button variant="secondary" size="sm">
+            View Combined Data
+          </Button>
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
           <h4 className="font-medium text-green-600 mb-2">Completed Deliveries</h4>
