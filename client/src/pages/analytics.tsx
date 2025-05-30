@@ -108,87 +108,82 @@ export default function Analytics() {
   }, 0);
 
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <header className="bg-primary text-white shadow-md z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Header matching dashboard style */}
+      <header className="gradient-header shadow-lg border-b border-white/20 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-white">ChillTrack</h1>
-            <span className="ml-4 text-white/80">Analytics</span>
+            <h1 className="text-3xl font-bold text-white tracking-tight">ChillTrack</h1>
+            <span className="ml-4 text-white/90 text-lg">Analytics</span>
           </div>
           
           <div className="flex items-center space-x-3">
             <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/dashboard'}
             >
-              Dashboard
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Back to Dashboard
             </Button>
-
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Delivery Analytics</h1>
-          <p className="text-gray-600">Insights from your imported delivery data</p>
+          <p className="text-gray-600">Real-time insights from your Axylog consignment data</p>
         </div>
 
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Consignments</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalConsignments.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                Imported delivery records
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalItems.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                Items across all deliveries
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Pallets</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalPallets.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                Pallets managed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Delivery Cities</CardTitle>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{Object.keys(cityCounts).length}</div>
-              <p className="text-xs text-muted-foreground">
-                Unique delivery locations
-              </p>
-            </CardContent>
-          </Card>
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Consignments</p>
+                <p className="text-3xl font-bold text-gray-900">{totalConsignments.toLocaleString()}</p>
+              </div>
+              <div className="bg-primary/10 p-3 rounded-lg">
+                <Package className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Items</p>
+                <p className="text-3xl font-bold text-blue-600">{totalItems.toLocaleString()}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Pallets</p>
+                <p className="text-3xl font-bold text-green-600">{totalPallets.toLocaleString()}</p>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg">
+                <Truck className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Delivery Cities</p>
+                <p className="text-3xl font-bold text-purple-600">{Object.keys(cityCounts).length}</p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <MapPin className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Status Breakdown */}
@@ -275,7 +270,7 @@ export default function Analytics() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }
