@@ -128,19 +128,39 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       }
     }
 
-    // Pagination complete
+    // Filter out depot transfers using master data codes
+    const initialCount = allDeliveries.length;
+    const filteredDeliveries = allDeliveries.filter((delivery: any) => {
+      const shipFromCode = delivery.shipFromMasterDataCode || '';
+      const shipToCode = delivery.shipToMasterDataCode || '';
+      
+      // Check for Chill depot-to-depot transfers using master data codes
+      const isChillDepotTransfer = (
+        // WA depot transfers
+        (shipFromCode === 'WA_8' && shipToCode === 'WA_8D') ||
+        (shipFromCode === 'WA_8D' && shipToCode === 'WA_8') ||
+        // NSW depot transfers  
+        (shipFromCode === 'NSW_5' && shipToCode === 'NSW_5D') ||
+        (shipFromCode === 'NSW_5D' && shipToCode === 'NSW_5') ||
+        // VIC depot transfers
+        (shipFromCode === 'VIC_29963' && shipToCode === 'VIC_29963D') ||
+        (shipFromCode === 'VIC_29963D' && shipToCode === 'VIC_29963') ||
+        // QLD depot transfers
+        (shipFromCode === 'QLD_829' && shipToCode === 'QLD_829D') ||
+        (shipFromCode === 'QLD_829D' && shipToCode === 'QLD_829')
+      );
+      
+      return !isChillDepotTransfer;
+    });
+    
+    console.log(`Retrieved ${allDeliveries.length} deliveries, filtered to ${filteredDeliveries.length} (removed ${initialCount - filteredDeliveries.length} depot transfers)`);
 
-    // Create response object with all deliveries
+    // Create response object with filtered deliveries
     const paginatedResponse = {
-      itemList: allDeliveries,
-      totalItems: allDeliveries.length,
+      itemList: filteredDeliveries,
+      totalItems: filteredDeliveries.length,
       pagesRetrieved: pageNumber
     };
-
-    // Minimal logging for performance
-
-    // Minimal performance-optimized logging
-    console.log(`Retrieved ${allDeliveries.length} deliveries`);
 
     res.json({
       success: true,
