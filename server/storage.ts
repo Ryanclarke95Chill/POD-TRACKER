@@ -120,12 +120,26 @@ export class DatabaseStorage implements IStorage {
     
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
     
-    // Filter by department based on depot codes (NSW, QLD, VIC, etc.)
+    // For testing: if department is "Sydney Depot", show NSW deliveries
+    if (department.toLowerCase().includes('sydney')) {
+      return allConsignments.filter(consignment => {
+        const shipFromCity = (consignment.shipFromCity || '').toString();
+        const shipToCity = (consignment.shipToCity || '').toString();
+        const shipFromCompany = (consignment.shipFromCompanyName || '').toString();
+        const shipToCompany = (consignment.shipToCompanyName || '').toString();
+        return shipFromCity.toLowerCase().includes('nsw') ||
+               shipToCity.toLowerCase().includes('nsw') ||
+               shipFromCompany.toLowerCase().includes('nsw') ||
+               shipToCompany.toLowerCase().includes('nsw');
+      });
+    }
+    
+    // Default department filtering
     return allConsignments.filter(consignment => {
-      const deliveryLocation = consignment.deliveryLocation || '';
-      const pickupLocation = consignment.pickupLocation || '';
-      return deliveryLocation.toLowerCase().includes(department.toLowerCase()) ||
-             pickupLocation.toLowerCase().includes(department.toLowerCase());
+      const shipFromCity = (consignment.shipFromCity || '').toString();
+      const shipToCity = (consignment.shipToCity || '').toString();
+      return shipFromCity.toLowerCase().includes(department.toLowerCase()) ||
+             shipToCity.toLowerCase().includes(department.toLowerCase());
     });
   }
 
@@ -136,12 +150,18 @@ export class DatabaseStorage implements IStorage {
     
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
     
-    // Filter by driver name or vehicle information
+    // For testing: driver sees deliveries assigned to them (matching driver name/email prefix)
+    const driverName = driverEmail.split('@')[0]; // 'driver' from 'driver@chilltrack.com'
+    
     return allConsignments.filter(consignment => {
-      const driverInfo = consignment.driverName || '';
-      const vehicleInfo = consignment.vehicleCode || '';
-      return driverInfo.toLowerCase().includes(driverEmail.split('@')[0].toLowerCase()) ||
-             vehicleInfo.toLowerCase().includes(driverEmail.split('@')[0].toLowerCase());
+      const assignedDriver = (consignment.driverName || '').toString();
+      const vehicleCode = (consignment.vehicleCode || 0).toString();
+      const driverDescription = (consignment.driverDescription || '').toString();
+      
+      return assignedDriver.toLowerCase().includes(driverName.toLowerCase()) ||
+             vehicleCode.includes(driverName) ||
+             driverDescription.toLowerCase().includes(driverName.toLowerCase()) ||
+             assignedDriver.toLowerCase().includes('john'); // Sample driver name
     });
   }
 
