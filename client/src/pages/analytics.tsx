@@ -30,7 +30,11 @@ import { Link } from "wouter";
 import { Consignment } from "@shared/schema";
 
 // Component to show detailed delivery breakdown for a driver
-function DriverDeliveryDetails({ driverName, consignments }: { driverName: string; consignments: Consignment[] }) {
+function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }: { 
+  driverName: string; 
+  consignments: Consignment[]; 
+  filterType?: "all" | "completed" | "active" | "failed" 
+}) {
   const driverConsignments = consignments.filter(c => 
     (c as any).driverName === driverName || ((c as any).driverName === null && driverName === 'Unassigned')
   );
@@ -56,73 +60,88 @@ function DriverDeliveryDetails({ driverName, consignments }: { driverName: strin
     return acc;
   }, {} as Record<string, Array<{ consignment: Consignment; status: string; reason?: string }>>);
 
+  // Filter based on filterType
+  const getFilteredData = () => {
+    switch (filterType) {
+      case "completed":
+        return statusBreakdown.success || [];
+      case "active":
+        return statusBreakdown.active || [];
+      case "failed":
+        return statusBreakdown.failure || [];
+      default:
+        return Object.values(statusBreakdown).flat();
+    }
+  };
+
+  const filteredData = getFilteredData();
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4 text-sm">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">{statusBreakdown.success?.length || 0}</div>
-          <div className="text-muted-foreground">Successful</div>
+      {filterType === "all" && (
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{statusBreakdown.success?.length || 0}</div>
+            <div className="text-muted-foreground">Successful</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">{statusBreakdown.failure?.length || 0}</div>
+            <div className="text-muted-foreground">Failed</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{statusBreakdown.active?.length || 0}</div>
+            <div className="text-muted-foreground">Active</div>
+          </div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-red-600">{statusBreakdown.failure?.length || 0}</div>
-          <div className="text-muted-foreground">Failed</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-blue-600">{statusBreakdown.active?.length || 0}</div>
-          <div className="text-muted-foreground">Active</div>
+      )}
+
+      {/* Display filtered deliveries */}
+      <div>
+        <h4 className="font-medium mb-2 flex items-center gap-2">
+          {filterType === "completed" && <CheckCircle className="h-4 w-4 text-green-600" />}
+          {filterType === "active" && <Truck className="h-4 w-4 text-blue-600" />}
+          {filterType === "failed" && <AlertTriangle className="h-4 w-4 text-red-600" />}
+          {filterType === "all" && <Package className="h-4 w-4" />}
+          {filterType === "completed" && `Completed Deliveries (${filteredData.length})`}
+          {filterType === "active" && `Active Deliveries (${filteredData.length})`}
+          {filterType === "failed" && `Failed Deliveries (${filteredData.length})`}
+          {filterType === "all" && `All Deliveries (${filteredData.length})`}
+        </h4>
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {filteredData.map(({ consignment, status, reason }, index) => (
+            <div key={index} className={`p-3 rounded border-l-4 ${
+              filterType === "completed" || (filterType === "all" && status === "Delivered") ? "bg-green-50 border-green-200" :
+              filterType === "failed" || (filterType === "all" && (status.includes("Failed") || status.includes("GPS"))) ? "bg-red-50 border-red-200" :
+              "bg-blue-50 border-blue-200"
+            }`}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                  </div>
+                  {(consignment as any).delivery_PlannedETA && (
+                    <div className="text-xs text-muted-foreground">
+                      ETA: {new Date((consignment as any).delivery_PlannedETA).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+                <Badge variant={
+                  status === "Delivered" ? "secondary" :
+                  status.includes("Failed") || status.includes("GPS") ? "destructive" :
+                  "outline"
+                } className="text-xs">
+                  {status}
+                </Badge>
+              </div>
+              {reason && (
+                <div className="text-xs text-red-700 mt-1">Reason: {reason}</div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {statusBreakdown.failure && statusBreakdown.failure.length > 0 && (
-        <div>
-          <h4 className="font-medium text-red-600 mb-2 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Failed Deliveries ({statusBreakdown.failure.length})
-          </h4>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {statusBreakdown.failure.map(({ consignment, status, reason }, index) => (
-              <div key={index} className="bg-red-50 p-3 rounded border-l-4 border-red-200">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
-                    </div>
-                  </div>
-                  <Badge variant="destructive" className="text-xs">{status}</Badge>
-                </div>
-                {reason && (
-                  <div className="text-xs text-red-700 mt-1">Reason: {reason}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {statusBreakdown.success && statusBreakdown.success.length > 0 && (
-        <div>
-          <h4 className="font-medium text-green-600 mb-2 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Recent Successful Deliveries (last 5)
-          </h4>
-          <div className="space-y-2 max-h-32 overflow-y-auto">
-            {statusBreakdown.success.slice(0, 5).map(({ consignment }, index) => (
-              <div key={index} className="bg-green-50 p-2 rounded border-l-4 border-green-200">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Delivered</Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -670,10 +689,40 @@ export default function Analytics() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="text-green-600">
-                      Completed: {(stats as any).delivered}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button className="hover:underline">
+                            Completed: {(stats as any).delivered}
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Completed Deliveries - {driverName}</DialogTitle>
+                            <DialogDescription>
+                              All successfully completed deliveries
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} filterType="completed" />
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     <div className="text-blue-600">
-                      Active: {(stats as any).inTransit}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button className="hover:underline">
+                            Active: {(stats as any).inTransit}
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Active Deliveries - {driverName}</DialogTitle>
+                            <DialogDescription>
+                              All deliveries currently in transit
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} filterType="active" />
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     <div className="text-amber-600">
                       <Dialog>
@@ -684,12 +733,12 @@ export default function Analytics() {
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl">
                           <DialogHeader>
-                            <DialogTitle>Delivery Details for {driverName}</DialogTitle>
+                            <DialogTitle>All Deliveries - {driverName}</DialogTitle>
                             <DialogDescription>
-                              Complete breakdown of deliveries and any failures
+                              Complete breakdown of all deliveries and their status
                             </DialogDescription>
                           </DialogHeader>
-                          <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} />
+                          <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} filterType="all" />
                         </DialogContent>
                       </Dialog>
                     </div>
