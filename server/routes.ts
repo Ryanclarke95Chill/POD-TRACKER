@@ -462,36 +462,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Working axylog sync endpoint with proper error handling
-  app.post("/api/sync-axylog-now", async (req: Request, res: Response) => {
-    console.log("=== AXYLOG SYNC ENDPOINT REACHED (PRE-AUTH) ===");
-    
-    // Manual authentication check with detailed logging
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    console.log("Token received:", token ? "Present" : "Missing");
-    
-    if (!token) {
-      console.log("No token provided");
-      return res.status(401).json({ success: false, message: "No token provided" });
-    }
-    
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-      console.log("Token decoded successfully, user ID:", decoded.userId);
-      const user = await storage.getUser(decoded.userId);
-      console.log("User found:", user ? user.email : "Not found");
-      
-      if (!user) {
-        return res.status(401).json({ success: false, message: "User not found" });
-      }
-      
-      req.user = user;
-      console.log("Authentication successful for user:", user.email);
-    } catch (error) {
-      console.log("Token verification failed:", error);
-      return res.status(401).json({ success: false, message: "Invalid token" });
-    }
-    
-    console.log("=== AXYLOG SYNC ENDPOINT REACHED (POST-AUTH) ===");
+  app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
+    console.log("=== AXYLOG SYNC ENDPOINT REACHED ===");
     
     // Immediately set response headers to prevent routing issues
     res.setHeader('Content-Type', 'application/json');
@@ -505,19 +477,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get date range from request body first
+      // Get date range from request body
       const { fromDate, toDate } = req.body;
       
       console.log("Starting axylog sync for user:", req.user.email);
-      console.log("Date parameters received:", { fromDate, toDate });
       
       // Test authentication first
-      console.log("Attempting axylog authentication...");
       const authResult = await axylogAPI.authenticate();
-      console.log("Authentication result:", authResult);
-      
       if (!authResult) {
-        console.log("Authentication failed");
         return res.status(500).json({
           success: false,
           message: "Failed to authenticate with axylog API"
@@ -528,26 +495,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get deliveries from axylog with date range and filters
       const todayString = new Date().toISOString().split('T')[0];
-      console.log("Calling axylogAPI.getConsignmentsWithFilters with:", {
-        deliveryEmail: req.user.email,
-        pickupDateFrom: fromDate || todayString,
-        pickupDateTo: toDate || todayString
-      });
-      
       const axylogConsignments = await axylogAPI.getConsignmentsWithFilters({
         deliveryEmail: req.user.email,
         pickupDateFrom: fromDate || todayString,
         pickupDateTo: toDate || todayString
       });
       console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
-      
-      if (axylogConsignments.length > 0) {
-        console.log("=== FIRST CONSIGNMENT ETA DEBUG ===");
-        const first = axylogConsignments[0];
-        console.log("delivery_ETA:", first.delivery_ETA);
-        console.log("delivery_FirstCalculatedETA:", first.delivery_FirstCalculatedETA);
-        console.log("delivery_PlannedETA:", first.delivery_PlannedETA);
-      }
       
       if (axylogConsignments.length === 0) {
         return res.json({
