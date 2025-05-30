@@ -140,7 +140,7 @@ export class AxylogAPI {
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
-          pageSize: 200
+          pageSize: 10000
         },
         filters: {
           type: "",
