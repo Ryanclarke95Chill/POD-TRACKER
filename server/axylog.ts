@@ -170,12 +170,23 @@ export class AxylogAPI {
       
       console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
 
-      // Debug: Check full first delivery record
-      console.log("=== FULL FIRST DELIVERY RECORD ===");
+      // Debug: Check ETA fields specifically
+      console.log("=== ETA FIELDS DEBUG ===");
       if (response.data.itemList.length > 0) {
-        console.log('First delivery:', JSON.stringify(response.data.itemList[0], null, 2));
+        const firstDelivery = response.data.itemList[0];
+        console.log('ETA Fields from API:');
+        console.log('delivery_EtaCalculated:', firstDelivery.delivery_EtaCalculated);
+        console.log('pickUp_EtaCalculated:', firstDelivery.pickUp_EtaCalculated);
+        console.log('delivery_PlannedETA:', firstDelivery.delivery_PlannedETA);
+        console.log('pickUp_PlannedETA:', firstDelivery.pickUp_PlannedETA);
+        
+        // Check if fields exist at all
+        const hasCalculatedDelivery = 'delivery_EtaCalculated' in firstDelivery;
+        const hasCalculatedPickup = 'pickUp_EtaCalculated' in firstDelivery;
+        console.log('delivery_EtaCalculated field exists:', hasCalculatedDelivery);
+        console.log('pickUp_EtaCalculated field exists:', hasCalculatedPickup);
       }
-      console.log("=== END FULL DELIVERY RECORD ===");
+      console.log("=== END ETA FIELDS DEBUG ===");
 
       // Apply additional filters and convert to our format
       let deliveries = response.data.itemList;
