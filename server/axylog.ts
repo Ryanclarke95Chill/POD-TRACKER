@@ -263,7 +263,7 @@ export class AxylogAPI {
       console.log(`Filtered out ${initialCount - filteredCount} depot transfers, keeping ${filteredCount} customer deliveries`);
 
       // Convert to our format
-      return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
+      return this.convertAndFilterDeliveries(deliveries, '');
     } catch (error) {
       console.error("Failed to get deliveries from Axylog API:", error);
       return [];
