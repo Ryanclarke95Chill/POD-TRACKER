@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
 
 
@@ -65,7 +67,7 @@ export default function Dashboard() {
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
-  // Filter consignments based on search term, temperature zone, and warehouse company
+  // Filter consignments based on search term, temperature zone, warehouse company, and date range
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
       (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -74,7 +76,26 @@ export default function Dashboard() {
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
     
-    return matchesSearch && matchesTempZone && matchesWarehouse;
+    // Date filtering logic
+    const matchesDateRange = (() => {
+      if (!fromDate && !toDate) return true;
+      
+      const consignmentDate = consignment.departureDateTime || consignment.delivery_PlannedETA;
+      if (!consignmentDate) return false;
+      
+      const date = new Date(consignmentDate).toISOString().split('T')[0];
+      
+      if (fromDate && toDate) {
+        return date >= fromDate && date <= toDate;
+      } else if (fromDate) {
+        return date >= fromDate;
+      } else if (toDate) {
+        return date <= toDate;
+      }
+      return true;
+    })();
+    
+    return matchesSearch && matchesTempZone && matchesWarehouse && matchesDateRange;
   });
 
   const handleViewDetails = (consignment: Consignment) => {
@@ -202,7 +223,7 @@ export default function Dashboard() {
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
@@ -240,11 +261,56 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  From Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+              />
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  To Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+              />
+            </div>
             
-            <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
-              <Package className="h-4 w-4 text-gray-500 mr-2" />
-              <span className="text-sm font-medium text-gray-700">{filteredConsignments.length}</span>
-              <span className="text-sm text-gray-500 ml-1">found</span>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                <Package className="h-4 w-4 text-gray-500 mr-2" />
+                <span className="text-sm font-medium text-gray-700">{filteredConsignments.length}</span>
+                <span className="text-sm text-gray-500 ml-1">found</span>
+              </div>
+              {(fromDate || toDate) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="text-xs"
+                >
+                  Clear Dates
+                </Button>
+              )}
             </div>
           </div>
         </div>

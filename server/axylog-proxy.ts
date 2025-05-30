@@ -83,8 +83,8 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     while (hasMorePages) {
       const requestBody = {
         pagination: {
-          skip: 0,
-          pageSize: 200
+          skip: (pageNumber - 1) * pageSize,
+          pageSize: pageSize
         },
         filters: {
           type: "",
