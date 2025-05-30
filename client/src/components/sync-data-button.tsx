@@ -5,7 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export default function SyncDataButton() {
+interface SyncDataButtonProps {
+  fromDate?: string;
+  toDate?: string;
+}
+
+export default function SyncDataButton({ fromDate, toDate }: SyncDataButtonProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -46,7 +51,9 @@ export default function SyncDataButton() {
             token: authData.token,
             userId: authData.userId,
             companyId: authData.companyId,
-            contextOwnerId: authData.contextOwnerId
+            contextOwnerId: authData.contextOwnerId,
+            fromDate: fromDate,
+            toDate: toDate
           })
         });
         

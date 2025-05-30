@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings } from "lucide-react";
+import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings, Calendar } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import SyncDataButton from "@/components/sync-data-button";
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
 
 
@@ -65,7 +67,7 @@ export default function Dashboard() {
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
-  // Filter consignments based on search term, temperature zone, and warehouse company
+  // Filter consignments based on search term, temperature zone, warehouse company, and date range
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
       (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -73,7 +75,27 @@ export default function Dashboard() {
     const matchesTempZone = selectedTempZone === "all" || tempZone === selectedTempZone;
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
-    return matchesSearch && matchesTempZone && matchesWarehouse;
+    
+    // Date filtering logic
+    const matchesDateRange = (() => {
+      if (!fromDate && !toDate) return true;
+      
+      const consignmentDate = consignment.departureDateTime || consignment.delivery_PlannedETA;
+      if (!consignmentDate) return false;
+      
+      const date = new Date(consignmentDate).toISOString().split('T')[0];
+      
+      if (fromDate && toDate) {
+        return date >= fromDate && date <= toDate;
+      } else if (fromDate) {
+        return date >= fromDate;
+      } else if (toDate) {
+        return date <= toDate;
+      }
+      return true;
+    })();
+    
+    return matchesSearch && matchesTempZone && matchesWarehouse && matchesDateRange;
   });
 
   const handleViewDetails = (consignment: Consignment) => {
@@ -195,34 +217,34 @@ export default function Dashboard() {
             <p className="text-gray-600 mt-1">Monitor and track your temperature-controlled shipments</p>
           </div>
           <div className="flex gap-2">
-            <SyncDataButton />
+            <SyncDataButton fromDate={fromDate} toDate={toDate} />
           </div>
         </div>
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
                 <label htmlFor="reference-search" className="text-sm font-semibold text-gray-700">
-                  Search by Reference Number
+                  Search by Reference
                 </label>
               </div>
               <Input
                 id="reference-search"
-                placeholder="Enter consignment reference number..."
+                placeholder="Enter reference number..."
                 className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             
-            <div className="relative max-w-xs">
+            <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <MapPin className="h-5 w-5 text-primary" />
                 <label className="text-sm font-semibold text-gray-700">
-                  Filter by Warehouse
+                  Warehouse
                 </label>
               </div>
               <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
@@ -240,10 +262,40 @@ export default function Dashboard() {
               </Select>
             </div>
             
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  From Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  To Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            
             <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
               <Package className="h-4 w-4 text-gray-500 mr-2" />
               <span className="text-sm font-medium text-gray-700">{filteredConsignments.length}</span>
-              <span className="text-sm text-gray-500 ml-1">consignments found</span>
+              <span className="text-sm text-gray-500 ml-1">found</span>
             </div>
           </div>
         </div>
