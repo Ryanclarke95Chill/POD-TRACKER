@@ -130,13 +130,13 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Build dynamic date filters
-      const pickupFromDate = `${filters.pickupDateFrom}T00:00:00.000Z`;
-      const pickupToDate = `${filters.pickupDateTo}T23:59:59.000Z`;
+      // Build dynamic date filters to match working Postman request
+      const fromDate = `${filters.pickupDateFrom}T00:00:00.000Z`;
+      const toDate = `${filters.pickupDateTo}T23:59:59.000Z`;
       
-      console.log(`Requesting data from ${pickupFromDate} to ${pickupToDate}`);
+      console.log(`Requesting data from ${fromDate} to ${toDate}`);
 
-      // Make request to get deliveries using exact working Postman structure
+      // Make request using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
@@ -144,8 +144,8 @@ export class AxylogAPI {
         },
         filters: {
           type: "",
-          pickUp_Delivery_From: pickupFromDate,
-          pickUp_Delivery_To: pickupToDate,
+          departureDate_From: fromDate,
+          departureDate_To: toDate,
           delivery_EtaCalculated: true,
           pickUp_EtaCalculated: true
         }
