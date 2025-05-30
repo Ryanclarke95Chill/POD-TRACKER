@@ -315,15 +315,7 @@ export class AxylogAPI {
           code: delivery.code || null,
           prog: delivery.prog || null,
           consignmentNo: (() => {
-            // Debug reference fields to see what's available
-            console.log("=== REFERENCE DEBUG ===");
-            console.log("consignmentNo:", delivery.consignmentNo);
-            console.log("documentReference:", delivery.documentReference);
-            console.log("orderNumberRef:", delivery.orderNumberRef);
-            console.log("shipperOrderReferenceNumber:", delivery.shipperOrderReferenceNumber);
-            console.log("year-code-prog:", delivery.year, delivery.code, delivery.prog);
-            console.log("externalReference:", delivery.externalReference);
-            console.log("documentNumber:", delivery.documentNumber);
+            // Use the best available reference field
             
             return delivery.consignmentNo || 
                    delivery.documentReference || 

@@ -151,56 +151,17 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(paginatedResponse, null, 2));
     console.log('Full paginated Axylog response saved to /tmp/sample_delivery.json');
 
-    // Debug cargo data structure
-    console.log(`\n=== CARGO DATA INSPECTION ===`);
-    console.log(`Total deliveries returned: ${allDeliveries.length}`);
+    // Log summary only for performance
+    console.log(`Retrieved ${allDeliveries.length} deliveries from axylog`);
     
-    if (allDeliveries && allDeliveries.length > 0) {
-      let recordsWithCargo = 0;
-      let recordsWithoutCargo = 0;
-      
-      allDeliveries.forEach((delivery: any, index: number) => {
-        const hasCargo = delivery.qty1 !== null || delivery.qty2 !== null || 
-                        delivery.um1 !== null || delivery.um2 !== null || 
-                        delivery.volumeInM3 !== null || delivery.totalWeightInKg !== null;
-        
-        if (hasCargo) {
-          recordsWithCargo++;
-          console.log(`Record ${index}: HAS CARGO - qty1: ${delivery.qty1}, um1: ${delivery.um1}, qty2: ${delivery.qty2}, um2: ${delivery.um2}, volume: ${delivery.volumeInM3}, weight: ${delivery.totalWeightInKg}`);
-        } else {
-          recordsWithoutCargo++;
-          if (recordsWithoutCargo <= 3) { // Only log first 3 to avoid spam
-            console.log(`Record ${index}: NO CARGO - all cargo fields are null`);
-          }
-        }
+    // Log only first delivery for error checking
+    if (allDeliveries.length > 0) {
+      const firstDelivery = allDeliveries[0];
+      console.log("Sample delivery:", {
+        orderNumberRef: firstDelivery.orderNumberRef,
+        shipFromCompanyName: firstDelivery.shipFromCompanyName,
+        shipToCompanyName: firstDelivery.shipToCompanyName
       });
-      
-      console.log(`Summary: ${recordsWithCargo} records WITH cargo, ${recordsWithoutCargo} records WITHOUT cargo`);
-    }
-
-    allDeliveries.slice(0, 5).forEach((delivery: any, index: number) => {
-      const {
-        deliveryNumber,
-        qty1,
-        um1,
-        qty2,
-        um2,
-        volumeInM3,
-        totalWeightInKg
-      } = delivery;
-
-      console.log(`\n📦 Delivery #${index + 1}: ${deliveryNumber}`);
-      console.log(`   Cartons (qty1): ${qty1} ${um1}`);
-      console.log(`   Pallets (qty2): ${qty2} ${um2}`);
-      console.log(`   Volume (m³): ${volumeInM3}`);
-      console.log(`   Weight (kg): ${totalWeightInKg}`);
-    });
-
-    // Save first delivery to file for inspection
-    const firstDelivery = allDeliveries?.[0];
-    if (firstDelivery) {
-      fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(firstDelivery, null, 2));
-      console.log('\n💾 Sample delivery saved to /tmp/sample_delivery.json');
     }
 
     res.json({
