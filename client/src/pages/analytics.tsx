@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Users,
+  Building2,
   Calendar,
   Thermometer,
   ArrowLeft,
