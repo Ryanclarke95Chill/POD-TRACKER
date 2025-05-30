@@ -347,6 +347,9 @@ function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }:
     
     if (deliveryState === 'Positive outcome') return { status: 'Completed', type: 'success' };
     if (deliveryState === 'Delivered') return { status: 'Completed', type: 'success' };
+    if (pickupState === 'Positive outcome') return { status: 'Completed', type: 'success' };
+    if (deliveryState === 'Negative outcome') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
+    if (pickupState === 'Negative outcome') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
     if (deliveryState === 'Not delivered') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
     if (deliveryState === 'GPS not present') return { status: 'GPS Issue', type: 'failure', reason: deliveryState };
     if (pickupState === 'Not picked up') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
