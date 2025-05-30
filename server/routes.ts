@@ -3,9 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { axylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
+import { consignments } from "@shared/schema";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
