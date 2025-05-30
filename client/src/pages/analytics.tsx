@@ -917,31 +917,53 @@ export default function Analytics() {
     <div className="space-y-6">
       {/* Detailed Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Volume</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              All time deliveries
-            </div>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader>
+                <CardTitle className="text-sm">Total Volume</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  All time deliveries
+                </div>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>All Deliveries ({analytics.totalConsignments})</DialogTitle>
+              <DialogDescription>Complete list of all consignments</DialogDescription>
+            </DialogHeader>
+            <AllDeliveriesBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Completion Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(2)}%</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {analytics.delivered} / {analytics.totalConsignments}
-            </div>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader>
+                <CardTitle className="text-sm">Completion Rate</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(2)}%</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {analytics.delivered} / {analytics.totalConsignments}
+                </div>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Delivery Performance Breakdown</DialogTitle>
+              <DialogDescription>Completed vs pending deliveries</DialogDescription>
+            </DialogHeader>
+            <DeliveryRateBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card>
+        <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
           <CardHeader>
             <CardTitle className="text-sm">Active Depots</CardTitle>
           </CardHeader>
@@ -953,7 +975,7 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
           <CardHeader>
             <CardTitle className="text-sm">Customer Base</CardTitle>
           </CardHeader>
