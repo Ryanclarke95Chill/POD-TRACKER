@@ -65,7 +65,7 @@ export default function Dashboard() {
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
-  // Filter consignments based on search term, temperature zone, warehouse company, and date range
+  // Filter consignments based on search term, temperature zone, and warehouse company
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
       (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -74,26 +74,7 @@ export default function Dashboard() {
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
     
-    // Date filtering logic
-    const matchesDateRange = (() => {
-      if (!fromDate && !toDate) return true;
-      
-      const consignmentDate = consignment.departureDateTime || consignment.delivery_PlannedETA;
-      if (!consignmentDate) return false;
-      
-      const date = new Date(consignmentDate).toISOString().split('T')[0];
-      
-      if (fromDate && toDate) {
-        return date >= fromDate && date <= toDate;
-      } else if (fromDate) {
-        return date >= fromDate;
-      } else if (toDate) {
-        return date <= toDate;
-      }
-      return true;
-    })();
-    
-    return matchesSearch && matchesTempZone && matchesWarehouse && matchesDateRange;
+    return matchesSearch && matchesTempZone && matchesWarehouse;
   });
 
   const handleViewDetails = (consignment: Consignment) => {
