@@ -552,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // New endpoint to store axylog deliveries
   app.post("/api/consignments/sync-from-axylog", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      console.log("=== STORING AXYLOG DELIVERIES ===");
+      // Storing deliveries
       
       const { deliveries } = req.body;
       if (!deliveries || !Array.isArray(deliveries)) {
