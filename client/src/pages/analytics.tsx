@@ -782,6 +782,99 @@ export default function Analytics() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Global Filters Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Data Filters
+                {hasActiveFilters && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="ml-auto"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear All
+                  </Button>
+                )}
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredConsignments.length} of {(consignments as Consignment[]).length} records
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Filter data across all analytics views by date range, status, depot, and driver
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div>
+                  <Label htmlFor="dateFrom">Date From</Label>
+                  <Input
+                    id="dateFrom"
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dateTo">Date To</Label>
+                  <Input
+                    id="dateTo"
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="active">In Transit</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="depot">Depot</Label>
+                  <Select value={filters.depot} onValueChange={(value) => setFilters(prev => ({ ...prev, depot: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Depots" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Depots</SelectItem>
+                      {uniqueDepots.map(depot => (
+                        <SelectItem key={depot} value={depot}>{depot}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="driver">Driver</Label>
+                  <Select value={filters.driver} onValueChange={(value) => setFilters(prev => ({ ...prev, driver: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Drivers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Drivers</SelectItem>
+                      {uniqueDrivers.map(driver => (
+                        <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <TabsContent value="ceo">
             <CEOView />
           </TabsContent>
