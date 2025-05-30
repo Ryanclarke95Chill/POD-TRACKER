@@ -177,9 +177,8 @@ export class DatabaseStorage implements IStorage {
       return allConsignments.filter(consignment => {
         const shipperCompany = (consignment.shipperCompanyName || '').toString();
         
-        // Show only deliveries where "Chill NSW" is the shipper company
-        return shipperCompany.toLowerCase().includes('chill') ||
-               shipperCompany.toLowerCase().includes('**chill nsw');
+        // Show only deliveries where "GREENCROSS" is the shipper company
+        return shipperCompany.toLowerCase().includes('greencross');
       });
     }
     
@@ -455,7 +454,7 @@ export class DatabaseStorage implements IStorage {
       { username: 'manager', password: 'manager123', name: 'Fleet Manager', role: 'manager', department: 'Operations' },
       { username: 'supervisor', password: 'super123', name: 'Depot Supervisor', role: 'supervisor', department: 'Sydney Depot' },
       { username: 'driver', password: 'driver123', name: 'John Driver', role: 'driver', department: 'Sydney Depot' },
-      { username: 'shipper', password: 'shipper123', name: 'Chill NSW Shipper', role: 'viewer', department: 'Shipper' },
+      { username: 'shipper', password: 'shipper123', name: 'Greencross Shipper', role: 'viewer', department: 'Shipper' },
       { username: 'viewer', password: 'viewer123', name: 'Analytics Viewer', role: 'viewer', department: 'Management' }
     ];
 
