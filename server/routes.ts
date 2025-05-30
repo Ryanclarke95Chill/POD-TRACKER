@@ -112,6 +112,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Current user endpoint
+  app.get("/api/user", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      res.json(req.user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Consignments endpoint
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
@@ -187,20 +200,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         if (axylogConsignments.length > 0) {
           const consignmentsToInsert = axylogConsignments.map(consignment => ({
-          ...consignment,
-          userId: req.user.id
-        }));
+            ...consignment,
+            userId: req.user!.id
+          }));
+          
+          await storage.createConsignmentsBatch(consignmentsToInsert);
+          console.log(`Successfully inserted ${axylogConsignments.length} consignments`);
+        }
         
-        await storage.createConsignmentsBatch(consignmentsToInsert);
-        console.log(`Successfully inserted ${axylogConsignments.length} consignments`);
+        // Log the successful sync
+        await storage.logDataSync({
+          syncedByUserId: req.user!.id,
+          recordCount: axylogConsignments.length,
+          status: syncStatus,
+          errorMessage: null
+        });
+        
+        // Copy the real data to all non-admin users
+        console.log("Distributing data to all non-admin users...");
+        await storage.copyConsignmentsForNonAdminUsers();
+        console.log("Data distribution completed");
+        
+      } catch (syncError) {
+        syncStatus = 'failed';
+        errorMessage = syncError instanceof Error ? syncError.message : 'Unknown error';
+        
+        await storage.logDataSync({
+          syncedByUserId: req.user.id,
+          recordCount: 0,
+          status: syncStatus,
+          errorMessage: errorMessage
+        });
+        
+        throw syncError;
       }
       
       res.json({
         success: true,
-        message: `Sync completed: ${axylogConsignments.length} consignments synced`,
+        message: `Sync completed: ${axylogConsignments.length} consignments synced and distributed to all users`,
         consignments: axylogConsignments.length
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Axylog sync error:", error);
       res.status(500).json({ 
         success: false, 

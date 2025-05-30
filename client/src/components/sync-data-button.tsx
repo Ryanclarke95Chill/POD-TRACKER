@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { RefreshCw, Download, Calendar, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,17 @@ export default function SyncDataButton() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check if user is admin
+  const { data: user } = useQuery({
+    queryKey: ["/api/user"],
+    retry: false,
+  });
+
+  // Don't show sync button for non-admin users
+  if (!user || user.role !== 'admin') {
+    return null;
+  }
 
   const syncMutation = useMutation({
     mutationFn: async () => {
