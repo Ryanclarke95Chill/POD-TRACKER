@@ -153,18 +153,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Supervisor can see department data
         consignments = await storage.getConsignmentsByDepartment(user.department || '');
       } else if (permissions.canViewOwnConsignments) {
-        // Driver can see their own assigned deliveries
-        consignments = await storage.getConsignmentsByDriver(user.email);
-      } else {
-        // Viewer/Shipper gets filtered access based on their company
-        console.log(`Checking shipper access for email: ${user.email}`);
+        // Check if this is a shipper or driver
         if (user.email.includes('shipper@')) {
-          console.log('Calling getConsignmentsByShipper');
+          console.log('Shipper user detected, calling getConsignmentsByShipper');
           consignments = await storage.getConsignmentsByShipper(user.email);
         } else {
-          console.log('Using getConsignmentsByUserId fallback');
-          consignments = await storage.getConsignmentsByUserId(user.id);
+          console.log('Driver user, calling getConsignmentsByDriver');
+          consignments = await storage.getConsignmentsByDriver(user.email);
         }
+      } else {
+        // Fallback for other viewer types
+        console.log('Using getConsignmentsByUserId fallback');
+        consignments = await storage.getConsignmentsByUserId(user.id);
       }
       
       res.json(consignments);
