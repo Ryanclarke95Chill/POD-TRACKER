@@ -144,10 +144,25 @@ export class AxylogAPI {
         },
         filters: {
           type: "",
+          tripNumber: [],
+          plateNumber: [],
+          documentNumber: [],
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
-          delivery_EtaCalculated: true,
-          pickUp_EtaCalculated: true
+          states: {
+            posOutcome: false,
+            negOutcome: false,
+            notDelOutcome: false,
+            waitingForOutcome: null,
+            inAdvance: null,
+            ot: null,
+            notOT: null,
+            deliveryLoading: null,
+            deliveryUnloading_PickupLoading: null,
+            travel: null,
+            unknown: null,
+            delivery_Pickup_Complete: null
+          }
         }
       }, {
         headers: {
