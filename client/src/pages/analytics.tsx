@@ -122,11 +122,17 @@ function AllDeliveriesBreakdown({ consignments }: { consignments: Consignment[] 
           </div>
         ))}
         {consignments.length > 50 && (
-          <div className="text-center space-y-2">
+          <div className="text-center space-y-3">
             <div className="text-muted-foreground text-sm">
               Showing first 50 of {consignments.length} deliveries
             </div>
-            <div className="flex justify-center gap-2">
+            <div className="text-sm font-medium">Want to see more?</div>
+            <div className="flex justify-center gap-2 flex-wrap">
+              <Link href="/view-all?type=all">
+                <Button variant="default" size="sm">
+                  View All Data
+                </Button>
+              </Link>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -179,11 +185,17 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
               </div>
             ))}
             {delivered.length > 20 && (
-              <div className="text-center pt-2">
-                <div className="text-xs text-muted-foreground mb-2">
+              <div className="text-center pt-2 space-y-2">
+                <div className="text-xs text-muted-foreground">
                   Showing 20 of {delivered.length} completed deliveries
                 </div>
-                <div className="flex justify-center gap-2">
+                <div className="text-xs font-medium">Want to see more?</div>
+                <div className="flex justify-center gap-2 flex-wrap">
+                  <Link href="/view-all?type=completed">
+                    <Button variant="default" size="sm">
+                      View All Completed
+                    </Button>
+                  </Link>
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -218,11 +230,17 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
               </div>
             ))}
             {pending.length > 20 && (
-              <div className="text-center pt-2">
-                <div className="text-xs text-muted-foreground mb-2">
+              <div className="text-center pt-2 space-y-2">
+                <div className="text-xs text-muted-foreground">
                   Showing 20 of {pending.length} pending deliveries
                 </div>
-                <div className="flex justify-center gap-2">
+                <div className="text-xs font-medium">Want to see more?</div>
+                <div className="flex justify-center gap-2 flex-wrap">
+                  <Link href="/view-all?type=pending">
+                    <Button variant="default" size="sm">
+                      View All Pending
+                    </Button>
+                  </Link>
                   <Button 
                     variant="outline" 
                     size="sm"
