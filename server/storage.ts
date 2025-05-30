@@ -222,6 +222,48 @@ export class DatabaseStorage implements IStorage {
     
     return results;
   }
+
+  // Dashboard operations
+  async getDashboardsByUserId(userId: number): Promise<Dashboard[]> {
+    return await db.select().from(dashboards).where(eq(dashboards.userId, userId));
+  }
+
+  async getDashboardById(id: number): Promise<Dashboard | undefined> {
+    const [dashboard] = await db.select().from(dashboards).where(eq(dashboards.id, id));
+    return dashboard || undefined;
+  }
+
+  async createDashboard(dashboard: Omit<Dashboard, "id" | "createdAt" | "updatedAt">): Promise<Dashboard> {
+    const [newDashboard] = await db
+      .insert(dashboards)
+      .values({
+        ...dashboard,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return newDashboard;
+  }
+
+  async updateDashboard(id: number, updates: Partial<Dashboard>): Promise<Dashboard> {
+    const [updatedDashboard] = await db
+      .update(dashboards)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(dashboards.id, id))
+      .returning();
+    return updatedDashboard;
+  }
+
+  async deleteDashboard(id: number): Promise<void> {
+    await db.delete(dashboards).where(eq(dashboards.id, id));
+  }
+
+  async getPublicDashboards(): Promise<Dashboard[]> {
+    return await db.select().from(dashboards).where(eq(dashboards.isPublic, true));
+  }
 }
 
 export const storage = new DatabaseStorage();

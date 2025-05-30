@@ -8,6 +8,8 @@ import ViewAll from "@/pages/view-all";
 import AdminPage from "@/pages/admin";
 import SimpleImport from "@/pages/simple-import";
 import Settings from "@/pages/settings";
+import CustomDashboards from "@/pages/custom-dashboards";
+import UserManagement from "@/pages/user-management";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
@@ -36,6 +38,8 @@ function App() {
             <Route path="/dashboard" component={Dashboard} />
             <Route path="/analytics" component={Analytics} />
             <Route path="/view-all" component={ViewAll} />
+            <Route path="/custom-dashboards" component={CustomDashboards} />
+            <Route path="/user-management" component={UserManagement} />
             <Route path="/simple-import" component={SimpleImport} />
             <Route path="/settings" component={Settings} />
             <Route component={NotFound} />
