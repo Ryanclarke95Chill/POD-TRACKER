@@ -222,34 +222,8 @@ export class AxylogAPI {
         console.log(`Sample ${i+1}: Order ${d.orderNumberRef} - From: "${d.shipFromMasterDataCode}" To: "${d.shipToMasterDataCode}"`);
       }
       
-      deliveries = deliveries.filter((delivery: AxylogDelivery) => {
-        const shipFromCode = delivery.shipFromMasterDataCode || '';
-        const shipToCode = delivery.shipToMasterDataCode || '';
-        
-        // Check for Chill depot-to-depot transfers using master data codes
-        // Pattern: pickup from "XX_#" and delivery to "XX_#D" (same warehouse, depot variant)
-        const isChillDepotTransfer = (
-          // WA depot transfers
-          (shipFromCode === 'WA_8' && shipToCode === 'WA_8D') ||
-          (shipFromCode === 'WA_8D' && shipToCode === 'WA_8') ||
-          // NSW depot transfers  
-          (shipFromCode === 'NSW_5' && shipToCode === 'NSW_5D') ||
-          (shipFromCode === 'NSW_5D' && shipToCode === 'NSW_5') ||
-          // VIC depot transfers
-          (shipFromCode === 'VIC_29963' && shipToCode === 'VIC_29963D') ||
-          (shipFromCode === 'VIC_29963D' && shipToCode === 'VIC_29963') ||
-          // QLD depot transfers
-          (shipFromCode === 'QLD_829' && shipToCode === 'QLD_829D') ||
-          (shipFromCode === 'QLD_829D' && shipToCode === 'QLD_829')
-        );
-        
-        if (isChillDepotTransfer) {
-          console.log(`FILTERING DEPOT TRANSFER: ${delivery.orderNumberRef} - ${delivery.shipFromMasterDataCode} → ${delivery.shipToMasterDataCode}`);
-        }
-        
-        return !isChillDepotTransfer;
-      });
-      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated depot transfer consignments`);
+      // TEMPORARILY DISABLED depot transfer filtering to debug shipper data
+      console.log(`Keeping all ${deliveries.length} deliveries (depot transfer filtering disabled for debugging)`);
 
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
