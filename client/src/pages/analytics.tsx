@@ -88,7 +88,8 @@ const downloadData = (data: any[], format: 'csv' | 'xlsx', filename: string) => 
 function AllDeliveriesBreakdown({ consignments }: { consignments: Consignment[] }) {
   const statusCounts = consignments.reduce((acc, c) => {
     const deliveryState = (c as any).delivery_StateLabel;
-    const status = deliveryState === 'Positive outcome' ? 'Delivered' :
+    const status = deliveryState === 'Positive outcome' ? 'Completed' :
+                  deliveryState === 'Delivered' ? 'Completed' :
                   deliveryState === 'Not delivered' ? 'Failed' :
                   deliveryState === 'Traveling' ? 'In Transit' : 'Other';
     acc[status] = (acc[status] || 0) + 1;
@@ -344,7 +345,8 @@ function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }:
     const deliveryState = (consignment as any).delivery_StateLabel;
     const pickupState = (consignment as any).pickUp_StateLabel;
     
-    if (deliveryState === 'Positive outcome') return { status: 'Delivered', type: 'success' };
+    if (deliveryState === 'Positive outcome') return { status: 'Completed', type: 'success' };
+    if (deliveryState === 'Delivered') return { status: 'Completed', type: 'success' };
     if (deliveryState === 'Not delivered') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
     if (deliveryState === 'GPS not present') return { status: 'GPS Issue', type: 'failure', reason: deliveryState };
     if (pickupState === 'Not picked up') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
