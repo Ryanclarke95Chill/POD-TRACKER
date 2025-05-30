@@ -102,7 +102,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
           'User': userId,
           'Company': companyId,
           'ContextOwner': contextOwnerId,
-          'SourceDeviceType': '2',
+          'SourceDeviceType': '3',
           'LanguageCode': 'EN'
         }
       });
