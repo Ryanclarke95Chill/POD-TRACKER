@@ -170,21 +170,26 @@ export class AxylogAPI {
       
       console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
 
-      // Debug: Check ETA fields specifically
-      console.log("=== ETA FIELDS DEBUG ===");
+      // Debug: Check all ETA-related fields
+      console.log("=== ALL ETA FIELDS DEBUG ===");
       if (response.data.itemList.length > 0) {
         const firstDelivery = response.data.itemList[0];
-        console.log('ETA Fields from API:');
+        console.log('All ETA-related fields from API:');
         console.log('delivery_EtaCalculated:', firstDelivery.delivery_EtaCalculated);
-        console.log('pickUp_EtaCalculated:', firstDelivery.pickUp_EtaCalculated);
+        console.log('delivery_ETA:', firstDelivery.delivery_ETA);
+        console.log('delivery_FirstCalculatedETA:', firstDelivery.delivery_FirstCalculatedETA);
         console.log('delivery_PlannedETA:', firstDelivery.delivery_PlannedETA);
+        console.log('pickUp_EtaCalculated:', firstDelivery.pickUp_EtaCalculated);
+        console.log('pickUp_ETA:', firstDelivery.pickUp_ETA);
+        console.log('pickUp_FirstCalculatedETA:', firstDelivery.pickUp_FirstCalculatedETA);
         console.log('pickUp_PlannedETA:', firstDelivery.pickUp_PlannedETA);
         
-        // Check if fields exist at all
-        const hasCalculatedDelivery = 'delivery_EtaCalculated' in firstDelivery;
-        const hasCalculatedPickup = 'pickUp_EtaCalculated' in firstDelivery;
-        console.log('delivery_EtaCalculated field exists:', hasCalculatedDelivery);
-        console.log('pickUp_EtaCalculated field exists:', hasCalculatedPickup);
+        // Check which ETA fields exist
+        const etaFields = ['delivery_EtaCalculated', 'delivery_ETA', 'delivery_FirstCalculatedETA', 'delivery_PlannedETA',
+                          'pickUp_EtaCalculated', 'pickUp_ETA', 'pickUp_FirstCalculatedETA', 'pickUp_PlannedETA'];
+        etaFields.forEach(field => {
+          console.log(`${field} exists:`, field in firstDelivery);
+        });
       }
       console.log("=== END ETA FIELDS DEBUG ===");
 
@@ -418,6 +423,10 @@ export class AxylogAPI {
           pickupLiveTrackLink: delivery.pickupLiveTrackLink || null,
           delivery_EtaCalculated: delivery.delivery_EtaCalculated || null,
           pickUp_EtaCalculated: delivery.pickUp_EtaCalculated || null,
+          delivery_ETA: delivery.delivery_ETA || null,
+          pickUp_ETA: delivery.pickUp_ETA || null,
+          delivery_FirstCalculatedETA: delivery.delivery_FirstCalculatedETA || null,
+          pickUp_FirstCalculatedETA: delivery.pickUp_FirstCalculatedETA || null,
           deliveryLiveDistanceKm: delivery.deliveryLiveDistanceKm || null,
           pickupLiveDistanceKm: delivery.pickupLiveDistanceKm || null,
           deliveryDistanceKm: delivery.deliveryDistanceKm || null,
