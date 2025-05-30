@@ -462,8 +462,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Working axylog sync endpoint with proper error handling
-  app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
-    console.log("=== AXYLOG SYNC ENDPOINT REACHED ===");
+  app.post("/api/sync-axylog-now", async (req: Request, res: Response) => {
+    console.log("=== AXYLOG SYNC ENDPOINT REACHED (PRE-AUTH) ===");
+    
+    // Manual authentication check with detailed logging
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    console.log("Token received:", token ? "Present" : "Missing");
+    
+    if (!token) {
+      console.log("No token provided");
+      return res.status(401).json({ success: false, message: "No token provided" });
+    }
+    
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+      console.log("Token decoded successfully, user ID:", decoded.userId);
+      const user = await storage.getUser(decoded.userId);
+      console.log("User found:", user ? user.email : "Not found");
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: "User not found" });
+      }
+      
+      req.user = user;
+      console.log("Authentication successful for user:", user.email);
+    } catch (error) {
+      console.log("Token verification failed:", error);
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+    
+    console.log("=== AXYLOG SYNC ENDPOINT REACHED (POST-AUTH) ===");
     
     // Immediately set response headers to prevent routing issues
     res.setHeader('Content-Type', 'application/json');
