@@ -320,7 +320,13 @@ export class DatabaseStorage implements IStorage {
       });
 
       if (consignmentsCopy.length > 0) {
-        await this.createConsignmentsBatch(consignmentsCopy);
+        // Use direct database insertion to avoid ID conflicts
+        const chunkSize = 50;
+        for (let i = 0; i < consignmentsCopy.length; i += chunkSize) {
+          const chunk = consignmentsCopy.slice(i, i + chunkSize);
+          await db.insert(consignments).values(chunk);
+        }
+        console.log(`Copied ${consignmentsCopy.length} consignments to user ${user.id}`);
       }
     }
   }
