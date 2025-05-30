@@ -110,10 +110,35 @@ export default function Login() {
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
 
-              <div className="text-center text-sm text-neutral-500 space-y-1">
-                <p><strong>Demo Access:</strong> demo@chill.com.au / demo123</p>
-                <p><strong>Admin Access:</strong> admin / admin123</p>
-                <div className="mt-3 text-xs text-neutral-400">
+              <div className="text-center text-sm text-neutral-500 space-y-3">
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "demo@chill.com.au");
+                      form.setValue("password", "demo123");
+                    }}
+                    className="text-xs"
+                  >
+                    Login as Demo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("email", "admin");
+                      form.setValue("password", "admin123");
+                    }}
+                    className="text-xs"
+                  >
+                    Login as Admin
+                  </Button>
+                </div>
+                
+                <div className="text-xs text-neutral-400">
                   <div className="grid grid-cols-2 gap-2 text-left">
                     <div>
                       <strong>Admin:</strong> Full system control, user management
@@ -128,7 +153,7 @@ export default function Login() {
                       <strong>Driver:</strong> Own deliveries only
                     </div>
                   </div>
-                  <p className="mt-2"><strong>Viewer:</strong> Read-only analytics access</p>
+                  <p className="mt-2 text-center"><strong>Viewer:</strong> Read-only analytics access</p>
                 </div>
               </div>
             </form>
