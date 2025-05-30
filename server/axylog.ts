@@ -100,8 +100,10 @@ export class AxylogAPI {
       const todayDate = new Date(todayAEST);
       const todayString = todayDate.toISOString().split('T')[0];
 
-      // Get all deliveries and filter by ETA fields on our side
-      const filters = {};
+      const filters = {
+        pickupDateFrom: todayString,
+        pickupDateTo: todayString
+      };
 
       console.log("Using today's date filters (AEST):", filters, "AEST date:", todayAEST);
       return this.getConsignmentsWithFilters(filters);
