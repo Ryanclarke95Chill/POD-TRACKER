@@ -143,11 +143,10 @@ export class AxylogAPI {
           pageSize: 1000  // Increased page size for better performance
         },
         filters: {
-          type: "",
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
           includeCargo: true
-          // Removed API-level filtering to see all data including shipper info
+          // Removed type filter and API-level filtering to get all deliveries with shipper info
         }
       }, {
         headers: {
