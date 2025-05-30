@@ -21,17 +21,13 @@ export default function SyncDataButton() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Check if user is admin
+  // Check if user is admin - hooks must be called unconditionally
   const { data: user } = useQuery({
     queryKey: ["/api/user"],
     retry: false,
   });
 
-  // Don't show sync button for non-admin users
-  if (!user || user.role !== 'admin') {
-    return null;
-  }
-
+  // All hooks must be defined before any early returns
   const syncMutation = useMutation({
     mutationFn: async () => {
       try {
@@ -81,6 +77,11 @@ export default function SyncDataButton() {
       });
     },
   });
+
+  // Don't show sync button for non-admin users
+  if (!user || (user as any)?.role !== 'admin') {
+    return null;
+  }
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
