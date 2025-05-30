@@ -17,8 +17,6 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
 
 
 
@@ -217,13 +215,13 @@ export default function Dashboard() {
             <p className="text-gray-600 mt-1">Monitor and track your temperature-controlled shipments</p>
           </div>
           <div className="flex gap-2">
-            <SyncDataButton fromDate={fromDate} toDate={toDate} />
+            <SyncDataButton />
           </div>
         </div>
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
@@ -260,36 +258,6 @@ export default function Dashboard() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="h-5 w-5 text-primary" />
-                <label className="text-sm font-semibold text-gray-700">
-                  From Date
-                </label>
-              </div>
-              <Input
-                type="date"
-                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </div>
-            
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="h-5 w-5 text-primary" />
-                <label className="text-sm font-semibold text-gray-700">
-                  To Date
-                </label>
-              </div>
-              <Input
-                type="date"
-                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
             </div>
             
             <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
