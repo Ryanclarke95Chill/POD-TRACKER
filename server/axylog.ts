@@ -214,13 +214,25 @@ export class AxylogAPI {
         console.log(`Filtered to ${deliveries.length} deliveries by warehouse company name: ${filters.warehouseCompanyName}`);
       }
 
-      // Filter out auto-generated consignments where pickup and delivery are the same location
+      // Filter out auto-generated consignments where pickup and delivery are both Chill depots
       const initialCount = deliveries.length;
       deliveries = deliveries.filter((delivery: AxylogDelivery) => {
-        return !(delivery.shipFromCompanyName && delivery.shipToCompanyName && 
-                delivery.shipFromCompanyName === delivery.shipToCompanyName);
+        const shipFrom = delivery.shipFromCompanyName?.toLowerCase() || '';
+        const shipTo = delivery.shipToCompanyName?.toLowerCase() || '';
+        
+        // Filter out if both pickup and delivery contain "chill" (indicating depot-to-depot transfers)
+        const isChillToChillTransfer = (
+          (shipFrom.includes('chill') && shipTo.includes('chill')) ||
+          (shipFrom === shipTo) // Also keep the original exact match filter
+        );
+        
+        if (isChillToChillTransfer) {
+          console.log(`Filtering auto-generated consignment: ${delivery.shipFromCompanyName} → ${delivery.shipToCompanyName}`);
+        }
+        
+        return !isChillToChillTransfer;
       });
-      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated consignments (same pickup/delivery location)`);
+      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated consignments (depot-to-depot transfers)`);
 
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
