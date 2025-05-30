@@ -130,13 +130,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ success: false, message: "Axylog authentication failed" });
       }
 
-      // Use date range if provided, otherwise get today's data
-      const axylogConsignments = syncFromDate && syncToDate 
-        ? await axylogAPI.getConsignmentsWithFilters({
-            pickupDateFrom: syncFromDate,
-            pickupDateTo: syncToDate
-          })
-        : await axylogAPI.getDeliveries(req.user.email);
+      // For now, always use the working getDeliveries method
+      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
       
       if (syncFromDate && syncToDate) {
         console.log(`Synced date range: ${syncFromDate} to ${syncToDate}`);
