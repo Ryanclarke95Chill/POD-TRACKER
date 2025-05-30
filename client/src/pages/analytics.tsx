@@ -95,6 +95,31 @@ export default function Analytics() {
       return acc;
     }, {} as Record<string, any>);
 
+    // Driver analysis
+    const driverStats = data.reduce((acc, c) => {
+      const driverName = (c as any).driverName || 'Unassigned';
+      const driverId = (c as any).driverId;
+      const vehicleCode = (c as any).tractorPlateNumber || (c as any).plateNumber || 'No Vehicle';
+      
+      if (!acc[driverName]) {
+        acc[driverName] = { 
+          total: 0, 
+          delivered: 0, 
+          inTransit: 0, 
+          driverId: driverId,
+          vehicle: vehicleCode
+        };
+      }
+      acc[driverName].total++;
+      const status = getStatusDisplay(c);
+      if (status === "Delivered") {
+        acc[driverName].delivered++;
+      } else if (status === "In Transit") {
+        acc[driverName].inTransit++;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
     // Temperature zone analysis
     const tempZoneStats = data.reduce((acc, c) => {
       const tempZone = c.documentNote?.split('\\')[0] || c.expectedTemperature || 'Standard';
@@ -125,6 +150,7 @@ export default function Analytics() {
       onTimeRate,
       depotStats,
       customerStats,
+      driverStats,
       tempZoneStats,
       recentDeliveries: recentDeliveries.length,
       topDepots: Object.entries(depotStats)
@@ -132,7 +158,13 @@ export default function Analytics() {
         .slice(0, 5),
       topCustomers: Object.entries(customerStats)
         .sort(([,a], [,b]) => (b as any).total - (a as any).total)
-        .slice(0, 5)
+        .slice(0, 5),
+      topDrivers: Object.entries(driverStats)
+        .sort(([,a], [,b]) => (b as any).total - (a as any).total)
+        .slice(0, 10),
+      activeDrivers: Object.entries(driverStats)
+        .filter(([,stats]) => (stats as any).inTransit > 0)
+        .length
     };
   }, [consignments]);
 
@@ -233,20 +265,27 @@ export default function Analytics() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Key Customers</CardTitle>
-            <CardDescription>Top customers by delivery volume</CardDescription>
+            <CardTitle>Top Drivers</CardTitle>
+            <CardDescription>Driver performance and delivery volume</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {analytics.topCustomers.map(([customer, stats]) => (
-                <div key={customer} className="flex items-center justify-between">
+              {analytics.topDrivers.map(([driverName, stats]) => (
+                <div key={driverName} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">{customer.substring(0, 25)}</span>
+                    <div>
+                      <span className="font-medium text-sm">{driverName}</span>
+                      {(stats as any).vehicle && (stats as any).vehicle !== 'No Vehicle' && (
+                        <div className="text-xs text-muted-foreground">{(stats as any).vehicle}</div>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium">{(stats as any).total}</div>
-                    <div className="text-xs text-muted-foreground">deliveries</div>
+                    <div className="text-xs text-muted-foreground">
+                      {(stats as any).delivered} delivered, {(stats as any).inTransit} active
+                    </div>
                   </div>
                 </div>
               ))}
@@ -304,21 +343,21 @@ export default function Analytics() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Alerts & Issues</CardTitle>
+            <CardTitle className="text-lg">Driver Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center space-x-2 text-amber-600">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm">Delayed: 0</span>
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Active Drivers: {analytics.activeDrivers}</span>
               </div>
-              <div className="flex items-center space-x-2 text-red-600">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm">Temperature Issues: 0</span>
+              <div className="flex items-center space-x-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Total Drivers: {Object.keys(analytics.driverStats).length}</span>
               </div>
               <div className="flex items-center space-x-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
-                <span className="text-sm">All Systems Normal</span>
+                <span className="text-sm">Fleet Operational</span>
               </div>
             </div>
           </CardContent>
@@ -418,22 +457,45 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Customer Analysis</CardTitle>
-            <CardDescription>Detailed breakdown by customer volume and performance</CardDescription>
+            <CardTitle>Driver Performance Analysis</CardTitle>
+            <CardDescription>Detailed breakdown by driver efficiency and workload</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {Object.entries(analytics.customerStats)
+              {Object.entries(analytics.driverStats)
                 .sort(([,a], [,b]) => (b as any).total - (a as any).total)
-                .map(([customer, stats]) => (
-                <div key={customer} className="border-b pb-2 last:border-b-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-sm font-medium">{customer}</span>
+                .map(([driverName, stats]) => (
+                <div key={driverName} className="border-b pb-3 last:border-b-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-sm font-medium">{driverName}</span>
+                      {(stats as any).vehicle && (stats as any).vehicle !== 'No Vehicle' && (
+                        <div className="text-xs text-muted-foreground">Vehicle: {(stats as any).vehicle}</div>
+                      )}
+                      {(stats as any).driverId && (
+                        <div className="text-xs text-muted-foreground">ID: {(stats as any).driverId}</div>
+                      )}
+                    </div>
                     <Badge variant="secondary">{(stats as any).total}</Badge>
                   </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Delivered: {(stats as any).delivered}</span>
-                    <span>Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%</span>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-green-600">
+                      Delivered: {(stats as any).delivered}
+                    </div>
+                    <div className="text-blue-600">
+                      In Transit: {(stats as any).inTransit}
+                    </div>
+                    <div className="text-amber-600">
+                      Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${((stats as any).delivered / (stats as any).total) * 100}%` 
+                      }}
+                    ></div>
                   </div>
                 </div>
               ))}
