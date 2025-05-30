@@ -216,8 +216,8 @@ export default function Dashboard() {
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 xl:grid-cols-7 gap-6 items-end">
-            <div className="relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 items-end">
+            <div className="relative lg:col-span-2 xl:col-span-1">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
                 <label htmlFor="reference-search" className="text-sm font-semibold text-gray-700">
@@ -226,8 +226,8 @@ export default function Dashboard() {
               </div>
               <Input
                 id="reference-search"
-                placeholder="Enter reference number..."
-                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                placeholder="Enter reference..."
+                className="w-full min-w-[180px] border-gray-200 focus:border-primary focus:ring-primary/20"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
