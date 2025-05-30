@@ -853,9 +853,9 @@ export default function Analytics() {
                       <div className="text-right">
                         <div className="text-sm font-medium">{(stats as any).total}</div>
                         <div className="text-xs flex gap-2">
-                          <span className="text-green-600">{(stats as any).completed} completed</span>
-                          <span className="text-blue-600">{(stats as any).inTransit} active</span>
-                          <span className="text-red-600">{(stats as any).failed} failed</span>
+                          {(stats as any).completed > 0 && <span className="text-green-600">{(stats as any).completed} completed</span>}
+                          {(stats as any).inTransit > 0 && <span className="text-blue-600">{(stats as any).inTransit} active</span>}
+                          {(stats as any).failed > 0 && <span className="text-red-600">{(stats as any).failed} failed</span>}
                         </div>
                       </div>
                     </button>
