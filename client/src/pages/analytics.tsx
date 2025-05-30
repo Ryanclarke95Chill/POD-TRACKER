@@ -526,8 +526,11 @@ export default function Analytics() {
     if (deliveryStateLabel === 'Traveling' || pickupStateLabel === 'Traveling') {
       return 'In Transit';
     }
+    if (deliveryStateLabel === 'Negative outcome' || pickupStateLabel === 'Negative outcome') {
+      return 'Failed';
+    }
     
-    // Return the actual status for failed deliveries, GPS issues, etc.
+    // Return the actual status for other cases
     return deliveryStateLabel || pickupStateLabel || 'In Transit';
   };
 
@@ -614,6 +617,7 @@ export default function Analytics() {
           total: 0, 
           completed: 0, 
           inTransit: 0, 
+          failed: 0,
           driverId: driverId,
           vehicle: vehicleCode
         };
@@ -625,6 +629,8 @@ export default function Analytics() {
         acc[driverName].completed++;
       } else if (status === "In Transit") {
         acc[driverName].inTransit++;
+      } else if (status === "Failed") {
+        acc[driverName].failed++;
       }
       return acc;
     }, {} as Record<string, any>);
@@ -841,7 +847,7 @@ export default function Analytics() {
                       <div className="text-right">
                         <div className="text-sm font-medium">{(stats as any).total}</div>
                         <div className="text-xs text-muted-foreground">
-                          {(stats as any).completed} completed, {(stats as any).inTransit} active
+                          {(stats as any).completed} completed, {(stats as any).inTransit} active, {(stats as any).failed} failed
                         </div>
                       </div>
                     </button>
