@@ -232,9 +232,9 @@ export class AxylogAPI {
           // VIC depot transfers
           (shipFromCode === 'VIC_29963' && shipToCode === 'VIC_29963D') ||
           (shipFromCode === 'VIC_29963D' && shipToCode === 'VIC_29963') ||
-          // QLD depot transfers (add pattern when we see the codes)
-          (shipFromCode.startsWith('QLD_') && shipToCode.startsWith('QLD_') && 
-           shipFromCode.replace('D', '') === shipToCode.replace('D', ''))
+          // QLD depot transfers
+          (shipFromCode === 'QLD_829' && shipToCode === 'QLD_829D') ||
+          (shipFromCode === 'QLD_829D' && shipToCode === 'QLD_829')
         );
         
         if (isChillDepotTransfer) {
