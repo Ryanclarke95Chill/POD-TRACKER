@@ -29,6 +29,61 @@ import {
 import { Link } from "wouter";
 import { Consignment } from "@shared/schema";
 
+// Download functionality
+const downloadData = (data: any[], format: 'csv' | 'xlsx', filename: string) => {
+  const headers = [
+    'Consignment No',
+    'From',
+    'To',
+    'Status',
+    'Driver',
+    'Vehicle',
+    'Temperature Zone',
+    'Delivery Date',
+    'Depot'
+  ];
+
+  const csvData = data.map(item => [
+    (item as any).consignmentNo || '',
+    (item as any).shipFromCompanyName || '',
+    (item as any).shipToCompanyName || '',
+    (item as any).delivery_StateLabel || '',
+    (item as any).driverName || 'Unassigned',
+    (item as any).tractorPlateNumber || (item as any).plateNumber || '',
+    (item as any).temperatureZone || '',
+    (item as any).contextPlannedDeliveryDateTime || '',
+    (item as any).warehouseCompanyName || (item as any).shipFromCompanyName || ''
+  ]);
+
+  if (format === 'csv') {
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } else {
+    // For Excel format, we'll use the same CSV approach but with .xlsx extension
+    // In a real app, you'd use a library like xlsx or exceljs
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}-${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
 // Component to show all deliveries breakdown
 function AllDeliveriesBreakdown({ consignments }: { consignments: Consignment[] }) {
   const statusCounts = consignments.reduce((acc, c) => {
@@ -67,8 +122,26 @@ function AllDeliveriesBreakdown({ consignments }: { consignments: Consignment[] 
           </div>
         ))}
         {consignments.length > 50 && (
-          <div className="text-center text-muted-foreground text-sm">
-            Showing first 50 of {consignments.length} deliveries
+          <div className="text-center space-y-2">
+            <div className="text-muted-foreground text-sm">
+              Showing first 50 of {consignments.length} deliveries
+            </div>
+            <div className="flex justify-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => downloadData(consignments, 'csv', 'all-deliveries')}
+              >
+                Download CSV
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => downloadData(consignments, 'xlsx', 'all-deliveries')}
+              >
+                Download Excel
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -105,6 +178,29 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
                 </div>
               </div>
             ))}
+            {delivered.length > 20 && (
+              <div className="text-center pt-2">
+                <div className="text-xs text-muted-foreground mb-2">
+                  Showing 20 of {delivered.length} completed deliveries
+                </div>
+                <div className="flex justify-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadData(delivered, 'csv', 'completed-deliveries')}
+                  >
+                    Download CSV
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadData(delivered, 'xlsx', 'completed-deliveries')}
+                  >
+                    Download Excel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div>
@@ -121,6 +217,29 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
                 </div>
               </div>
             ))}
+            {pending.length > 20 && (
+              <div className="text-center pt-2">
+                <div className="text-xs text-muted-foreground mb-2">
+                  Showing 20 of {pending.length} pending deliveries
+                </div>
+                <div className="flex justify-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadData(pending, 'csv', 'pending-deliveries')}
+                  >
+                    Download CSV
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadData(pending, 'xlsx', 'pending-deliveries')}
+                  >
+                    Download Excel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
