@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form";
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
+  email: z.string().min(1, { message: "Email or username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
 });
 
