@@ -511,19 +511,24 @@ export default function Analytics() {
     return filtered;
   }, [consignments, filters]);
 
-  // Helper function to get status display
+  // Helper function to get status display for analytics (converts to "Completed" for both stages)
   const getStatusDisplay = (consignment: Consignment) => {
     const deliveryStateLabel = (consignment as any).delivery_StateLabel;
     const pickupStateLabel = (consignment as any).pickUp_StateLabel;
     
-    const mapStatus = (status: string | null, isPickup: boolean = false) => {
-      if (!status) return null;
-      if (status === 'Traveling') return 'In Transit';
-      if (status === 'Positive outcome') return isPickup ? 'Picked Up' : 'Delivered';
-      return status;
-    };
+    // For analytics, we want to show both successful pickups and deliveries as "Completed"
+    if (deliveryStateLabel === 'Positive outcome' || deliveryStateLabel === 'Delivered') {
+      return 'Completed';
+    }
+    if (pickupStateLabel === 'Positive outcome') {
+      return 'Completed';
+    }
+    if (deliveryStateLabel === 'Traveling' || pickupStateLabel === 'Traveling') {
+      return 'In Transit';
+    }
     
-    return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
+    // Return the actual status for failed deliveries, GPS issues, etc.
+    return deliveryStateLabel || pickupStateLabel || 'In Transit';
   };
 
   // Get unique values for filter dropdowns
@@ -615,6 +620,7 @@ export default function Analytics() {
       }
       acc[driverName].total++;
       const status = getStatusDisplay(c);
+      
       if (status === "Completed") {
         acc[driverName].completed++;
       } else if (status === "In Transit") {
