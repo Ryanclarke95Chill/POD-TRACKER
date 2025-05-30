@@ -50,21 +50,36 @@ export default function Analytics() {
     );
   }
 
-  // Calculate analytics from your imported data
+  // Calculate analytics from Axylog data
   const totalConsignments = consignments.length;
+  
+  // Status breakdown using delivery_StateLabel
   const statusCounts = consignments.reduce((acc, c) => {
-    acc[c.status] = (acc[c.status] || 0) + 1;
+    const status = c.delivery_StateLabel || c.pickUp_StateLabel || "Unknown";
+    acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
+  // Temperature zone analysis from documentNote field
   const temperatureZoneCounts = consignments.reduce((acc, c) => {
-    acc[c.temperatureZone] = (acc[c.temperatureZone] || 0) + 1;
+    const note = c.documentNote || "";
+    let tempZone = "Unknown";
+    if (note.toLowerCase().includes("frozen") || note.toLowerCase().includes("-18")) {
+      tempZone = "Frozen";
+    } else if (note.toLowerCase().includes("chilled") || note.toLowerCase().includes("2-8")) {
+      tempZone = "Chilled";
+    } else if (note.toLowerCase().includes("ambient")) {
+      tempZone = "Ambient";
+    }
+    acc[tempZone] = (acc[tempZone] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
+  // City distribution using shipToCity
   const cityCounts = consignments.reduce((acc, c) => {
-    if (c.deliveryCity && c.deliveryCity !== "Unknown") {
-      acc[c.deliveryCity] = (acc[c.deliveryCity] || 0) + 1;
+    const city = c.shipToCity;
+    if (city && city !== "Unknown") {
+      acc[city] = (acc[city] || 0) + 1;
     }
     return acc;
   }, {} as Record<string, number>);
@@ -73,8 +88,9 @@ export default function Analytics() {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5);
 
-  const totalQuantity = consignments.reduce((sum, c) => sum + parseInt(c.quantity || "0"), 0);
-  const totalPallets = consignments.reduce((sum, c) => sum + parseInt(c.pallets || "0"), 0);
+  // Use qty1 and qty2 from Axylog data
+  const totalItems = consignments.reduce((sum, c) => sum + (c.qty1 || 0), 0);
+  const totalPallets = consignments.reduce((sum, c) => sum + (c.qty2 || 0), 0);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -94,13 +110,7 @@ export default function Analytics() {
             >
               Dashboard
             </Button>
-            <Button 
-              variant="ghost" 
-              className="h-9 px-3 text-white hover:bg-white/10 hover:text-white"
-              onClick={() => window.location.href = '/simple-import'}
-            >
-              Import Data
-            </Button>
+
           </div>
         </div>
       </header>
@@ -128,11 +138,11 @@ export default function Analytics() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalQuantity.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{totalItems.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 Items across all deliveries
               </p>

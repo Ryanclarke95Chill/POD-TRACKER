@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Upload, LogOut, Search, Package, TrendingUp, Clock, MapPin, Settings, Calendar } from "lucide-react";
+import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import SyncDataButton from "@/components/sync-data-button";
@@ -126,26 +126,6 @@ export default function Dashboard() {
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
-            </Button>
-            <Button 
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
-              onClick={() => window.location.href = '/simple-import'}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import Data
-            </Button>
-            <Button 
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
-              onClick={() => window.location.href = '/settings'}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-            <Button 
-              className="bg-red-500/20 hover:bg-red-500/30 text-white border border-red-300/30 backdrop-blur-sm"
-              onClick={clearLocalStorage}
-            >
-              Clear Cache
             </Button>
             <Button 
               className="gradient-accent hover:opacity-90 text-white border-0"
