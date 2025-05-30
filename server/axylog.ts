@@ -150,18 +150,18 @@ export class AxylogAPI {
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
           states: {
-            posOutcome: false,
-            negOutcome: false,
-            notDelOutcome: false,
-            waitingForOutcome: null,
-            inAdvance: null,
-            ot: null,
-            notOT: null,
-            deliveryLoading: null,
-            deliveryUnloading_PickupLoading: null,
-            travel: null,
-            unknown: null,
-            delivery_Pickup_Complete: null
+            posOutcome: true,
+            negOutcome: true,
+            notDelOutcome: true,
+            waitingForOutcome: true,
+            inAdvance: true,
+            ot: true,
+            notOT: true,
+            deliveryLoading: true,
+            deliveryUnloading_PickupLoading: true,
+            travel: true,
+            unknown: true,
+            delivery_Pickup_Complete: true
           }
         }
       }, {

@@ -478,6 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Starting axylog sync for user:", req.user.email);
+      console.log("Date parameters received:", { fromDate, toDate });
       
       // Test authentication first
       const authResult = await axylogAPI.authenticate();
