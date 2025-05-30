@@ -146,7 +146,10 @@ export class AxylogAPI {
           type: "",
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
-          includeCargo: true
+          includeCargo: true,
+          // Exclude internal depot transfers at API level
+          excludeShipFromCodes: ["WA_8", "NSW_5", "VIC_29963", "QLD_829"],
+          excludeShipToCodes: ["WA_8D", "NSW_5D", "VIC_29963D", "QLD_829D"]
         }
       }, {
         headers: {
@@ -262,17 +265,6 @@ export class AxylogAPI {
 
     // Return all deliveries without email filtering to get all data
     return deliveries.map((delivery, index) => {
-        console.log(`Converting delivery ${index + 1}: ${delivery.consignmentNo || 'Unknown'}`);
-        
-        // Extract cargo data directly from delivery object (not from cargoList)
-        console.log(`Cargo data for delivery ${index + 1}:`, {
-          qty1: delivery.qty1,
-          um1: delivery.um1,
-          qty2: delivery.qty2,
-          um2: delivery.um2,
-          volumeInM3: delivery.volumeInM3,
-          totalWeightInKg: delivery.totalWeightInKg
-        });
         
         // Map status from Axylog to our status types
         const statusMap: Record<string, string> = {
