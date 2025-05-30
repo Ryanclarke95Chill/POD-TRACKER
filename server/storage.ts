@@ -165,6 +165,32 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async getConsignmentsByCustomer(customerEmail: string): Promise<Consignment[]> {
+    // Get admin's consignments and filter by customer company
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return [];
+    
+    const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
+    
+    // For customer account, show only deliveries where they are the shipper or recipient
+    if (customerEmail.includes('customer@')) {
+      return allConsignments.filter(consignment => {
+        const shipperCompany = (consignment.shipperCompanyName || '').toString();
+        const shipToCompany = (consignment.shipToCompanyName || '').toString();
+        const shipFromCompany = (consignment.shipFromCompanyName || '').toString();
+        
+        // Show deliveries related to "Chill NSW" or similar companies
+        return shipperCompany.toLowerCase().includes('chill') ||
+               shipToCompany.toLowerCase().includes('chill') ||
+               shipFromCompany.toLowerCase().includes('chill') ||
+               shipperCompany.toLowerCase().includes('nsw') ||
+               shipToCompany.toLowerCase().includes('nsw');
+      });
+    }
+    
+    return [];
+  }
+
   async getConsignmentById(id: number): Promise<Consignment | undefined> {
     const [consignment] = await db.select().from(consignments).where(eq(consignments.id, id));
     return consignment || undefined;
@@ -434,6 +460,7 @@ export class DatabaseStorage implements IStorage {
       { username: 'manager', password: 'manager123', name: 'Fleet Manager', role: 'manager', department: 'Operations' },
       { username: 'supervisor', password: 'super123', name: 'Depot Supervisor', role: 'supervisor', department: 'Sydney Depot' },
       { username: 'driver', password: 'driver123', name: 'John Driver', role: 'driver', department: 'Sydney Depot' },
+      { username: 'customer', password: 'customer123', name: 'Chill NSW Customer', role: 'viewer', department: 'Customer' },
       { username: 'viewer', password: 'viewer123', name: 'Analytics Viewer', role: 'viewer', department: 'Management' }
     ];
 

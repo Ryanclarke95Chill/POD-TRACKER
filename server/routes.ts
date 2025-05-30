@@ -154,8 +154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Driver can see their own assigned deliveries
         consignments = await storage.getConsignmentsByDriver(user.email);
       } else {
-        // Viewer gets limited access
-        consignments = await storage.getConsignmentsByUserId(user.id);
+        // Viewer/Customer gets filtered access based on their company
+        if (user.email.includes('customer@')) {
+          consignments = await storage.getConsignmentsByCustomer(user.email);
+        } else {
+          consignments = await storage.getConsignmentsByUserId(user.id);
+        }
       }
       
       res.json(consignments);
