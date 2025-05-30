@@ -611,7 +611,7 @@ export default function Analytics() {
 
     // Driver analysis
     const driverStats = data.reduce((acc, c) => {
-      const driverName = (c as any).driverName || 'Unassigned';
+      const driverName = ((c as any).driverName || 'Unassigned').trim(); // Trim whitespace
       const driverId = (c as any).driverId;
       const vehicleCode = (c as any).tractorPlateNumber || (c as any).plateNumber || 'No Vehicle';
       
