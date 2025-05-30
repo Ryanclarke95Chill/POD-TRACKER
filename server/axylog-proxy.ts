@@ -89,15 +89,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         filters: {
           type: "",
           pickUp_Delivery_From: dateFrom,
-          pickUp_Delivery_To: dateTo,
-          gridHeaderFilters: {
-            shipperMasterDataCode: "",
-            shipperCompanyName: "",
-            shipFromMasterDataCode: "",
-            shipFromCompanyName: "",
-            shipToMasterDataCode: "",
-            shipToCompanyName: ""
-          }
+          pickUp_Delivery_To: dateTo
         }
       };
 
