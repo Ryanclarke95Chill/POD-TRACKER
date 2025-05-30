@@ -29,6 +29,157 @@ import {
 import { Link } from "wouter";
 import { Consignment } from "@shared/schema";
 
+// Component to show all deliveries breakdown
+function AllDeliveriesBreakdown({ consignments }: { consignments: Consignment[] }) {
+  const statusCounts = consignments.reduce((acc, c) => {
+    const deliveryState = (c as any).delivery_StateLabel;
+    const status = deliveryState === 'Positive outcome' ? 'Delivered' :
+                  deliveryState === 'Not delivered' ? 'Failed' :
+                  deliveryState === 'Traveling' ? 'In Transit' : 'Other';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-4 text-sm">
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <div key={status} className="text-center">
+            <div className="text-2xl font-bold">{count}</div>
+            <div className="text-muted-foreground">{status}</div>
+          </div>
+        ))}
+      </div>
+      <div className="max-h-96 overflow-y-auto space-y-2">
+        {consignments.slice(0, 50).map((consignment, index) => (
+          <div key={index} className="p-2 border rounded">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {(consignment as any).delivery_StateLabel || 'Unknown'}
+              </Badge>
+            </div>
+          </div>
+        ))}
+        {consignments.length > 50 && (
+          <div className="text-center text-muted-foreground text-sm">
+            Showing first 50 of {consignments.length} deliveries
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Component to show delivery rate breakdown
+function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }) {
+  const delivered = consignments.filter(c => (c as any).delivery_StateLabel === 'Positive outcome');
+  const pending = consignments.filter(c => (c as any).delivery_StateLabel !== 'Positive outcome');
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="text-center">
+          <div className="text-3xl font-bold text-green-600">{delivered.length}</div>
+          <div className="text-muted-foreground">Completed</div>
+        </div>
+        <div className="text-center">
+          <div className="text-3xl font-bold text-amber-600">{pending.length}</div>
+          <div className="text-muted-foreground">Pending</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <h4 className="font-medium text-green-600 mb-2">Completed Deliveries</h4>
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {delivered.slice(0, 20).map((consignment, index) => (
+              <div key={index} className="p-2 bg-green-50 border-l-4 border-green-200 rounded">
+                <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="font-medium text-amber-600 mb-2">Pending Deliveries</h4>
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {pending.slice(0, 20).map((consignment, index) => (
+              <div key={index} className="p-2 bg-amber-50 border-l-4 border-amber-200 rounded">
+                <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                </div>
+                <div className="text-xs text-amber-700">
+                  Status: {(consignment as any).delivery_StateLabel || 'Unknown'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Component to show depot breakdown
+function DepotBreakdown({ consignments, depotName }: { consignments: Consignment[]; depotName: string }) {
+  const depotConsignments = consignments.filter(c => 
+    (c as any).shipFromCompanyName?.includes(depotName) || (c as any).warehouseCompanyName?.includes(depotName)
+  );
+
+  const statusCounts = depotConsignments.reduce((acc, c) => {
+    const status = (c as any).delivery_StateLabel === 'Positive outcome' ? 'delivered' : 'pending';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, { delivered: 0, pending: 0 });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <div className="text-2xl font-bold">{depotConsignments.length}</div>
+          <div className="text-muted-foreground">Total</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-green-600">{statusCounts.delivered}</div>
+          <div className="text-muted-foreground">Delivered</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-amber-600">{statusCounts.pending}</div>
+          <div className="text-muted-foreground">Pending</div>
+        </div>
+      </div>
+      <div className="max-h-96 overflow-y-auto space-y-2">
+        {depotConsignments.map((consignment, index) => (
+          <div key={index} className="p-2 border rounded">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                <div className="text-xs text-muted-foreground">
+                  To: {(consignment as any).shipToCompanyName}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Driver: {(consignment as any).driverName || 'Unassigned'}
+                </div>
+              </div>
+              <Badge variant={(consignment as any).delivery_StateLabel === 'Positive outcome' ? 'secondary' : 'outline'} className="text-xs">
+                {(consignment as any).delivery_StateLabel || 'Unknown'}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Component to show detailed delivery breakdown for a driver
 function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }: { 
   driverName: string; 
@@ -396,10 +547,23 @@ export default function Analytics() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
-            <p className="text-xs text-muted-foreground">
-              +{analytics.recentDeliveries} this week
-            </p>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="text-left hover:bg-gray-50 p-2 rounded -m-2">
+                  <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
+                  <p className="text-xs text-muted-foreground">
+                    +{analytics.recentDeliveries} this week
+                  </p>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>All Deliveries ({analytics.totalConsignments})</DialogTitle>
+                  <DialogDescription>Complete list of all consignments</DialogDescription>
+                </DialogHeader>
+                <AllDeliveriesBreakdown consignments={filteredConsignments as Consignment[]} />
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
@@ -409,10 +573,23 @@ export default function Analytics() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.delivered} of {analytics.totalConsignments} completed
-            </p>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="text-left hover:bg-gray-50 p-2 rounded -m-2">
+                  <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</div>
+                  <p className="text-xs text-muted-foreground">
+                    {analytics.delivered} of {analytics.totalConsignments} completed
+                  </p>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Delivery Performance Breakdown</DialogTitle>
+                  <DialogDescription>Completed vs pending deliveries</DialogDescription>
+                </DialogHeader>
+                <DeliveryRateBreakdown consignments={filteredConsignments as Consignment[]} />
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
@@ -453,18 +630,29 @@ export default function Analytics() {
           <CardContent>
             <div className="space-y-4">
               {analytics.topDepots.map(([depot, stats]) => (
-                <div key={depot} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{depot}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">{(stats as any).total} deliveries</div>
-                    <div className="text-xs text-muted-foreground">
-                      {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}% complete
-                    </div>
-                  </div>
-                </div>
+                <Dialog key={depot}>
+                  <DialogTrigger asChild>
+                    <button className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{depot}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium">{(stats as any).total} deliveries</div>
+                        <div className="text-xs text-muted-foreground">
+                          {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}% complete
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Depot Performance - {depot}</DialogTitle>
+                      <DialogDescription>All deliveries from this depot</DialogDescription>
+                    </DialogHeader>
+                    <DepotBreakdown consignments={filteredConsignments as Consignment[]} depotName={depot} />
+                  </DialogContent>
+                </Dialog>
               ))}
             </div>
           </CardContent>
