@@ -140,12 +140,14 @@ export class AxylogAPI {
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
-          pageSize: 200
+          pageSize: 500
         },
         filters: {
           type: "",
           pickUp_Delivery_From: pickupFromDate,
-          pickUp_Delivery_To: pickupToDate
+          pickUp_Delivery_To: pickupToDate,
+          delivery_EtaCalculated: true,
+          pickUp_EtaCalculated: true
         }
       }, {
         headers: {
