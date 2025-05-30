@@ -477,6 +477,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get date range from request body first
+      const { fromDate, toDate } = req.body;
+      
       console.log("Starting axylog sync for user:", req.user.email);
       console.log("Date parameters received:", { fromDate, toDate });
       
@@ -490,9 +493,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Axylog authentication successful");
-      
-      // Get date range from request body
-      const { fromDate, toDate } = req.body;
       
       // Get deliveries from axylog with date range and filters
       const todayString = new Date().toISOString().split('T')[0];
