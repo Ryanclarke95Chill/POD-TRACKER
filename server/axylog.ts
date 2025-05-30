@@ -145,8 +145,10 @@ export class AxylogAPI {
         filters: {
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
-          includeCargo: true
-          // Removed type filter and API-level filtering to get all deliveries with shipper info
+          includeCargo: true,
+          includeShipperDetails: true,
+          includeAllFields: true
+          // Added parameters to request complete shipper information
         }
       }, {
         headers: {
