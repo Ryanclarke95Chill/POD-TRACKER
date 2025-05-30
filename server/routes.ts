@@ -484,8 +484,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Date parameters received:", { fromDate, toDate });
       
       // Test authentication first
+      console.log("Attempting axylog authentication...");
       const authResult = await axylogAPI.authenticate();
+      console.log("Authentication result:", authResult);
+      
       if (!authResult) {
+        console.log("Authentication failed");
         return res.status(500).json({
           success: false,
           message: "Failed to authenticate with axylog API"
