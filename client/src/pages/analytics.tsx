@@ -542,17 +542,30 @@ function ExecutiveView() {
       stats.satisfaction = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
     });
 
-    // Temperature zone distribution
+    // Temperature zone distribution - using actual data fields
     const tempZoneAnalysis = data.reduce((acc, c) => {
-      const indicators = [
+      // Extract temperature zone from actual data fields
+      let zone = 'Standard';
+      
+      // Check multiple potential temperature fields from Axylog data
+      const tempIndicators = [
+        (c as any).temperatureZone,
+        (c as any).expectedTemperature, 
+        (c as any).documentNote,
         (c as any).shipFromMasterDataCode,
         (c as any).warehouseCompanyName,
-        (c as any).shipperCompanyName
-      ].join(' ').toLowerCase();
+        (c as any).shipperCompanyName,
+        (c as any).delivery_MasterDataCode
+      ].filter(Boolean).join(' ').toLowerCase();
       
-      let zone = 'Ambient';
-      if (indicators.includes('frozen') || indicators.includes('freeze')) zone = 'Frozen';
-      else if (indicators.includes('chill') || indicators.includes('cold')) zone = 'Chilled';
+      // Categorize based on actual data patterns
+      if (tempIndicators.includes('frozen') || tempIndicators.includes('freeze') || tempIndicators.includes('-18')) zone = 'Frozen';
+      else if (tempIndicators.includes('chill') || tempIndicators.includes('cold') || tempIndicators.includes('2-8')) zone = 'Chilled';
+      else if (tempIndicators.includes('wine') || tempIndicators.includes('cellar')) zone = 'Wine';
+      else if (tempIndicators.includes('confect') || tempIndicators.includes('chocolate')) zone = 'Confectionery';
+      else if (tempIndicators.includes('dry') || tempIndicators.includes('ambient')) zone = 'Dry/Ambient';
+      else if (tempIndicators.includes('pharma') || tempIndicators.includes('medical')) zone = 'Pharmaceutical';
+      else if (tempIndicators.includes('produce') || tempIndicators.includes('fresh')) zone = 'Fresh Produce';
       
       acc[zone] = (acc[zone] || 0) + 1;
       return acc;
