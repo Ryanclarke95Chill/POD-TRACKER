@@ -177,6 +177,18 @@ export default function Login() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
+                      form.setValue("email", "customer");
+                      form.setValue("password", "customer123");
+                    }}
+                    className="text-xs"
+                  >
+                    Customer
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
                       form.setValue("email", "viewer");
                       form.setValue("password", "viewer123");
                     }}

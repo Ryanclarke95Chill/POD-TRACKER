@@ -172,19 +172,17 @@ export class DatabaseStorage implements IStorage {
     
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
     
-    // For customer account, show only deliveries where they are the shipper or recipient
+    // For customer account, show only deliveries where they are the shipper
+    // Customer should only see shipments they're sending, not receiving
     if (customerEmail.includes('customer@')) {
       return allConsignments.filter(consignment => {
         const shipperCompany = (consignment.shipperCompanyName || '').toString();
-        const shipToCompany = (consignment.shipToCompanyName || '').toString();
-        const shipFromCompany = (consignment.shipFromCompanyName || '').toString();
+        const documentShipperName = (consignment.documentShipperCompanyName || '').toString();
         
-        // Show deliveries related to "Chill NSW" or similar companies
+        // Show deliveries where "Chill NSW" is the shipper (sending company)
         return shipperCompany.toLowerCase().includes('chill') ||
-               shipToCompany.toLowerCase().includes('chill') ||
-               shipFromCompany.toLowerCase().includes('chill') ||
-               shipperCompany.toLowerCase().includes('nsw') ||
-               shipToCompany.toLowerCase().includes('nsw');
+               documentShipperName.toLowerCase().includes('chill') ||
+               shipperCompany.toLowerCase().includes('**chill nsw');
       });
     }
     
