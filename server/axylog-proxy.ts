@@ -79,6 +79,10 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     const pageSize = 500;
 
     console.log(`Starting pagination for date range: ${dateFrom} to ${dateTo}`);
+    console.log(`=== DATE RANGE DEBUG ===`);
+    console.log(`From Date: ${dateFrom}`);
+    console.log(`To Date: ${dateTo}`);
+    console.log(`=== END DATE RANGE DEBUG ===`);
 
     while (hasMorePages) {
       const requestBody = {
