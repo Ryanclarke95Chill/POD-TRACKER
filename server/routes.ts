@@ -123,12 +123,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "User email required" });
       }
 
+      const { syncFromDate, syncToDate } = req.body;
+
       const authResult = await axylogAPI.authenticate();
       if (!authResult) {
         return res.status(500).json({ success: false, message: "Axylog authentication failed" });
       }
 
-      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
+      // Use date range if provided, otherwise get today's data
+      const axylogConsignments = syncFromDate && syncToDate 
+        ? await axylogAPI.getConsignmentsWithFilters({
+            pickupDateFrom: syncFromDate,
+            pickupDateTo: syncToDate,
+            deliveryEmail: req.user.email
+          })
+        : await axylogAPI.getDeliveries(req.user.email);
+      
+      if (syncFromDate && syncToDate) {
+        console.log(`Synced date range: ${syncFromDate} to ${syncToDate}`);
+      } else {
+        console.log("Synced today's data");
+      }
+      
       console.log(`Retrieved ${axylogConsignments.length} deliveries from axylog`);
       
       await storage.clearUserConsignments(req.user.id);
