@@ -214,28 +214,39 @@ export class AxylogAPI {
         console.log(`Filtered to ${deliveries.length} deliveries by warehouse company name: ${filters.warehouseCompanyName}`);
       }
 
-      // Filter out auto-generated consignments where pickup and delivery are both Chill depots
+      // Filter out auto-generated consignments using master data codes
       const initialCount = deliveries.length;
       deliveries = deliveries.filter((delivery: AxylogDelivery) => {
-        const shipFrom = delivery.shipFromCompanyName?.toLowerCase() || '';
-        const shipTo = delivery.shipToCompanyName?.toLowerCase() || '';
+        const shipFromCode = delivery.shipFromMasterDataCode || '';
+        const shipToCode = delivery.shipToMasterDataCode || '';
         
-        // Filter out if both pickup and delivery contain "chill" (indicating depot-to-depot transfers)
-        const isChillToChillTransfer = (
-          (shipFrom.includes('chill') && shipTo.includes('chill')) ||
-          (shipFrom === shipTo) // Also keep the original exact match filter
+        // Check for Chill depot-to-depot transfers using master data codes
+        // Pattern: pickup from "XX_#" and delivery to "XX_#D" (same warehouse, depot variant)
+        const isChillDepotTransfer = (
+          // WA depot transfers
+          (shipFromCode === 'WA_8' && shipToCode === 'WA_8D') ||
+          (shipFromCode === 'WA_8D' && shipToCode === 'WA_8') ||
+          // NSW depot transfers  
+          (shipFromCode === 'NSW_5' && shipToCode === 'NSW_5D') ||
+          (shipFromCode === 'NSW_5D' && shipToCode === 'NSW_5') ||
+          // VIC depot transfers
+          (shipFromCode === 'VIC_29963' && shipToCode === 'VIC_29963D') ||
+          (shipFromCode === 'VIC_29963D' && shipToCode === 'VIC_29963') ||
+          // QLD depot transfers (add pattern when we see the codes)
+          (shipFromCode.startsWith('QLD_') && shipToCode.startsWith('QLD_') && 
+           shipFromCode.replace('D', '') === shipToCode.replace('D', ''))
         );
         
-        if (isChillToChillTransfer) {
-          console.log(`=== FILTERING CHILL-TO-CHILL TRANSFER ===`);
-          console.log(`From: ${delivery.shipFromCompanyName} → To: ${delivery.shipToCompanyName}`);
-          console.log(`Full payload:`, JSON.stringify(delivery, null, 2));
+        if (isChillDepotTransfer) {
+          console.log(`=== FILTERING DEPOT TRANSFER ===`);
+          console.log(`From: ${delivery.shipFromMasterDataCode} (${delivery.shipFromCompanyName}) → To: ${delivery.shipToMasterDataCode} (${delivery.shipToCompanyName})`);
+          console.log(`Order: ${delivery.orderNumberRef}`);
           console.log(`=== END FILTERED CONSIGNMENT ===`);
         }
         
-        return !isChillToChillTransfer;
+        return !isChillDepotTransfer;
       });
-      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated consignments (depot-to-depot transfers)`);
+      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated depot transfer consignments`);
 
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
