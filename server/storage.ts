@@ -168,26 +168,16 @@ export class DatabaseStorage implements IStorage {
   async getConsignmentsByShipper(shipperEmail: string): Promise<Consignment[]> {
     // Get admin's consignments and filter by shipper company
     const adminUser = await this.getUserByUsername('admin');
-    if (!adminUser) {
-      console.log('Admin user not found for shipper filtering');
-      return [];
-    }
+    if (!adminUser) return [];
     
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
-    console.log(`Found ${allConsignments.length} total consignments for admin user`);
     
     // For shipper account, show only deliveries where they are the actual shipper
     if (shipperEmail.includes('shipper')) {
-      const filtered = allConsignments.filter(consignment => {
+      return allConsignments.filter(consignment => {
         const shipperCompany = consignment.shipperCompanyName || '';
-        const isMatch = shipperCompany === 'GREENCROSS';
-        if (isMatch) {
-          console.log(`Found GREENCROSS match: ${consignment.id} - ${shipperCompany}`);
-        }
-        return isMatch;
+        return shipperCompany === 'GREENCROSS';
       });
-      console.log(`Filtered to ${filtered.length} GREENCROSS consignments`);
-      return filtered;
     }
     
     return [];
