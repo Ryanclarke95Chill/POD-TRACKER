@@ -60,17 +60,25 @@ export default function Analytics() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Temperature zone analysis from documentNote field
+  // Temperature zone analysis from multiple fields
   const temperatureZoneCounts = consignments.reduce((acc, c) => {
-    const note = c.documentNote || "";
-    let tempZone = "Unknown";
-    if (note.toLowerCase().includes("frozen") || note.toLowerCase().includes("-18")) {
+    const note = (c.documentNote || "").toLowerCase();
+    const temp = c.expectedTemperature || "";
+    const warehouseName = (c.warehouseCompanyName || "").toLowerCase();
+    
+    let tempZone = "Ambient"; // Default to ambient
+    
+    // Check various fields for temperature indicators
+    if (note.includes("frozen") || note.includes("-18") || note.includes("freeze") ||
+        temp.includes("frozen") || temp.includes("-18") ||
+        warehouseName.includes("frozen")) {
       tempZone = "Frozen";
-    } else if (note.toLowerCase().includes("chilled") || note.toLowerCase().includes("2-8")) {
+    } else if (note.includes("chilled") || note.includes("chill") || note.includes("2-8") || note.includes("cold") ||
+               temp.includes("chilled") || temp.includes("2-8") ||
+               warehouseName.includes("chill")) {
       tempZone = "Chilled";
-    } else if (note.toLowerCase().includes("ambient")) {
-      tempZone = "Ambient";
     }
+    
     acc[tempZone] = (acc[tempZone] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -88,9 +96,16 @@ export default function Analytics() {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5);
 
-  // Use qty1 and qty2 from Axylog data
-  const totalItems = consignments.reduce((sum, c) => sum + (c.qty1 || 0), 0);
-  const totalPallets = consignments.reduce((sum, c) => sum + (c.qty2 || 0), 0);
+  // Use qty1 and qty2 from Axylog data with proper number conversion
+  const totalItems = consignments.reduce((sum, c) => {
+    const qty = typeof c.qty1 === 'number' ? c.qty1 : parseInt(String(c.qty1 || 0), 10) || 0;
+    return sum + qty;
+  }, 0);
+  
+  const totalPallets = consignments.reduce((sum, c) => {
+    const qty = typeof c.qty2 === 'number' ? c.qty2 : parseInt(String(c.qty2 || 0), 10) || 0;
+    return sum + qty;
+  }, 0);
 
   return (
     <div className="flex-1 flex flex-col">
