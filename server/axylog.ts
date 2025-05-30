@@ -442,6 +442,8 @@ export class AxylogAPI {
           driverCode: delivery.driverCode || null,
           driverMasterDataCode: delivery.driverMasterDataCode || null,
           driverDescription: delivery.driverDescription || null,
+          driverName: delivery.driverName || null,
+          driverPhoneNumber: delivery.driverPhoneNumber || null,
           quantity: delivery.quantity || null,
           pallets: delivery.pallets || null,
           spaces: delivery.spaces || null,

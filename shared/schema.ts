@@ -127,6 +127,8 @@ export const consignments = pgTable("consignments", {
   driverCode: integer("driver_code"),
   driverMasterDataCode: text("driver_master_data_code"),
   driverDescription: text("driver_description"),
+  driverName: text("driver_name"),
+  driverPhoneNumber: text("driver_phone_number"),
   quantity: integer("quantity"),
   pallets: integer("pallets"),
   spaces: integer("spaces"),
@@ -252,18 +254,7 @@ export const consignments = pgTable("consignments", {
   events: text("events").default('[]'),
 });
 
-export const insertConsignmentSchema = createInsertSchema(consignments).pick({
-  consignmentNumber: true,
-  userId: true,
-  customerName: true,
-  pickupAddress: true,
-  deliveryAddress: true,
-  status: true,
-  estimatedDeliveryDate: true,
-  temperatureZone: true,
-  lastKnownLocation: true,
-  events: true,
-});
+export const insertConsignmentSchema = createInsertSchema(consignments);
 
 export type ConsignmentEvent = {
   timestamp: string;
