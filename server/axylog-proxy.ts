@@ -110,18 +110,15 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       if (response.data && response.data.itemList) {
         const deliveries = response.data.itemList;
         allDeliveries.push(...deliveries);
-        console.log(`Page ${pageNumber}: Retrieved ${deliveries.length} deliveries`);
         
         // Check if we got fewer results than page size (indicates last page)
         if (deliveries.length < pageSize) {
           hasMorePages = false;
-          console.log('Last page reached');
         } else {
           pageNumber++;
         }
       } else {
         hasMorePages = false;
-        console.log('No more data available');
       }
 
       // Safety check to prevent infinite loops
@@ -131,8 +128,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       }
     }
 
-    console.log(`=== PAGINATION COMPLETE ===`);
-    console.log(`Total deliveries retrieved: ${allDeliveries.length}`);
+    // Pagination complete
 
     // Create response object with all deliveries
     const paginatedResponse = {
@@ -141,28 +137,10 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       pagesRetrieved: pageNumber
     };
 
-    console.log('=== AXYLOG DELIVERIES RESPONSE ===');
-    console.log('Status: 200 (paginated)');
-    console.log('Response keys:', Object.keys(paginatedResponse || {}));
-    console.log('ItemList array length:', paginatedResponse?.itemList?.length);
-    console.log(`Retrieved ${paginatedResponse?.itemList?.length || 0} deliveries from axylog via pagination`);
+    // Minimal logging for performance
 
-    // Save full response to file for detailed inspection
-    fs.writeFileSync('/tmp/sample_delivery.json', JSON.stringify(paginatedResponse, null, 2));
-    console.log('Full paginated Axylog response saved to /tmp/sample_delivery.json');
-
-    // Log summary only for performance
-    console.log(`Retrieved ${allDeliveries.length} deliveries from axylog`);
-    
-    // Log only first delivery for error checking
-    if (allDeliveries.length > 0) {
-      const firstDelivery = allDeliveries[0];
-      console.log("Sample delivery:", {
-        orderNumberRef: firstDelivery.orderNumberRef,
-        shipFromCompanyName: firstDelivery.shipFromCompanyName,
-        shipToCompanyName: firstDelivery.shipToCompanyName
-      });
-    }
+    // Minimal performance-optimized logging
+    console.log(`Retrieved ${allDeliveries.length} deliveries`);
 
     res.json({
       success: true,
