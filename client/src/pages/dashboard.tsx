@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedShipper, setSelectedShipper] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [isPendingFilter, setIsPendingFilter] = useState<boolean>(false);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
@@ -89,8 +90,13 @@ export default function Dashboard() {
       consignment.warehouseCompanyName === selectedWarehouse;
     const matchesShipper = selectedShipper === "all" || 
       (consignment as any).shipperCompanyName === selectedShipper;
-    const matchesStatus = selectedStatus === "all" || 
-      getStatusDisplay(consignment) === selectedStatus;
+    const matchesStatus = (() => {
+      if (isPendingFilter) {
+        const status = getStatusDisplay(consignment);
+        return status !== "Traveling" && status !== "In Transit" && status !== "Delivered" && status !== "Complete";
+      }
+      return selectedStatus === "all" || getStatusDisplay(consignment) === selectedStatus;
+    })();
     
     // Date filtering logic - convert to AEST timezone
     const matchesDateRange = (() => {
@@ -162,11 +168,17 @@ export default function Dashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+          <div 
+            className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+            onClick={() => {
+              setSelectedStatus("all");
+              setIsPendingFilter(false);
+            }}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Consignments</p>
-                <p className="text-3xl font-bold text-gray-900">{consignments.length}</p>
+                <p className="text-3xl font-bold text-gray-900">{(consignments as Consignment[]).length}</p>
               </div>
               <div className="bg-primary/10 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-primary" />
@@ -174,11 +186,17 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+          <div 
+            className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+            onClick={() => {
+              setSelectedStatus("In Transit");
+              setIsPendingFilter(false);
+            }}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">In Transit</p>
-                <p className="text-3xl font-bold text-blue-600">{consignments.filter(c => getStatusDisplay(c) === "Traveling" || getStatusDisplay(c) === "In Transit").length}</p>
+                <p className="text-3xl font-bold text-blue-600">{(consignments as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Traveling" || getStatusDisplay(c) === "In Transit").length}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
@@ -186,11 +204,17 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+          <div 
+            className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+            onClick={() => {
+              setSelectedStatus("Delivered");
+              setIsPendingFilter(false);
+            }}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-3xl font-bold text-green-600">{consignments.filter(c => getStatusDisplay(c) === "Delivered" || getStatusDisplay(c) === "Complete").length}</p>
+                <p className="text-3xl font-bold text-green-600">{(consignments as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Delivered" || getStatusDisplay(c) === "Complete").length}</p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-green-600" />
@@ -198,11 +222,17 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="gradient-card shadow-card rounded-xl p-6 border border-white/20">
+          <div 
+            className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+            onClick={() => {
+              setSelectedStatus("all");
+              setIsPendingFilter(true);
+            }}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-3xl font-bold text-amber-600">{consignments.filter(c => {
+                <p className="text-3xl font-bold text-amber-600">{(consignments as Consignment[]).filter((c: Consignment) => {
                   const status = getStatusDisplay(c);
                   return status !== "Traveling" && status !== "In Transit" && status !== "Delivered" && status !== "Complete";
                 }).length}</p>
@@ -294,7 +324,10 @@ export default function Dashboard() {
                   Status
                 </label>
               </div>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus} onValueChange={(value) => {
+                setSelectedStatus(value);
+                setIsPendingFilter(false);
+              }}>
                 <SelectTrigger className="w-full border-gray-200 focus:border-primary focus:ring-primary/20">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
