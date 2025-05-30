@@ -155,9 +155,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consignments = await storage.getConsignmentsByDriver(user.email);
       } else {
         // Viewer/Shipper gets filtered access based on their company
+        console.log(`Checking shipper access for email: ${user.email}`);
         if (user.email.includes('shipper@')) {
+          console.log('Calling getConsignmentsByShipper');
           consignments = await storage.getConsignmentsByShipper(user.email);
         } else {
+          console.log('Using getConsignmentsByUserId fallback');
           consignments = await storage.getConsignmentsByUserId(user.id);
         }
       }
