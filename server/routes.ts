@@ -134,8 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const axylogConsignments = syncFromDate && syncToDate 
         ? await axylogAPI.getConsignmentsWithFilters({
             pickupDateFrom: syncFromDate,
-            pickupDateTo: syncToDate,
-            deliveryEmail: req.user.email
+            pickupDateTo: syncToDate
           })
         : await axylogAPI.getDeliveries(req.user.email);
       
