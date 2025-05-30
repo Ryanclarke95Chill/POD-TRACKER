@@ -630,8 +630,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Insert new consignments from axylog
-      const insertedConsignments = [];
+      // Prepare all consignments for batch insert
+      console.log(`Preparing ${axylogConsignments.length} consignments for batch insert...`);
+      const consignmentsToInsert = [];
+      
       for (const consignment of axylogConsignments) {
         try {
           // Create a complete consignment record with all required fields
@@ -837,14 +839,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             events: JSON.stringify(consignment.events || [])
           };
           
-          const inserted = await storage.createConsignment(insertData);
-          insertedConsignments.push(inserted);
-        } catch (insertError) {
-          console.error("Error inserting consignment:", insertError);
+          consignmentsToInsert.push(insertData);
+        } catch (prepareError) {
+          console.error("Error preparing consignment:", prepareError);
           console.error("Consignment data:", consignment);
         }
       }
 
+      // Batch insert all consignments at once
+      console.log(`Batch inserting ${consignmentsToInsert.length} consignments...`);
+      const insertedConsignments = await storage.createConsignmentsBatch(consignmentsToInsert);
       console.log(`Successfully synced ${insertedConsignments.length} consignments`);
       res.setHeader('Content-Type', 'application/json');
       res.json({ 

@@ -12,6 +12,7 @@ export interface IStorage {
   getConsignmentById(id: number): Promise<Consignment | undefined>;
   getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined>;
   createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
+  createConsignmentsBatch(consignments: Omit<Consignment, "id">[]): Promise<Consignment[]>;
   updateConsignment(consignment: Consignment): Promise<Consignment>;
   seedDemoConsignments(userId: number): Promise<void>;
   clearAllConsignments(): Promise<void>;
@@ -161,6 +162,25 @@ export class DatabaseStorage implements IStorage {
 
   async clearUserConsignments(userId: number): Promise<void> {
     await db.delete(consignments).where(eq(consignments.userId, userId));
+  }
+
+  async createConsignmentsBatch(consignmentList: Omit<Consignment, "id">[]): Promise<Consignment[]> {
+    if (consignmentList.length === 0) return [];
+    
+    // Process in chunks of 100 to avoid SQL parameter limits
+    const chunkSize = 100;
+    const results: Consignment[] = [];
+    
+    for (let i = 0; i < consignmentList.length; i += chunkSize) {
+      const chunk = consignmentList.slice(i, i + chunkSize);
+      const inserted = await db
+        .insert(consignments)
+        .values(chunk)
+        .returning();
+      results.push(...inserted);
+    }
+    
+    return results;
   }
 }
 
