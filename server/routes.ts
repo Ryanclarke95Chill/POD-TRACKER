@@ -575,6 +575,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           await storage.createConsignment(consignmentData);
           inserted++;
+          
+          // Log only the first delivery for error checking
+          if (inserted === 1) {
+            console.log("Sample delivery processed:", {
+              orderNumberRef: delivery.orderNumberRef,
+              shipFromCompanyName: delivery.shipFromCompanyName,
+              shipToCompanyName: delivery.shipToCompanyName,
+              qty1: delivery.qty1,
+              um1: delivery.um1
+            });
+          }
         } catch (insertError) {
           console.error("Insert error:", insertError);
         }
