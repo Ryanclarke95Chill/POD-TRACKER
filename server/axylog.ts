@@ -146,10 +146,8 @@ export class AxylogAPI {
           type: "",
           pickUp_Delivery_From: pickupFromDate,
           pickUp_Delivery_To: pickupToDate,
-          includeCargo: true,
-          // Exclude internal depot transfers at API level
-          excludeShipFromCodes: ["WA_8", "NSW_5", "VIC_29963", "QLD_829"],
-          excludeShipToCodes: ["WA_8D", "NSW_5D", "VIC_29963D", "QLD_829D"]
+          includeCargo: true
+          // Removed API-level filtering to see all data including shipper info
         }
       }, {
         headers: {
