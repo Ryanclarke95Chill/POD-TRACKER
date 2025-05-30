@@ -45,6 +45,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   console.log("Registering API routes...");
+  
+  // Create admin user on startup
+  try {
+    const adminUser = await storage.createAdminUser();
+    console.log("Admin user ready:", adminUser.username);
+  } catch (error) {
+    console.error("Error creating admin user:", error);
+  }
 
   // Login endpoint
   app.post("/api/login", async (req: Request, res: Response) => {

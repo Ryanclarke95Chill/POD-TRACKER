@@ -2,6 +2,7 @@ import { users, type User, type InsertUser, consignments, type Consignment, type
 import { format, addDays, subDays } from "date-fns";
 import { db } from "./db";
 import { eq, sql, inArray } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -263,6 +264,31 @@ export class DatabaseStorage implements IStorage {
 
   async getPublicDashboards(): Promise<Dashboard[]> {
     return await db.select().from(dashboards).where(eq(dashboards.isPublic, true));
+  }
+
+  async createAdminUser(): Promise<User> {
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    
+    // Check if admin already exists
+    const existingAdmin = await this.getUserByUsername('admin');
+    if (existingAdmin) {
+      return existingAdmin;
+    }
+
+    const [adminUser] = await db
+      .insert(users)
+      .values({
+        username: 'admin',
+        password: hashedPassword,
+        email: 'admin@chilltrack.com',
+        name: 'System Administrator',
+        role: 'admin',
+        department: 'Management',
+        isActive: true,
+      })
+      .returning();
+    
+    return adminUser;
   }
 }
 
