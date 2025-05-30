@@ -136,49 +136,77 @@ export class AxylogAPI {
       
       console.log(`Requesting data from ${pickupFromDate} to ${pickupToDate}`);
 
-      // Make request to get deliveries using exact working Postman structure
-      const response = await axios.post(DELIVERIES_URL, {
-        pagination: {
-          skip: 0,
-          pageSize: 500
-        },
-        filters: {
-          type: "",
-          pickUp_Delivery_From: pickupFromDate,
-          pickUp_Delivery_To: pickupToDate
-        }
-      }, {
-        headers: {
-          "Authorization": `Bearer ${this.credentials!.token}`,
-          "ContextOwner": this.credentials!.contextOwnerId,
-          "User": this.credentials!.userId,
-          "Company": this.credentials!.companyId,
-          "SourceDeviceType": "3",
-          "Content-Type": "application/json"
-        }
-      });
+      // Fetch all deliveries using pagination
+      let allDeliveries: any[] = [];
+      let skip = 0;
+      const pageSize = 500;
+      let hasMoreData = true;
+      let pageNumber = 1;
 
-      console.log("=== AXYLOG RESPONSE SUMMARY ===");
-      console.log("Response status:", response.status);
-      console.log("Response data keys:", Object.keys(response.data || {}));
-      
-      if (!response.data || !response.data.itemList) {
-        console.warn("No deliveries found in Axylog response");
-        console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");
-        return [];
+      while (hasMoreData) {
+        console.log(`Fetching page ${pageNumber} (skip: ${skip}, pageSize: ${pageSize})`);
+        
+        const response = await axios.post(DELIVERIES_URL, {
+          pagination: {
+            skip: skip,
+            pageSize: pageSize
+          },
+          filters: {
+            type: "",
+            pickUp_Delivery_From: pickupFromDate,
+            pickUp_Delivery_To: pickupToDate
+          }
+        }, {
+          headers: {
+            "Authorization": `Bearer ${this.credentials!.token}`,
+            "ContextOwner": this.credentials!.contextOwnerId,
+            "User": this.credentials!.userId,
+            "Company": this.credentials!.companyId,
+            "SourceDeviceType": "3",
+            "Content-Type": "application/json"
+          }
+        });
+
+        console.log("=== AXYLOG RESPONSE SUMMARY ===");
+        console.log("Response status:", response.status);
+        console.log("Response data keys:", Object.keys(response.data || {}));
+        
+        if (!response.data || !response.data.itemList) {
+          console.warn("No deliveries found in Axylog response");
+          console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");
+          hasMoreData = false;
+          break;
+        }
+
+        const pageDeliveries = response.data.itemList;
+        console.log(`Received ${pageDeliveries.length} deliveries on page ${pageNumber}`);
+
+        if (pageDeliveries.length === 0 || pageDeliveries.length < pageSize) {
+          hasMoreData = false;
+        }
+
+        allDeliveries.push(...pageDeliveries);
+        skip += pageSize;
+        pageNumber++;
+
+        // Safety check to prevent infinite loops
+        if (pageNumber > 100) {
+          console.log("Reached maximum safety limit of 100 pages");
+          break;
+        }
       }
-      
-      console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
+
+      console.log(`Total deliveries retrieved across ${pageNumber - 1} pages: ${allDeliveries.length}`);
 
       // Debug: Check full first delivery record
       console.log("=== FULL FIRST DELIVERY RECORD ===");
-      if (response.data.itemList.length > 0) {
-        console.log('First delivery:', JSON.stringify(response.data.itemList[0], null, 2));
+      if (allDeliveries.length > 0) {
+        console.log('First delivery:', JSON.stringify(allDeliveries[0], null, 2));
       }
       console.log("=== END FULL DELIVERY RECORD ===");
 
       // Apply additional filters and convert to our format
-      let deliveries = response.data.itemList;
+      let deliveries = allDeliveries;
       
       // Filter by email if provided and not empty
       if (filters.deliveryEmail && filters.deliveryEmail.trim() !== '') {
