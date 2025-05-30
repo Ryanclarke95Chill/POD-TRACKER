@@ -4,6 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -18,19 +22,172 @@ import {
   Users,
   Calendar,
   Thermometer,
-  ArrowLeft
+  ArrowLeft,
+  Filter,
+  X
 } from "lucide-react";
 import { Link } from "wouter";
 import { Consignment } from "@shared/schema";
 
+// Component to show detailed delivery breakdown for a driver
+function DriverDeliveryDetails({ driverName, consignments }: { driverName: string; consignments: Consignment[] }) {
+  const driverConsignments = consignments.filter(c => 
+    (c as any).driverName === driverName || ((c as any).driverName === null && driverName === 'Unassigned')
+  );
+
+  const getDeliveryStatus = (consignment: Consignment) => {
+    const deliveryState = (consignment as any).delivery_StateLabel;
+    const pickupState = (consignment as any).pickUp_StateLabel;
+    
+    if (deliveryState === 'Positive outcome') return { status: 'Delivered', type: 'success' };
+    if (deliveryState === 'Not delivered') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
+    if (deliveryState === 'GPS not present') return { status: 'GPS Issue', type: 'failure', reason: deliveryState };
+    if (pickupState === 'Not picked up') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
+    if (deliveryState === 'Traveling' || pickupState === 'Traveling') return { status: 'In Transit', type: 'active' };
+    if (deliveryState === 'Arrived') return { status: 'Arrived at Destination', type: 'active' };
+    
+    return { status: deliveryState || pickupState || 'Unknown', type: 'unknown' };
+  };
+
+  const statusBreakdown = driverConsignments.reduce((acc, consignment) => {
+    const { status, type, reason } = getDeliveryStatus(consignment);
+    if (!acc[type]) acc[type] = [];
+    acc[type].push({ consignment, status, reason });
+    return acc;
+  }, {} as Record<string, Array<{ consignment: Consignment; status: string; reason?: string }>>);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{statusBreakdown.success?.length || 0}</div>
+          <div className="text-muted-foreground">Successful</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-red-600">{statusBreakdown.failure?.length || 0}</div>
+          <div className="text-muted-foreground">Failed</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-600">{statusBreakdown.active?.length || 0}</div>
+          <div className="text-muted-foreground">Active</div>
+        </div>
+      </div>
+
+      {statusBreakdown.failure && statusBreakdown.failure.length > 0 && (
+        <div>
+          <h4 className="font-medium text-red-600 mb-2 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Failed Deliveries ({statusBreakdown.failure.length})
+          </h4>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {statusBreakdown.failure.map(({ consignment, status, reason }, index) => (
+              <div key={index} className="bg-red-50 p-3 rounded border-l-4 border-red-200">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                    </div>
+                  </div>
+                  <Badge variant="destructive" className="text-xs">{status}</Badge>
+                </div>
+                {reason && (
+                  <div className="text-xs text-red-700 mt-1">Reason: {reason}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {statusBreakdown.success && statusBreakdown.success.length > 0 && (
+        <div>
+          <h4 className="font-medium text-green-600 mb-2 flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Recent Successful Deliveries (last 5)
+          </h4>
+          <div className="space-y-2 max-h-32 overflow-y-auto">
+            {statusBreakdown.success.slice(0, 5).map(({ consignment }, index) => (
+              <div key={index} className="bg-green-50 p-2 rounded border-l-4 border-green-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-sm">{(consignment as any).consignmentNo}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {(consignment as any).shipFromCompanyName} → {(consignment as any).shipToCompanyName}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Delivered</Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Analytics() {
   const [selectedView, setSelectedView] = useState<"ceo" | "allocator" | "deepdive">("ceo");
+  const [filters, setFilters] = useState({
+    dateFrom: "",
+    dateTo: "",
+    status: "all",
+    depot: "all",
+    driver: "all"
+  });
 
   const { data: consignments = [], isLoading } = useQuery({
     queryKey: ["/api/consignments"],
     staleTime: 0,
     gcTime: 0,
   });
+
+  // Filter consignments based on current filters
+  const filteredConsignments = useMemo(() => {
+    let filtered = consignments as Consignment[];
+
+    // Date filtering
+    if (filters.dateFrom || filters.dateTo) {
+      filtered = filtered.filter(c => {
+        const consignmentDate = (c as any).departureDateTime || (c as any).delivery_PlannedETA;
+        if (!consignmentDate) return true;
+        
+        const date = new Date(consignmentDate).toISOString().split('T')[0];
+        const fromMatch = !filters.dateFrom || date >= filters.dateFrom;
+        const toMatch = !filters.dateTo || date <= filters.dateTo;
+        return fromMatch && toMatch;
+      });
+    }
+
+    // Status filtering
+    if (filters.status !== "all") {
+      filtered = filtered.filter(c => {
+        const deliveryState = (c as any).delivery_StateLabel;
+        const pickupState = (c as any).pickUp_StateLabel;
+        
+        if (filters.status === "delivered") return deliveryState === 'Positive outcome';
+        if (filters.status === "failed") return deliveryState === 'Not delivered' || deliveryState === 'GPS not present' || pickupState === 'Not picked up';
+        if (filters.status === "active") return deliveryState === 'Traveling' || pickupState === 'Traveling';
+        return true;
+      });
+    }
+
+    // Depot filtering
+    if (filters.depot !== "all") {
+      filtered = filtered.filter(c => 
+        (c as any).shipFromCompanyName?.includes(filters.depot) || 
+        (c as any).warehouseCompanyName?.includes(filters.depot)
+      );
+    }
+
+    // Driver filtering
+    if (filters.driver !== "all") {
+      filtered = filtered.filter(c => (c as any).driverName === filters.driver);
+    }
+
+    return filtered;
+  }, [consignments, filters]);
 
   // Helper function to get status display
   const getStatusDisplay = (consignment: Consignment) => {
@@ -488,7 +645,22 @@ export default function Analytics() {
                       Active: {(stats as any).inTransit}
                     </div>
                     <div className="text-amber-600">
-                      Success Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button className="hover:underline">
+                            Success Rate: {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}%
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Delivery Details for {driverName}</DialogTitle>
+                            <DialogDescription>
+                              Complete breakdown of deliveries and any failures
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DriverDeliveryDetails driverName={driverName} consignments={consignments} />
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
