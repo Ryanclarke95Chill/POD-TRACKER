@@ -173,12 +173,12 @@ export class DatabaseStorage implements IStorage {
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
     
     // For shipper account, show only deliveries where they are the actual shipper
-    if (shipperEmail.includes('shipper@')) {
+    if (shipperEmail.includes('shipper')) {
       return allConsignments.filter(consignment => {
         const shipperCompany = (consignment.shipperCompanyName || '').toString();
         
         // Show only deliveries where "GREENCROSS" is the shipper company
-        return shipperCompany.toLowerCase().includes('greencross');
+        return shipperCompany.toUpperCase().includes('GREENCROSS');
       });
     }
     
