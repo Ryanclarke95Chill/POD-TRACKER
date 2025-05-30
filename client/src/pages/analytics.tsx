@@ -794,7 +794,7 @@ export default function Analytics() {
                       <div className="text-right">
                         <div className="text-sm font-medium">{(stats as any).total} deliveries</div>
                         <div className="text-xs text-muted-foreground">
-                          {((stats as any).delivered / (stats as any).total * 100).toFixed(1)}% complete
+                          {((stats as any).completed / (stats as any).total * 100).toFixed(1)}% complete
                         </div>
                       </div>
                     </button>
@@ -876,7 +876,7 @@ export default function Analytics() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Completed Today</span>
-                <Badge variant="outline">{analytics.delivered}</Badge>
+                <Badge variant="outline">{analytics.completed}</Badge>
               </div>
             </div>
           </CardContent>
@@ -1122,7 +1122,7 @@ export default function Analytics() {
                     <div 
                       className="bg-green-500 h-2 rounded-full" 
                       style={{ 
-                        width: `${((stats as any).delivered / (stats as any).total) * 100}%` 
+                        width: `${((stats as any).completed / (stats as any).total) * 100}%` 
                       }}
                     ></div>
                   </div>
