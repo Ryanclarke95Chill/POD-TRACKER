@@ -464,7 +464,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Working axylog sync endpoint with proper error handling
   app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
     console.log("=== AXYLOG SYNC ENDPOINT REACHED ===");
-    console.log("Request body:", JSON.stringify(req.body, null, 2));
     
     // Immediately set response headers to prevent routing issues
     res.setHeader('Content-Type', 'application/json');
@@ -472,26 +471,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       if (!req.user?.email) {
-        console.log("ERROR: No user email found");
         return res.status(400).json({ 
           success: false, 
           message: "User email not found" 
         });
       }
 
-      // Get date range from request body
-      const { fromDate, toDate } = req.body;
-      console.log("Date range:", { fromDate, toDate });
-      
       console.log("Starting axylog sync for user:", req.user.email);
       
       // Test authentication first
-      console.log("Attempting axylog authentication...");
       const authResult = await axylogAPI.authenticate();
-      console.log("Authentication result:", authResult);
-      
       if (!authResult) {
-        console.log("ERROR: Axylog authentication failed");
         return res.status(500).json({
           success: false,
           message: "Failed to authenticate with axylog API"
@@ -499,6 +489,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Axylog authentication successful");
+      
+      // Get date range from request body
+      const { fromDate, toDate } = req.body;
       
       // Get deliveries from axylog with date range and filters
       const todayString = new Date().toISOString().split('T')[0];
