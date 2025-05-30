@@ -88,6 +88,11 @@ export default function Dashboard() {
     const matchesTempZone = selectedTempZone === "all" || tempZone === selectedTempZone;
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
+    
+    // Debug logging for warehouse filtering
+    if (selectedWarehouse !== "all" && consignment.warehouseCompanyName === selectedWarehouse) {
+      console.log(`Warehouse match found: ${consignment.id} - ${consignment.warehouseCompanyName}`);
+    }
     const matchesShipper = selectedShipper === "all" || 
       (consignment as any).shipperCompanyName === selectedShipper;
     const matchesStatus = (() => {
