@@ -243,8 +243,32 @@ export class AxylogAPI {
         console.log(`Sample ${i+1}: Order ${d.orderNumberRef} - From: "${d.shipFromMasterDataCode}" To: "${d.shipToMasterDataCode}"`);
       }
       
-      // TEMPORARILY DISABLED depot transfer filtering to debug shipper data
-      console.log(`Keeping all ${deliveries.length} deliveries (depot transfer filtering disabled for debugging)`);
+      // Filter out depot transfers where pickup and delivery are the same depot
+      const depotTransferPatterns = [
+        { from: 'WA_8', to: 'WA_8D' },
+        { from: 'WA_8D', to: 'WA_8' },
+        { from: 'NSW_5', to: 'NSW_5D' },
+        { from: 'NSW_5D', to: 'NSW_5' },
+        { from: 'VIC_29963', to: 'VIC_29963D' },
+        { from: 'VIC_29963D', to: 'VIC_29963' },
+        { from: 'QLD_829', to: 'QLD_829D' },
+        { from: 'QLD_829D', to: 'QLD_829' }
+      ];
+
+      deliveries = deliveries.filter((delivery: AxylogDelivery) => {
+        const from = delivery.shipFromMasterDataCode;
+        const to = delivery.shipToMasterDataCode;
+        
+        // Check if this is a depot transfer
+        const isDepotTransfer = depotTransferPatterns.some(pattern => 
+          pattern.from === from && pattern.to === to
+        );
+        
+        return !isDepotTransfer;
+      });
+
+      const filteredCount = deliveries.length;
+      console.log(`Filtered out ${initialCount - filteredCount} depot transfers, keeping ${filteredCount} customer deliveries`);
 
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
