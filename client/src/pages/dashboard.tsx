@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [selectedTempZone, setSelectedTempZone] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
+  const [selectedShipper, setSelectedShipper] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
@@ -42,11 +44,6 @@ export default function Dashboard() {
     refetch();
   }, [refetch, queryClient]);
 
-  // Get unique warehouse company names for filter dropdown
-  const warehouseCompanies = Array.from(
-    new Set((consignments as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
-  ).sort();
-
   // Helper function to extract temperature from documentNote
   const getTemperatureZone = (consignment: Consignment) => {
     return consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
@@ -67,7 +64,22 @@ export default function Dashboard() {
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
-  // Filter consignments based on search term, temperature zone, warehouse company, and date range
+  // Get unique warehouse company names for filter dropdown
+  const warehouseCompanies = Array.from(
+    new Set((consignments as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
+  ).sort();
+
+  // Get unique shipper company names for filter dropdown
+  const shipperCompanies = Array.from(
+    new Set((consignments as Consignment[]).map(c => (c as any).shipperCompanyName).filter(Boolean))
+  ).sort();
+
+  // Get unique status values for filter dropdown
+  const statusValues = Array.from(
+    new Set((consignments as Consignment[]).map(c => getStatusDisplay(c)).filter(Boolean))
+  ).sort();
+
+  // Filter consignments based on search term, temperature zone, warehouse company, shipper, status, and date range
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
       (consignment.consignmentNo && consignment.consignmentNo.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -75,6 +87,10 @@ export default function Dashboard() {
     const matchesTempZone = selectedTempZone === "all" || tempZone === selectedTempZone;
     const matchesWarehouse = selectedWarehouse === "all" || 
       consignment.warehouseCompanyName === selectedWarehouse;
+    const matchesShipper = selectedShipper === "all" || 
+      (consignment as any).shipperCompanyName === selectedShipper;
+    const matchesStatus = selectedStatus === "all" || 
+      getStatusDisplay(consignment) === selectedStatus;
     
     // Date filtering logic
     const matchesDateRange = (() => {
@@ -95,7 +111,7 @@ export default function Dashboard() {
       return true;
     })();
     
-    return matchesSearch && matchesTempZone && matchesWarehouse && matchesDateRange;
+    return matchesSearch && matchesTempZone && matchesWarehouse && matchesShipper && matchesStatus && matchesDateRange;
   });
 
   const handleViewDetails = (consignment: Consignment) => {
@@ -197,7 +213,7 @@ export default function Dashboard() {
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
@@ -230,6 +246,50 @@ export default function Dashboard() {
                   {warehouseCompanies.map((warehouse) => (
                     <SelectItem key={warehouse} value={warehouse}>
                       {warehouse}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  Shipper
+                </label>
+              </div>
+              <Select value={selectedShipper} onValueChange={setSelectedShipper}>
+                <SelectTrigger className="w-full border-gray-200 focus:border-primary focus:ring-primary/20">
+                  <SelectValue placeholder="All Shippers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Shippers</SelectItem>
+                  {shipperCompanies.map((shipper) => (
+                    <SelectItem key={shipper} value={shipper}>
+                      {shipper}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  Status
+                </label>
+              </div>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full border-gray-200 focus:border-primary focus:ring-primary/20">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {statusValues.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
                     </SelectItem>
                   ))}
                 </SelectContent>
