@@ -192,7 +192,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Retrieved ${axylogConsignments.length} deliveries from axylog`);
       
-      await storage.clearUserConsignments(req.user.id);
+      // Clear ALL consignments from ALL users to ensure clean slate
+      console.log("Clearing all existing consignments from all users...");
+      await db.delete(consignments);
+      console.log("All consignments cleared successfully");
       
       let syncStatus = 'success';
       let errorMessage = null;

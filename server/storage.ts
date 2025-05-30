@@ -311,53 +311,13 @@ export class DatabaseStorage implements IStorage {
       await this.clearUserConsignments(user.id);
 
       // Create copies of admin's consignments for this user, excluding ID field
-      const consignmentsCopy = adminConsignments.map(consignment => ({
-        userId: user.id,
-        contextOwnerVatNumber: consignment.contextOwnerVatNumber,
-        type: consignment.type,
-        year: consignment.year,
-        code: consignment.code,
-        prog: consignment.prog,
-        consignmentNo: consignment.consignmentNo,
-        departureDateTime: consignment.departureDateTime,
-        contextPlannedDepartureDateTime: consignment.contextPlannedDepartureDateTime,
-        pickupAddress: consignment.pickupAddress,
-        pickupCityName: consignment.pickupCityName,
-        pickupPostalCode: consignment.pickupPostalCode,
-        pickupCountryCode: consignment.pickupCountryCode,
-        pickupLatitude: consignment.pickupLatitude,
-        pickupLongitude: consignment.pickupLongitude,
-        deliveryAddress: consignment.deliveryAddress,
-        deliveryCityName: consignment.deliveryCityName,
-        deliveryPostalCode: consignment.deliveryPostalCode,
-        deliveryCountryCode: consignment.deliveryCountryCode,
-        deliveryLatitude: consignment.deliveryLatitude,
-        deliveryLongitude: consignment.deliveryLongitude,
-        carrierCompanyName: consignment.carrierCompanyName,
-        driverFirstName: consignment.driverFirstName,
-        driverLastName: consignment.driverLastName,
-        vehicleCode: consignment.vehicleCode,
-        plannedPickupDateTime: consignment.plannedPickupDateTime,
-        actualPickupDateTime: consignment.actualPickupDateTime,
-        plannedDeliveryDateTime: consignment.plannedDeliveryDateTime,
-        actualDeliveryDateTime: consignment.actualDeliveryDateTime,
-        shipperCompanyName: consignment.shipperCompanyName,
-        receiverCompanyName: consignment.receiverCompanyName,
-        totalWeight: consignment.totalWeight,
-        totalVolume: consignment.totalVolume,
-        packageCount: consignment.packageCount,
-        packageType: consignment.packageType,
-        serviceType: consignment.serviceType,
-        priority: consignment.priority,
-        temperature: consignment.temperature,
-        specialInstructions: consignment.specialInstructions,
-        status: consignment.status,
-        pickupStatus: consignment.pickupStatus,
-        deliveryStatus: consignment.deliveryStatus,
-        trackingNumber: consignment.trackingNumber,
-        orderNumberRef: consignment.orderNumberRef,
-        events: consignment.events,
-      }));
+      const consignmentsCopy = adminConsignments.map(consignment => {
+        const { id, ...rest } = consignment;
+        return {
+          ...rest,
+          userId: user.id, // Override userId for the new user
+        };
+      });
 
       if (consignmentsCopy.length > 0) {
         // Use direct database insertion to avoid ID conflicts
