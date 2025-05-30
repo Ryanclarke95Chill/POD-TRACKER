@@ -58,13 +58,7 @@ app.use((req, res, next) => {
   
   // In production, serve built frontend files
   if (app.get("env") === "production") {
-    // Serve static files from client/dist
-    app.use(express.static(path.join(__dirname, '../client/dist')));
-    
-    // Catch-all handler for SPA routing
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-    });
+    serveStatic(app);
   } else {
     // Development mode - use Vite dev server
     await setupVite(app, server);
