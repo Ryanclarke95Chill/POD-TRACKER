@@ -46,6 +46,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserById(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
@@ -89,6 +94,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
+    // Get the user to check their role
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+
+    // If user is admin, show their own consignments
+    if (user.role === 'admin') {
+      return await db.select().from(consignments).where(eq(consignments.userId, userId));
+    }
+
+    // For non-admin users, show admin's consignments (latest synced data)
+    const adminUser = await this.getUserByUsername('admin');
+    if (adminUser) {
+      return await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
+    }
+
+    // Fallback to user's own consignments if no admin found
     return await db.select().from(consignments).where(eq(consignments.userId, userId));
   }
 

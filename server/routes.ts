@@ -220,10 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errorMessage: null
         });
         
-        // Copy the real data to all non-admin users
-        console.log("Distributing data to all non-admin users...");
-        await storage.copyConsignmentsForNonAdminUsers();
-        console.log("Data distribution completed");
+        console.log("Admin sync completed - all users will now see this data automatically");
         
       } catch (syncError) {
         syncStatus = 'failed';
