@@ -171,7 +171,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">In Transit</p>
-                <p className="text-3xl font-bold text-blue-600">{consignments.filter(c => c.status === "In Transit").length}</p>
+                <p className="text-3xl font-bold text-blue-600">{consignments.filter(c => getStatusDisplay(c) === "Traveling" || getStatusDisplay(c) === "In Transit").length}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
@@ -183,7 +183,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-3xl font-bold text-green-600">{consignments.filter(c => c.status === "Delivered").length}</p>
+                <p className="text-3xl font-bold text-green-600">{consignments.filter(c => getStatusDisplay(c) === "Delivered" || getStatusDisplay(c) === "Complete").length}</p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-green-600" />
@@ -195,7 +195,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-3xl font-bold text-amber-600">{consignments.filter(c => c.status !== "In Transit" && c.status !== "Delivered").length}</p>
+                <p className="text-3xl font-bold text-amber-600">{consignments.filter(c => {
+                  const status = getStatusDisplay(c);
+                  return status !== "Traveling" && status !== "In Transit" && status !== "Delivered" && status !== "Complete";
+                }).length}</p>
               </div>
               <div className="bg-amber-50 p-3 rounded-lg">
                 <Clock className="h-6 w-6 text-amber-600" />
