@@ -204,9 +204,28 @@ export default function Analytics() {
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
 
-  // Calculate analytics data
+  // Get unique values for filter dropdowns
+  const uniqueDepots = useMemo(() => {
+    const depots = new Set<string>();
+    (consignments as Consignment[]).forEach(c => {
+      const depot = (c as any).shipFromCompanyName || (c as any).warehouseCompanyName;
+      if (depot) depots.add(depot);
+    });
+    return Array.from(depots).sort();
+  }, [consignments]);
+
+  const uniqueDrivers = useMemo(() => {
+    const drivers = new Set<string>();
+    (consignments as Consignment[]).forEach(c => {
+      const driver = (c as any).driverName;
+      if (driver) drivers.add(driver);
+    });
+    return Array.from(drivers).sort();
+  }, [consignments]);
+
+  // Calculate analytics data using filtered data
   const analytics = useMemo(() => {
-    const data = consignments as Consignment[];
+    const data = filteredConsignments;
     
     // Basic metrics
     const totalConsignments = data.length;
@@ -323,7 +342,19 @@ export default function Analytics() {
         .filter(([,stats]) => (stats as any).inTransit > 0)
         .length
     };
-  }, [consignments]);
+  }, [filteredConsignments, getStatusDisplay]);
+
+  const clearFilters = () => {
+    setFilters({
+      dateFrom: "",
+      dateTo: "",
+      status: "all",
+      depot: "all",
+      driver: "all"
+    });
+  };
+
+  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.status !== "all" || filters.depot !== "all" || filters.driver !== "all";
 
   if (isLoading) {
     return (
@@ -658,7 +689,7 @@ export default function Analytics() {
                               Complete breakdown of deliveries and any failures
                             </DialogDescription>
                           </DialogHeader>
-                          <DriverDeliveryDetails driverName={driverName} consignments={consignments} />
+                          <DriverDeliveryDetails driverName={driverName} consignments={filteredConsignments as Consignment[]} />
                         </DialogContent>
                       </Dialog>
                     </div>
