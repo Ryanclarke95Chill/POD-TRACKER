@@ -165,23 +165,20 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getConsignmentsByCustomer(customerEmail: string): Promise<Consignment[]> {
-    // Get admin's consignments and filter by customer company
+  async getConsignmentsByShipper(shipperEmail: string): Promise<Consignment[]> {
+    // Get admin's consignments and filter by shipper company
     const adminUser = await this.getUserByUsername('admin');
     if (!adminUser) return [];
     
     const allConsignments = await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
     
-    // For customer account, show only deliveries where they are the shipper
-    // Customer should only see shipments they're sending, not receiving
-    if (customerEmail.includes('customer@')) {
+    // For shipper account, show only deliveries where they are the actual shipper
+    if (shipperEmail.includes('shipper@')) {
       return allConsignments.filter(consignment => {
         const shipperCompany = (consignment.shipperCompanyName || '').toString();
-        const documentShipperName = (consignment.documentShipperCompanyName || '').toString();
         
-        // Show deliveries where "Chill NSW" is the shipper (sending company)
+        // Show only deliveries where "Chill NSW" is the shipper company
         return shipperCompany.toLowerCase().includes('chill') ||
-               documentShipperName.toLowerCase().includes('chill') ||
                shipperCompany.toLowerCase().includes('**chill nsw');
       });
     }
@@ -458,7 +455,7 @@ export class DatabaseStorage implements IStorage {
       { username: 'manager', password: 'manager123', name: 'Fleet Manager', role: 'manager', department: 'Operations' },
       { username: 'supervisor', password: 'super123', name: 'Depot Supervisor', role: 'supervisor', department: 'Sydney Depot' },
       { username: 'driver', password: 'driver123', name: 'John Driver', role: 'driver', department: 'Sydney Depot' },
-      { username: 'customer', password: 'customer123', name: 'Chill NSW Customer', role: 'viewer', department: 'Customer' },
+      { username: 'shipper', password: 'shipper123', name: 'Chill NSW Shipper', role: 'viewer', department: 'Shipper' },
       { username: 'viewer', password: 'viewer123', name: 'Analytics Viewer', role: 'viewer', department: 'Management' }
     ];
 

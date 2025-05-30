@@ -177,12 +177,12 @@ export default function Login() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      form.setValue("email", "customer");
-                      form.setValue("password", "customer123");
+                      form.setValue("email", "shipper");
+                      form.setValue("password", "shipper123");
                     }}
                     className="text-xs"
                   >
-                    Customer
+                    Shipper
                   </Button>
                   <Button
                     type="button"
