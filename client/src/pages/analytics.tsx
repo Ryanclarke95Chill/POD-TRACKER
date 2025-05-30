@@ -278,12 +278,14 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
 
 // Component to show depot breakdown
 function DepotBreakdown({ consignments, depotName }: { consignments: Consignment[]; depotName: string }) {
-  const depotConsignments = consignments.filter(c => 
-    (c as any).shipFromMasterDataCode === depotName || 
-    (c as any).warehouseMasterDataCode === depotName ||
-    (c as any).shipFromCompanyName?.includes(depotName) || 
-    (c as any).warehouseCompanyName?.includes(depotName)
-  );
+  const depotConsignments = consignments.filter(c => {
+    const fullDepotCode = (c as any).shipFromMasterDataCode || '';
+    const depotState = fullDepotCode.includes('_') ? fullDepotCode.split('_')[0] : fullDepotCode;
+    return depotState === depotName ||
+           (c as any).warehouseMasterDataCode === depotName ||
+           (c as any).shipFromCompanyName?.includes(depotName) || 
+           (c as any).warehouseCompanyName?.includes(depotName);
+  });
 
   const statusCounts = depotConsignments.reduce((acc, c) => {
     const status = (c as any).delivery_StateLabel === 'Positive outcome' ? 'delivered' : 'pending';
@@ -454,8 +456,259 @@ function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }:
   );
 }
 
+// Executive View Component - Optimized for large datasets and board presentations
+function ExecutiveView() {
+  const { data: consignments = [] } = useQuery({
+    queryKey: ["/api/consignments"]
+  });
+
+  const executiveAnalytics = useMemo(() => {
+    const data = consignments as Consignment[];
+    const totalConsignments = data.length;
+    
+    // Status analysis with accurate calculations
+    const statusCounts = data.reduce((acc, c) => {
+      const deliveryState = (c as any).delivery_StateLabel;
+      const pickupState = (c as any).pickup_StateLabel;
+      
+      if (deliveryState === 'Positive outcome') acc.completed++;
+      else if (deliveryState === 'Negative outcome' || deliveryState === 'Not delivered') acc.failed++;
+      else if (pickupState === 'Positive outcome' && !deliveryState) acc.inTransit++;
+      else acc.active++;
+      
+      return acc;
+    }, { completed: 0, failed: 0, inTransit: 0, active: 0 });
+
+    // State-based depot performance (grouping by NSW, VIC, QLD, WA)
+    const statePerformance = data.reduce((acc, c) => {
+      const fullDepotCode = (c as any).shipFromMasterDataCode || 'Unknown';
+      const state = fullDepotCode.includes('_') ? fullDepotCode.split('_')[0] : fullDepotCode;
+      
+      if (!acc[state]) {
+        acc[state] = { total: 0, completed: 0, efficiency: 0 };
+      }
+      acc[state].total++;
+      if ((c as any).delivery_StateLabel === 'Positive outcome') {
+        acc[state].completed++;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Calculate efficiency percentages for states
+    Object.keys(statePerformance).forEach(state => {
+      const stats = statePerformance[state];
+      stats.efficiency = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    });
+
+    // Customer analysis
+    const customerAnalysis = data.reduce((acc, c) => {
+      const customer = (c as any).shipperCompanyName || 'Unknown';
+      if (!acc[customer]) {
+        acc[customer] = { total: 0, completed: 0, satisfaction: 0 };
+      }
+      acc[customer].total++;
+      if ((c as any).delivery_StateLabel === 'Positive outcome') {
+        acc[customer].completed++;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Calculate satisfaction rates
+    Object.keys(customerAnalysis).forEach(customer => {
+      const stats = customerAnalysis[customer];
+      stats.satisfaction = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    });
+
+    // Temperature zone distribution
+    const tempZoneAnalysis = data.reduce((acc, c) => {
+      const indicators = [
+        (c as any).shipFromMasterDataCode,
+        (c as any).warehouseCompanyName,
+        (c as any).shipperCompanyName
+      ].join(' ').toLowerCase();
+      
+      let zone = 'Ambient';
+      if (indicators.includes('frozen') || indicators.includes('freeze')) zone = 'Frozen';
+      else if (indicators.includes('chill') || indicators.includes('cold')) zone = 'Chilled';
+      
+      acc[zone] = (acc[zone] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalConsignments,
+      statusCounts,
+      statePerformance: Object.entries(statePerformance)
+        .sort(([,a], [,b]) => (b as any).total - (a as any).total)
+        .slice(0, 4),
+      topCustomers: Object.entries(customerAnalysis)
+        .sort(([,a], [,b]) => (b as any).total - (a as any).total)
+        .slice(0, 5),
+      tempZoneAnalysis,
+      completionRate: totalConsignments > 0 ? (statusCounts.completed / totalConsignments * 100) : 0,
+      failureRate: totalConsignments > 0 ? (statusCounts.failed / totalConsignments * 100) : 0
+    };
+  }, [consignments]);
+
+  return (
+    <div className="space-y-8">
+      {/* Executive KPI Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600">{executiveAnalytics.totalConsignments.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Active consignments</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{executiveAnalytics.completionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.completed.toLocaleString()} completed</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-red-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Risk Exposure</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-red-600">{executiveAnalytics.failureRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.failed.toLocaleString()} failed deliveries</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-purple-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Network</CardTitle>
+            <Building2 className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-600">{executiveAnalytics.topCustomers.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Major customers</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* State Performance Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <MapPin className="h-5 w-5 mr-2" />
+            State Operations Performance
+          </CardTitle>
+          <CardDescription>Performance metrics by Australian state operations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {executiveAnalytics.statePerformance.map(([state, stats], index) => (
+              <div key={state} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-lg">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg">{state}</p>
+                    <p className="text-sm text-muted-foreground">{(stats as any).total.toLocaleString()} consignments</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-green-600">{(stats as any).efficiency.toFixed(1)}%</div>
+                  <div className="text-sm text-muted-foreground">efficiency</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Customer Portfolio Analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="h-5 w-5 mr-2" />
+            Customer Portfolio Performance
+          </CardTitle>
+          <CardDescription>Key client relationships and satisfaction metrics</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium">Customer</th>
+                  <th className="text-left py-3 px-4 font-medium">Volume</th>
+                  <th className="text-left py-3 px-4 font-medium">Success Rate</th>
+                  <th className="text-left py-3 px-4 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {executiveAnalytics.topCustomers.map(([customer, stats], index) => (
+                  <tr key={customer} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4 font-medium">{customer}</td>
+                    <td className="py-3 px-4">{(stats as any).total.toLocaleString()}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">{(stats as any).satisfaction.toFixed(1)}%</span>
+                        <div className="w-20 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-green-600 h-2 rounded-full" 
+                            style={{ width: `${(stats as any).satisfaction}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={(stats as any).satisfaction > 90 ? "default" : "secondary"}>
+                        {(stats as any).satisfaction > 90 ? "Excellent" : "Good"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Temperature Compliance Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Thermometer className="h-5 w-5 mr-2" />
+            Temperature Compliance Portfolio
+          </CardTitle>
+          <CardDescription>Distribution of temperature-controlled cargo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-6">
+            {Object.entries(executiveAnalytics.tempZoneAnalysis).map(([zone, count]) => (
+              <div key={zone} className="text-center p-4 border rounded-lg">
+                <div className="text-3xl font-bold mb-2">{count.toLocaleString()}</div>
+                <div className="font-medium">{zone}</div>
+                <div className="text-sm text-muted-foreground">
+                  {((count / executiveAnalytics.totalConsignments) * 100).toFixed(1)}% of total
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Analytics() {
-  const [selectedView, setSelectedView] = useState<"ceo" | "allocator" | "deepdive">("ceo");
+  const [selectedView, setSelectedView] = useState<"ceo" | "allocator" | "deepdive" | "executive">("ceo");
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -584,9 +837,12 @@ export default function Analytics() {
     }).length;
     const onTimeRate = completed > 0 ? (onTimeDeliveries / completed * 100) : 0;
 
-    // Depot analysis
+    // Depot analysis - group by state (everything before underscore)
     const depotStats = data.reduce((acc, c) => {
-      const depot = (c as any).shipFromMasterDataCode || 'Unknown';
+      const fullDepotCode = (c as any).shipFromMasterDataCode || 'Unknown';
+      // Extract state from depot code (everything before first underscore)
+      const depot = fullDepotCode.includes('_') ? fullDepotCode.split('_')[0] : fullDepotCode;
+      
       if (!acc[depot]) {
         acc[depot] = { total: 0, completed: 0, inTransit: 0, pending: 0, failed: 0 };
       }
@@ -1213,7 +1469,7 @@ export default function Analytics() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={selectedView} onValueChange={(value) => setSelectedView(value as any)} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="ceo" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
               <span>CEO View</span>
@@ -1225,6 +1481,10 @@ export default function Analytics() {
             <TabsTrigger value="deepdive" className="flex items-center space-x-2">
               <TrendingUp className="h-4 w-4" />
               <span>Deep Dive</span>
+            </TabsTrigger>
+            <TabsTrigger value="executive" className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4" />
+              <span>Executive</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1331,6 +1591,10 @@ export default function Analytics() {
 
           <TabsContent value="deepdive">
             <DeepDiveView />
+          </TabsContent>
+
+          <TabsContent value="executive">
+            <ExecutiveView />
           </TabsContent>
         </Tabs>
       </main>
