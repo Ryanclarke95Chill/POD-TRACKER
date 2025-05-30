@@ -629,10 +629,7 @@ export default function Analytics() {
       acc[driverName].total++;
       const status = getStatusDisplay(c);
       
-      // Debug logging for failed deliveries
-      if (status === "Failed" || (c as any).delivery_StateLabel === "Not delivered" || (c as any).consignmentNo === "KKB113076") {
-        console.log("Failed delivery found:", (c as any).consignmentNo, "Driver:", driverName, "Status:", status, "Raw delivery:", (c as any).delivery_StateLabel, "Raw pickup:", (c as any).pickUp_StateLabel);
-      }
+
       
       if (status === "Completed") {
         acc[driverName].completed++;
@@ -855,8 +852,10 @@ export default function Analytics() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium">{(stats as any).total}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {(stats as any).completed} completed, {(stats as any).inTransit} active, {(stats as any).failed} failed
+                        <div className="text-xs flex gap-2">
+                          <span className="text-green-600">{(stats as any).completed} completed</span>
+                          <span className="text-blue-600">{(stats as any).inTransit} active</span>
+                          <span className="text-red-600">{(stats as any).failed} failed</span>
                         </div>
                       </div>
                     </button>
