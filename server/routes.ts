@@ -496,12 +496,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get deliveries from axylog with date range and filters
       const todayString = new Date().toISOString().split('T')[0];
+      console.log("Calling axylogAPI.getConsignmentsWithFilters with:", {
+        deliveryEmail: req.user.email,
+        pickupDateFrom: fromDate || todayString,
+        pickupDateTo: toDate || todayString
+      });
+      
       const axylogConsignments = await axylogAPI.getConsignmentsWithFilters({
         deliveryEmail: req.user.email,
         pickupDateFrom: fromDate || todayString,
         pickupDateTo: toDate || todayString
       });
       console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
+      
+      if (axylogConsignments.length > 0) {
+        console.log("=== FIRST CONSIGNMENT ETA DEBUG ===");
+        const first = axylogConsignments[0];
+        console.log("delivery_ETA:", first.delivery_ETA);
+        console.log("delivery_FirstCalculatedETA:", first.delivery_FirstCalculatedETA);
+        console.log("delivery_PlannedETA:", first.delivery_PlannedETA);
+      }
       
       if (axylogConsignments.length === 0) {
         return res.json({
