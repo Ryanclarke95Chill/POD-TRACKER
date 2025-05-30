@@ -463,6 +463,28 @@ function ExecutiveView() {
     queryKey: ["/api/consignments"]
   });
 
+  // Get date range from analytics hook for display
+  const { data: filteredConsignments = [] } = useQuery({
+    queryKey: ["/api/consignments"]
+  });
+
+  const analytics = useMemo(() => {
+    const data = filteredConsignments as Consignment[];
+    
+    // Calculate actual date range from the data
+    const allDates = data.map(c => {
+      const date = (c as any).departureDateTime || (c as any).delivery_OutcomeRegistrationDateTime || (c as any).delivery_PlannedETA;
+      return date ? new Date(date) : null;
+    }).filter(date => date !== null);
+
+    const dateRange = allDates.length > 0 ? {
+      earliest: new Date(Math.min(...allDates.map(d => d!.getTime()))),
+      latest: new Date(Math.max(...allDates.map(d => d!.getTime())))
+    } : null;
+
+    return { dateRange };
+  }, [filteredConsignments]);
+
   const executiveAnalytics = useMemo(() => {
     const data = consignments as Consignment[];
     const totalConsignments = data.length;
@@ -605,9 +627,16 @@ function ExecutiveView() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <MapPin className="h-5 w-5 mr-2" />
-            State Operations Performance
+            Top Performing Depots
           </CardTitle>
-          <CardDescription>Performance metrics by Australian state operations</CardDescription>
+          <CardDescription>
+            Volume and efficiency by location
+            {analytics.dateRange && (
+              <span className="block text-xs text-muted-foreground mt-1">
+                Data period: {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -615,7 +644,7 @@ function ExecutiveView() {
               <div key={state} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-lg">
-                    {index + 1}
+                    <MapPin className="h-4 w-4" />
                   </div>
                   <div>
                     <p className="font-bold text-lg">{state}</p>
@@ -623,8 +652,8 @@ function ExecutiveView() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-green-600">{(stats as any).efficiency.toFixed(1)}%</div>
-                  <div className="text-sm text-muted-foreground">efficiency</div>
+                  <div className="text-2xl font-bold">{(stats as any).total.toLocaleString()} deliveries</div>
+                  <div className="text-sm text-muted-foreground">{(stats as any).efficiency.toFixed(1)}% complete</div>
                 </div>
               </div>
             ))}
@@ -639,7 +668,14 @@ function ExecutiveView() {
             <Users className="h-5 w-5 mr-2" />
             Customer Portfolio Performance
           </CardTitle>
-          <CardDescription>Key client relationships and satisfaction metrics</CardDescription>
+          <CardDescription>
+            Key client relationships and satisfaction metrics
+            {analytics.dateRange && (
+              <span className="block text-xs text-muted-foreground mt-1">
+                Data period: {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -1035,6 +1071,17 @@ export default function Analytics() {
     // Active drivers count
     const activeDrivers = Object.values(driverStats).filter(stats => (stats as any).inTransit > 0).length;
 
+    // Calculate actual date range from the data
+    const allDates = data.map(c => {
+      const date = (c as any).departureDateTime || (c as any).delivery_OutcomeRegistrationDateTime || (c as any).delivery_PlannedETA;
+      return date ? new Date(date) : null;
+    }).filter(date => date !== null);
+
+    const dateRange = allDates.length > 0 ? {
+      earliest: new Date(Math.min(...allDates.map(d => d!.getTime()))),
+      latest: new Date(Math.max(...allDates.map(d => d!.getTime())))
+    } : null;
+
     return {
       totalConsignments,
       completed,
@@ -1048,6 +1095,7 @@ export default function Analytics() {
       driverStats,
       tempZoneStats,
       riskFactors,
+      dateRange,
       recentDeliveries: recentDeliveries.length,
       topDepots: Object.entries(depotStats)
         .sort(([,a], [,b]) => (b as any).total - (a as any).total)
