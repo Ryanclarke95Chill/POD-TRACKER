@@ -131,7 +131,10 @@ function DeliveryRateBreakdown({ consignments }: { consignments: Consignment[] }
 // Component to show depot breakdown
 function DepotBreakdown({ consignments, depotName }: { consignments: Consignment[]; depotName: string }) {
   const depotConsignments = consignments.filter(c => 
-    (c as any).shipFromCompanyName?.includes(depotName) || (c as any).warehouseCompanyName?.includes(depotName)
+    (c as any).shipFromMasterDataCode === depotName || 
+    (c as any).warehouseMasterDataCode === depotName ||
+    (c as any).shipFromCompanyName?.includes(depotName) || 
+    (c as any).warehouseCompanyName?.includes(depotName)
   );
 
   const statusCounts = depotConsignments.reduce((acc, c) => {
@@ -541,57 +544,53 @@ export default function Analytics() {
     <div className="space-y-6">
       {/* Executive Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <Dialog>
-              <DialogTrigger asChild>
-                <button className="text-left hover:bg-gray-50 p-2 rounded -m-2">
-                  <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
-                  <p className="text-xs text-muted-foreground">
-                    +{analytics.recentDeliveries} this week
-                  </p>
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>All Deliveries ({analytics.totalConsignments})</DialogTitle>
-                  <DialogDescription>Complete list of all consignments</DialogDescription>
-                </DialogHeader>
-                <AllDeliveriesBreakdown consignments={filteredConsignments as Consignment[]} />
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.totalConsignments}</div>
+                <p className="text-xs text-muted-foreground">
+                  +{analytics.recentDeliveries} this week
+                </p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>All Deliveries ({analytics.totalConsignments})</DialogTitle>
+              <DialogDescription>Complete list of all consignments</DialogDescription>
+            </DialogHeader>
+            <AllDeliveriesBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Delivery Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <Dialog>
-              <DialogTrigger asChild>
-                <button className="text-left hover:bg-gray-50 p-2 rounded -m-2">
-                  <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</div>
-                  <p className="text-xs text-muted-foreground">
-                    {analytics.delivered} of {analytics.totalConsignments} completed
-                  </p>
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>Delivery Performance Breakdown</DialogTitle>
-                  <DialogDescription>Completed vs pending deliveries</DialogDescription>
-                </DialogHeader>
-                <DeliveryRateBreakdown consignments={filteredConsignments as Consignment[]} />
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Delivery Rate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.delivered} of {analytics.totalConsignments} completed
+                </p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Delivery Performance Breakdown</DialogTitle>
+              <DialogDescription>Completed vs pending deliveries</DialogDescription>
+            </DialogHeader>
+            <DeliveryRateBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
