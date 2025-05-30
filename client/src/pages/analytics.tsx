@@ -109,12 +109,11 @@ export default function Analytics() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Header matching dashboard style */}
+      {/* Header matching dashboard exactly */}
       <header className="gradient-header shadow-lg border-b border-white/20 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <h1 className="text-3xl font-bold text-white tracking-tight">ChillTrack</h1>
-            <span className="ml-4 text-white/90 text-lg">Analytics</span>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -122,8 +121,14 @@ export default function Analytics() {
               className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/dashboard'}
             >
+              <Package className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
+            <Button 
+              className="gradient-accent hover:opacity-90 text-white border-0"
+            >
               <BarChart3 className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Analytics
             </Button>
           </div>
         </div>
