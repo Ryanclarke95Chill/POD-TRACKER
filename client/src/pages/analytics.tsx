@@ -597,7 +597,14 @@ function ExecutiveView() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">{executiveAnalytics.totalConsignments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Active consignments</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Active consignments
+              {analytics.dateRange && (
+                <span className="block">
+                  {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+                </span>
+              )}
+            </p>
           </CardContent>
         </Card>
 
@@ -737,7 +744,14 @@ function ExecutiveView() {
             <Thermometer className="h-5 w-5 mr-2" />
             Temperature Compliance Portfolio
           </CardTitle>
-          <CardDescription>Distribution of temperature-controlled cargo</CardDescription>
+          <CardDescription>
+            Distribution of temperature-controlled cargo
+            {analytics.dateRange && (
+              <span className="block text-xs text-muted-foreground mt-1">
+                Data period: {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-6">
@@ -1381,7 +1395,14 @@ export default function Analytics() {
       <Card>
         <CardHeader>
           <CardTitle>Depot Performance Overview</CardTitle>
-          <CardDescription>Real-time status across all depot locations</CardDescription>
+          <CardDescription>
+            Real-time status across all depot locations
+            {analytics.dateRange && (
+              <span className="block text-xs text-muted-foreground mt-1">
+                Data period: {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1495,6 +1516,11 @@ export default function Analytics() {
             <CardTitle>Driver Performance Analysis</CardTitle>
             <CardDescription>
               Shows each driver's delivery statistics: completed deliveries, active shipments, and success rate (percentage of total deliveries completed)
+              {analytics.dateRange && (
+                <span className="block text-xs text-muted-foreground mt-1">
+                  Data period: {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
