@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones } from "@shared/schema";
+import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard } from "@shared/schema";
 import { format, addDays, subDays } from "date-fns";
 import { db } from "./db";
 import { eq, sql, inArray } from "drizzle-orm";
@@ -21,6 +21,13 @@ export interface IStorage {
   seedDemoConsignments(userId: number): Promise<void>;
   clearAllConsignments(): Promise<void>;
   clearUserConsignments(userId: number): Promise<void>;
+  // Dashboard operations
+  getDashboardsByUserId(userId: number): Promise<Dashboard[]>;
+  getDashboardById(id: number): Promise<Dashboard | undefined>;
+  createDashboard(dashboard: Omit<Dashboard, "id" | "createdAt" | "updatedAt">): Promise<Dashboard>;
+  updateDashboard(id: number, updates: Partial<Dashboard>): Promise<Dashboard>;
+  deleteDashboard(id: number): Promise<void>;
+  getPublicDashboards(): Promise<Dashboard[]>;
 }
 
 export class DatabaseStorage implements IStorage {

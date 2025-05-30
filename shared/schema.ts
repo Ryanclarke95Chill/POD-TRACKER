@@ -32,6 +32,33 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type UserRole = typeof userRoles[number];
 
+// Custom Dashboard Schema
+export const dashboards = pgTable("dashboards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isDefault: boolean("is_default").default(false),
+  isPublic: boolean("is_public").default(false),
+  layout: json("layout").notNull(), // Store dashboard configuration as JSON
+  filters: json("filters"), // Store saved filters
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDashboardSchema = createInsertSchema(dashboards).pick({
+  userId: true,
+  name: true,
+  description: true,
+  isDefault: true,
+  isPublic: true,
+  layout: true,
+  filters: true,
+});
+
+export type Dashboard = typeof dashboards.$inferSelect;
+export type InsertDashboard = z.infer<typeof insertDashboardSchema>;
+
 // Define temperature zones
 export const temperatureZones = [
   "Dry",

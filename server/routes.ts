@@ -5,11 +5,12 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { axylogAPI } from "./axylog";
+import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
 interface AuthRequest extends Request {
-  user?: { id: number; email: string };
+  user?: { id: number; email: string; role: string; department?: string; name: string };
 }
 
 const authenticate = async (req: AuthRequest, res: Response, next: Function) => {
@@ -21,7 +22,19 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
 
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, SECRET_KEY) as { id: number; email: string };
-    req.user = decoded;
+    const user = await storage.getUser(decoded.id);
+    
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: "User not found or inactive" });
+    }
+    
+    req.user = { 
+      id: user.id, 
+      email: user.email, 
+      role: user.role, 
+      department: user.department || undefined,
+      name: user.name 
+    };
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
