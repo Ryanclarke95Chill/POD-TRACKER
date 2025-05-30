@@ -205,6 +205,13 @@ export class AxylogAPI {
 
       // Filter out auto-generated consignments using master data codes
       const initialCount = deliveries.length;
+      
+      // Debug: Show first few master data code combinations
+      for (let i = 0; i < Math.min(5, deliveries.length); i++) {
+        const d = deliveries[i];
+        console.log(`Sample ${i+1}: Order ${d.orderNumberRef} - From: "${d.shipFromMasterDataCode}" To: "${d.shipToMasterDataCode}"`);
+      }
+      
       deliveries = deliveries.filter((delivery: AxylogDelivery) => {
         const shipFromCode = delivery.shipFromMasterDataCode || '';
         const shipToCode = delivery.shipToMasterDataCode || '';
@@ -227,10 +234,7 @@ export class AxylogAPI {
         );
         
         if (isChillDepotTransfer) {
-          console.log(`=== FILTERING DEPOT TRANSFER ===`);
-          console.log(`From: ${delivery.shipFromMasterDataCode} (${delivery.shipFromCompanyName}) → To: ${delivery.shipToMasterDataCode} (${delivery.shipToCompanyName})`);
-          console.log(`Order: ${delivery.orderNumberRef}`);
-          console.log(`=== END FILTERED CONSIGNMENT ===`);
+          console.log(`FILTERING DEPOT TRANSFER: ${delivery.orderNumberRef} - ${delivery.shipFromMasterDataCode} → ${delivery.shipToMasterDataCode}`);
         }
         
         return !isChillDepotTransfer;
