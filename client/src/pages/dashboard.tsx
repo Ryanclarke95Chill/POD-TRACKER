@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar } from "lucide-react";
+import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar, Activity } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import SyncDataButton from "@/components/sync-data-button";
