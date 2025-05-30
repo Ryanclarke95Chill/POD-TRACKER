@@ -310,15 +310,17 @@ export class DatabaseStorage implements IStorage {
       // Clear existing consignments for this user
       await this.clearUserConsignments(user.id);
 
-      // Create copies of admin's consignments for this user
-      const consignmentsCopy = adminConsignments.map(consignment => ({
-        ...consignment,
-        id: undefined, // Remove ID so new ones are generated
-        userId: user.id, // Assign to the non-admin user
-      }));
+      // Create copies of admin's consignments for this user, excluding ID field
+      const consignmentsCopy = adminConsignments.map(consignment => {
+        const { id, ...consignmentWithoutId } = consignment;
+        return {
+          ...consignmentWithoutId,
+          userId: user.id, // Assign to the non-admin user
+        };
+      });
 
       if (consignmentsCopy.length > 0) {
-        await this.createConsignmentsBatch(consignmentsCopy as Omit<Consignment, "id">[]);
+        await this.createConsignmentsBatch(consignmentsCopy);
       }
     }
   }
