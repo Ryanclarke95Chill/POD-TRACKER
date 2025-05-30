@@ -13,7 +13,7 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
   // Column configuration for real Chill Transport Company data
   const [columns, setColumns] = useState([
     { key: 'consignmentNo', label: 'Consignment #' },
-    { key: 'shipperCompanyName', label: 'Customer Name' },
+    { key: 'shipToCompanyName', label: 'Customer Name' },
     { key: 'shipFromCity', label: 'Pickup From' },
     { key: 'shipToCity', label: 'Deliver To' },
     { key: 'qty2', label: 'Pallets' },
