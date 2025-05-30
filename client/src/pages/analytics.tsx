@@ -338,7 +338,7 @@ function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }:
   filterType?: "all" | "completed" | "active" | "failed" 
 }) {
   const driverConsignments = consignments.filter(c => 
-    (c as any).driverName === driverName || ((c as any).driverName === null && driverName === 'Unassigned')
+    ((c as any).driverName || 'Unassigned').trim() === driverName || ((c as any).driverName === null && driverName === 'Unassigned')
   );
 
   const getDeliveryStatus = (consignment: Consignment) => {
