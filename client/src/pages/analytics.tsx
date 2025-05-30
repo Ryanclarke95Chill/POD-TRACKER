@@ -344,15 +344,17 @@ function DriverDeliveryDetails({ driverName, consignments, filterType = "all" }:
   const getDeliveryStatus = (consignment: Consignment) => {
     const deliveryState = (consignment as any).delivery_StateLabel;
     const pickupState = (consignment as any).pickUp_StateLabel;
+    const deliveryReason = (consignment as any).delivery_OutcomePODReason;
+    const pickupReason = (consignment as any).pickUp_OutcomePODReason;
     
     if (deliveryState === 'Positive outcome') return { status: 'Completed', type: 'success' };
     if (deliveryState === 'Delivered') return { status: 'Completed', type: 'success' };
     if (pickupState === 'Positive outcome') return { status: 'Completed', type: 'success' };
-    if (deliveryState === 'Negative outcome') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
-    if (pickupState === 'Negative outcome') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
-    if (deliveryState === 'Not delivered') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryState };
-    if (deliveryState === 'GPS not present') return { status: 'GPS Issue', type: 'failure', reason: deliveryState };
-    if (pickupState === 'Not picked up') return { status: 'Failed to Pickup', type: 'failure', reason: pickupState };
+    if (deliveryState === 'Negative outcome') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryReason || deliveryState };
+    if (pickupState === 'Negative outcome') return { status: 'Failed to Pickup', type: 'failure', reason: pickupReason || pickupState };
+    if (deliveryState === 'Not delivered') return { status: 'Failed to Deliver', type: 'failure', reason: deliveryReason || deliveryState };
+    if (deliveryState === 'GPS not present') return { status: 'GPS Issue', type: 'failure', reason: deliveryReason || deliveryState };
+    if (pickupState === 'Not picked up') return { status: 'Failed to Pickup', type: 'failure', reason: pickupReason || pickupState };
     if (deliveryState === 'Traveling' || pickupState === 'Traveling') return { status: 'In Transit', type: 'active' };
     if (deliveryState === 'Arrived') return { status: 'Arrived at Destination', type: 'active' };
     
