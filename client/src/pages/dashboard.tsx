@@ -154,6 +154,14 @@ export default function Dashboard() {
             </div>
 
             <Button 
+              className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
+              onClick={() => window.location.href = '/executive'}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Executive
+            </Button>
+
+            <Button 
               className="gradient-accent hover:opacity-90 text-white border-0"
               onClick={logout}
             >

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
+import ExecutiveDashboard from "@/pages/executive-dashboard";
 import ViewAll from "@/pages/view-all";
 import AdminPage from "@/pages/admin";
 import SimpleImport from "@/pages/simple-import";
@@ -37,6 +38,7 @@ function App() {
             <Route path="/" component={Login} />
             <Route path="/dashboard" component={Dashboard} />
             <Route path="/analytics" component={Analytics} />
+            <Route path="/executive" component={ExecutiveDashboard} />
             <Route path="/view-all" component={ViewAll} />
             <Route path="/custom-dashboards" component={CustomDashboards} />
             <Route path="/user-management" component={UserManagement} />
