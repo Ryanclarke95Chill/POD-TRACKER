@@ -268,8 +268,8 @@ export class AxylogAPI {
           // Add more temperature zone mappings as needed
         };
 
-        // Convert events to our format
-        const events: ConsignmentEvent[] = delivery.events.map((event: any) => ({
+        // Convert events to our format with null checking
+        const events: ConsignmentEvent[] = (delivery.events || []).map((event: any) => ({
           timestamp: new Date(event.timestamp).toLocaleString('en-AU', {
             month: 'short',
             day: 'numeric',
