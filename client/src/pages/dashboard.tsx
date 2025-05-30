@@ -92,21 +92,24 @@ export default function Dashboard() {
     const matchesStatus = selectedStatus === "all" || 
       getStatusDisplay(consignment) === selectedStatus;
     
-    // Date filtering logic
+    // Date filtering logic - convert to AEST timezone
     const matchesDateRange = (() => {
       if (!fromDate && !toDate) return true;
       
-      const consignmentDate = consignment.departureDateTime || consignment.delivery_PlannedETA;
-      if (!consignmentDate) return false;
+      const consignmentDate = (consignment as any).delivery_PlannedETA || consignment.departureDateTime;
+      if (!consignmentDate) return true; // Show consignments without dates
       
-      const date = new Date(consignmentDate).toISOString().split('T')[0];
+      // Convert UTC date to AEST (UTC+10) for comparison
+      const utcDate = new Date(consignmentDate);
+      const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000)); // Add 10 hours for AEST
+      const dateString = aestDate.toISOString().split('T')[0];
       
       if (fromDate && toDate) {
-        return date >= fromDate && date <= toDate;
+        return dateString >= fromDate && dateString <= toDate;
       } else if (fromDate) {
-        return date >= fromDate;
+        return dateString >= fromDate;
       } else if (toDate) {
-        return date <= toDate;
+        return dateString <= toDate;
       }
       return true;
     })();
