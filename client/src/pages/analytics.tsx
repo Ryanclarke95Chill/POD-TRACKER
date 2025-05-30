@@ -830,6 +830,192 @@ export default function Analytics() {
       return status !== "In Transit" && status !== "Completed" && !status.includes("Failed") && status !== "GPS Issue" && status !== "Not delivered";
     }).length;
 
+    // Risk exposure analysis based on actual data patterns
+    const riskFactors = {
+      highVolumeRoutes: [] as any[],
+      temperatureRisks: [] as any[],
+      customerConcentration: [] as any[],
+      operationalRisks: [] as any[]
+    };
+
+    // Identify high-volume routes with delivery issues
+    const routeRiskAnalysis = data.reduce((acc, c) => {
+      const fromLocation = (c as any).shipFromMasterDataCode || 'Unknown';
+      const toLocation = (c as any).delivery_MasterDataCode || (c as any).delivery_StateLabel || 'Unknown';
+      const routeKey = `${fromLocation} → ${toLocation}`;
+      
+      if (!acc[routeKey]) {
+        acc[routeKey] = { total: 0, failed: 0, delayed: 0, tempIssues: 0 };
+      }
+      
+      acc[routeKey].total++;
+      const status = getStatusDisplay(c);
+      if (status.includes("Failed") || status === "GPS Issue") acc[routeKey].failed++;
+      if ((c as any).delivery_ETA && (c as any).delivery_ActualETA) {
+        const eta = new Date((c as any).delivery_ETA);
+        const actual = new Date((c as any).delivery_ActualETA);
+        if (actual > eta) acc[routeKey].delayed++;
+      }
+      if ((c as any).temperatureZone && ((c as any).temperatureMin || (c as any).temperatureMax)) {
+        // Check for potential temperature compliance issues
+        if ((c as any).temperatureMin < -18 || (c as any).temperatureMax > 25) {
+          acc[routeKey].tempIssues++;
+        }
+      }
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Identify routes with >5% failure rate and high volume
+    riskFactors.highVolumeRoutes = Object.entries(routeRiskAnalysis)
+      .filter(([_, stats]) => (stats as any).total >= 20 && ((stats as any).failed / (stats as any).total) > 0.05)
+      .map(([route, stats]) => ({
+        route,
+        volume: (stats as any).total,
+        failureRate: ((stats as any).failed / (stats as any).total * 100).toFixed(1),
+        risk: 'High volume route with elevated failure rate'
+      }))
+      .sort((a, b) => parseFloat(b.failureRate) - parseFloat(a.failureRate));
+
+    // Build temperature zone stats for risk analysis
+    const tempZoneStats = data.reduce((acc, c) => {
+      const zone = (c as any).temperatureZone || 'Standard';
+      if (!acc[zone]) {
+        acc[zone] = { total: 0, completed: 0, failed: 0, inTransit: 0 };
+      }
+      acc[zone].total++;
+      const status = getStatusDisplay(c);
+      if (status === "Completed") acc[zone].completed++;
+      else if (status.includes("Failed") || status === "GPS Issue") acc[zone].failed++;
+      else if (status === "In Transit") acc[zone].inTransit++;
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Temperature zone risk analysis
+    const tempZoneRisks = Object.entries(tempZoneStats)
+      .filter(([zone, stats]) => {
+        const failureRate = ((stats as any).failed / (stats as any).total);
+        return (stats as any).total >= 10 && failureRate > 0.03;
+      })
+      .map(([zone, stats]) => ({
+        zone,
+        volume: (stats as any).total,
+        failureRate: ((stats as any).failed / (stats as any).total * 100).toFixed(1),
+        risk: 'Temperature sensitive cargo with delivery issues'
+      }));
+
+    riskFactors.temperatureRisks = tempZoneRisks;
+
+    // Build customer stats for risk analysis
+    const customerStats = data.reduce((acc, c) => {
+      const customer = (c as any).shipperCompanyName || c.warehouseCompanyName || 'Unknown';
+      if (!acc[customer]) {
+        acc[customer] = { total: 0, completed: 0 };
+      }
+      acc[customer].total++;
+      if (getStatusDisplay(c) === "Completed") {
+        acc[customer].completed++;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Customer concentration risk
+    const customerVolumes = Object.entries(customerStats)
+      .sort(([,a], [,b]) => (b as any).total - (a as any).total);
+    
+    const totalVolume = data.length;
+    const top5Volume = customerVolumes.slice(0, 5).reduce((sum, [_, stats]) => sum + (stats as any).total, 0);
+    const concentrationRisk = (top5Volume / totalVolume * 100);
+
+    if (concentrationRisk > 60) {
+      riskFactors.customerConcentration.push({
+        risk: 'High customer concentration',
+        percentage: concentrationRisk.toFixed(1),
+        detail: `Top 5 customers represent ${concentrationRisk.toFixed(1)}% of total volume`
+      });
+    }
+
+    // Build driver stats for risk analysis
+    const driverStats = data.reduce((acc, c) => {
+      const driverName = (c as any).driverName || (c as any).driver || 'Unknown Driver';
+      const vehicleCode = (c as any).vehicleCode || (c as any).vehicle;
+      const driverId = (c as any).driverId;
+      
+      if (!acc[driverName]) {
+        acc[driverName] = { 
+          total: 0, 
+          delivered: 0, 
+          inTransit: 0, 
+          pending: 0, 
+          failed: 0,
+          vehicle: vehicleCode || 'No Vehicle',
+          driverId: driverId
+        };
+      }
+      
+      acc[driverName].total++;
+      const status = getStatusDisplay(c);
+      if (status === "Completed") acc[driverName].delivered++;
+      else if (status === "In Transit") acc[driverName].inTransit++;
+      else if (status.includes("Failed") || status === "GPS Issue") acc[driverName].failed++;
+      else acc[driverName].pending++;
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Operational risk indicators
+    const driverWorkload = Object.entries(driverStats)
+      .filter(([_, stats]) => (stats as any).total > 50)
+      .map(([driver, stats]) => ({
+        driver,
+        volume: (stats as any).total,
+        activeLoad: (stats as any).inTransit || 0
+      }));
+
+    const highWorkloadDrivers = driverWorkload.filter(d => d.activeLoad > 10);
+    if (highWorkloadDrivers.length > 0) {
+      riskFactors.operationalRisks.push({
+        risk: 'Driver overload risk',
+        count: highWorkloadDrivers.length,
+        detail: `${highWorkloadDrivers.length} drivers with >10 active deliveries`
+      });
+    }
+
+    // Build depot stats for risk analysis
+    const depotStats = data.reduce((acc, c) => {
+      const fullDepotCode = (c as any).shipFromMasterDataCode || 'Unknown';
+      const depot = fullDepotCode.includes('_') ? fullDepotCode.split('_')[0] : fullDepotCode;
+      
+      if (!acc[depot]) {
+        acc[depot] = { total: 0, completed: 0, inTransit: 0, pending: 0, failed: 0 };
+      }
+      acc[depot].total++;
+      const status = getStatusDisplay(c);
+      if (status === "Completed") acc[depot].completed++;
+      else if (status === "In Transit") acc[depot].inTransit++;
+      else if (status.includes("Failed") || status === "GPS Issue") acc[depot].failed++;
+      else acc[depot].pending++;
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Depot capacity risks
+    const depotVolumes = Object.entries(depotStats)
+      .sort(([,a], [,b]) => (b as any).total - (a as any).total);
+    
+    const highVolumeDepots = depotVolumes.filter(([_, stats]) => (stats as any).total > 1000);
+    if (highVolumeDepots.length > 0) {
+      const avgFailureRate = highVolumeDepots.reduce((sum, [_, stats]) => 
+        sum + ((stats as any).failed / (stats as any).total), 0) / highVolumeDepots.length;
+      
+      if (avgFailureRate > 0.02) {
+        riskFactors.operationalRisks.push({
+          risk: 'High-volume depot performance',
+          rate: (avgFailureRate * 100).toFixed(1),
+          detail: `${highVolumeDepots.length} high-volume depots with ${(avgFailureRate * 100).toFixed(1)}% avg failure rate`
+        });
+      }
+    }
+
     // Performance metrics
     const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
     const onTimeDeliveries = data.filter(c => {
