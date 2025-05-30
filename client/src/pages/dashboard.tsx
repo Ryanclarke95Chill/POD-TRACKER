@@ -109,19 +109,17 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="gradient-header shadow-lg border-b border-white/20 backdrop-blur-md">
+      <header className="gradient-primary shadow-header z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-3xl font-bold text-white tracking-tight">ChillTrack</h1>
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-3 text-blue-100 text-sm">Professional Logistics Dashboard</span>
           </div>
           
           <div className="flex items-center space-x-3">
-            <Button 
-              className="gradient-accent hover:opacity-90 text-white border-0"
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
+            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+              <span>{user?.email}</span>
+            </div>
             <Button 
               className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/analytics'}
@@ -130,7 +128,7 @@ export default function Dashboard() {
               Analytics
             </Button>
             <Button 
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
+              className="gradient-accent hover:opacity-90 text-white border-0"
               onClick={logout}
             >
               <LogOut className="h-4 w-4 mr-2" />

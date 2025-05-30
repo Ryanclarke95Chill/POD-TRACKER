@@ -108,15 +108,19 @@ export default function Analytics() {
   }, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Header matching dashboard exactly */}
-      <header className="gradient-header shadow-lg border-b border-white/20 backdrop-blur-md">
+    <div className="flex-1 flex flex-col">
+      {/* Header - exact same as dashboard */}
+      <header className="gradient-primary shadow-header z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-3xl font-bold text-white tracking-tight">ChillTrack</h1>
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-3 text-blue-100 text-sm">Professional Logistics Dashboard</span>
           </div>
           
           <div className="flex items-center space-x-3">
+            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+              <span>api.chill@axylog.com</span>
+            </div>
             <Button 
               className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
               onClick={() => window.location.href = '/dashboard'}
@@ -129,6 +133,13 @@ export default function Analytics() {
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
+            </Button>
+            <Button 
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
+              onClick={() => window.location.href = '/dashboard'}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
             </Button>
           </div>
         </div>
