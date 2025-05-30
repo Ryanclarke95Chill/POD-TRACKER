@@ -96,7 +96,14 @@ export default function Dashboard() {
     const matchesDateRange = (() => {
       if (!fromDate && !toDate) return true;
       
-      const consignmentDate = (consignment as any).delivery_PlannedETA || consignment.departureDateTime;
+      // Check multiple ETA fields as suggested
+      const consignmentDate = (consignment as any).delivery_PlannedETA || 
+                              (consignment as any).delivery_ETA || 
+                              (consignment as any).delivery_FirstCalculatedETA ||
+                              (consignment as any).pickUp_PlannedETA ||
+                              (consignment as any).pickUp_ETA ||
+                              (consignment as any).pickUp_FirstCalculatedETA ||
+                              consignment.departureDateTime;
       if (!consignmentDate) return true; // Show consignments without dates
       
       // Convert UTC date to AEST (UTC+10) for comparison
