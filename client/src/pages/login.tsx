@@ -110,8 +110,26 @@ export default function Login() {
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
 
-              <div className="text-center text-sm text-neutral-500">
-                <p>Demo credentials: demo@chill.com.au / demo123</p>
+              <div className="text-center text-sm text-neutral-500 space-y-1">
+                <p><strong>Demo Access:</strong> demo@chill.com.au / demo123</p>
+                <p><strong>Admin Access:</strong> admin / admin123</p>
+                <div className="mt-3 text-xs text-neutral-400">
+                  <div className="grid grid-cols-2 gap-2 text-left">
+                    <div>
+                      <strong>Admin:</strong> Full system control, user management
+                    </div>
+                    <div>
+                      <strong>Manager:</strong> All analytics, driver management
+                    </div>
+                    <div>
+                      <strong>Supervisor:</strong> Department analytics only
+                    </div>
+                    <div>
+                      <strong>Driver:</strong> Own deliveries only
+                    </div>
+                  </div>
+                  <p className="mt-2"><strong>Viewer:</strong> Read-only analytics access</p>
+                </div>
               </div>
             </form>
           </Form>
