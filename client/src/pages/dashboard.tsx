@@ -216,7 +216,7 @@ export default function Dashboard() {
         
         {/* Search and Filter */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 xl:grid-cols-7 gap-6 items-end">
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
                 <Search className="h-5 w-5 text-primary" />
