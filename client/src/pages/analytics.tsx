@@ -529,7 +529,8 @@ export default function Analytics() {
     if (deliveryStateLabel === 'Traveling' || pickupStateLabel === 'Traveling') {
       return 'In Transit';
     }
-    if (deliveryStateLabel === 'Negative outcome' || pickupStateLabel === 'Negative outcome') {
+    if (deliveryStateLabel === 'Negative outcome' || pickupStateLabel === 'Negative outcome' || 
+        deliveryStateLabel === 'Not delivered' || pickupStateLabel === 'Not delivered') {
       return 'Failed';
     }
     
