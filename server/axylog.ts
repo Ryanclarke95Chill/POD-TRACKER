@@ -214,6 +214,14 @@ export class AxylogAPI {
         console.log(`Filtered to ${deliveries.length} deliveries by warehouse company name: ${filters.warehouseCompanyName}`);
       }
 
+      // Filter out auto-generated consignments where pickup and delivery are the same location
+      const initialCount = deliveries.length;
+      deliveries = deliveries.filter((delivery: AxylogDelivery) => {
+        return !(delivery.shipFromCompanyName && delivery.shipToCompanyName && 
+                delivery.shipFromCompanyName === delivery.shipToCompanyName);
+      });
+      console.log(`Filtered out ${initialCount - deliveries.length} auto-generated consignments (same pickup/delivery location)`);
+
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, filters.deliveryEmail || '');
     } catch (error) {
