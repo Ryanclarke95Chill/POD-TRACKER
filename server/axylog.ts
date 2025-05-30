@@ -210,9 +210,17 @@ export class AxylogAPI {
       
       // Filter by email if provided and not empty
       if (filters.deliveryEmail && filters.deliveryEmail.trim() !== '') {
-        deliveries = deliveries.filter((delivery: AxylogDelivery) => 
-          delivery.deliveryAddress.email?.toLowerCase() === filters.deliveryEmail?.toLowerCase()
-        );
+        deliveries = deliveries.filter((delivery: AxylogDelivery) => {
+          // Check multiple email fields that might exist in the delivery data
+          const shipToEmail = delivery.documentShipToEmail?.toLowerCase();
+          const carrierEmail = delivery.documentCarrierEmail?.toLowerCase();
+          const warehouseEmail = delivery.documentWarehouseEmail?.toLowerCase();
+          const filterEmail = filters.deliveryEmail?.toLowerCase();
+          
+          return shipToEmail === filterEmail || 
+                 carrierEmail === filterEmail || 
+                 warehouseEmail === filterEmail;
+        });
         console.log(`Filtered to ${deliveries.length} deliveries by email: ${filters.deliveryEmail}`);
       } else {
         console.log('No email filter applied, returning all consignments');
