@@ -130,6 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
       const user = req.user!;
+      console.log(`User accessing consignments: ${user.email}, role: ${user.role}`);
       const userWithRole = {
         id: user.id,
         username: user.email.split('@')[0],
@@ -141,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       };
       const permissions = getUserPermissions(userWithRole);
+      console.log('User permissions:', permissions);
       
       let consignments;
       
