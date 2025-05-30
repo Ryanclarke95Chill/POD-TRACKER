@@ -2,12 +2,23 @@ import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzl
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const userRoles = [
+  "admin",        // Full system access, user management
+  "manager",      // All analytics, driver management, no user management
+  "supervisor",   // Department analytics, limited driver access
+  "driver",       // Own deliveries only, basic tracking
+  "viewer"        // Read-only analytics access
+] as const;
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  role: text("role").notNull().default("viewer"),
+  department: text("department"), // For depot/region-based access
+  isActive: boolean("is_active").default(true),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -15,7 +26,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
   email: true,
   name: true,
+  role: true,
+  department: true,
 });
+
+export type UserRole = typeof userRoles[number];
 
 // Define temperature zones
 export const temperatureZones = [

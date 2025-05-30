@@ -1,14 +1,18 @@
 import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones } from "@shared/schema";
 import { format, addDays, subDays } from "date-fns";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<User>): Promise<User>;
+  getAllUsers(): Promise<User[]>;
   getConsignmentsByUserId(userId: number): Promise<Consignment[]>;
+  getConsignmentsByDepartment(department: string): Promise<Consignment[]>;
+  getAllConsignments(): Promise<Consignment[]>;
   getConsignmentById(id: number): Promise<Consignment | undefined>;
   getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined>;
   createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
@@ -41,6 +45,35 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isActive, true));
+  }
+
+  async getConsignmentsByDepartment(department: string): Promise<Consignment[]> {
+    // Get all users in the department first
+    const departmentUsers = await db.select().from(users).where(eq(users.department, department));
+    const userIds = departmentUsers.map(u => u.id);
+    
+    if (userIds.length === 0) return [];
+    
+    return await db.select().from(consignments).where(
+      inArray(consignments.userId, userIds)
+    );
+  }
+
+  async getAllConsignments(): Promise<Consignment[]> {
+    return await db.select().from(consignments);
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
