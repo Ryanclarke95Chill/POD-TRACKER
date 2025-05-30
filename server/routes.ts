@@ -124,6 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { syncFromDate, syncToDate } = req.body;
+      console.log("Received date filters:", { syncFromDate, syncToDate });
 
       const authResult = await axylogAPI.authenticate();
       if (!authResult) {
