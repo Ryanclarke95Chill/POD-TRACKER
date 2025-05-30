@@ -155,6 +155,18 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     
     console.log(`Retrieved ${allDeliveries.length} deliveries, filtered to ${filteredDeliveries.length} (removed ${initialCount - filteredDeliveries.length} depot transfers)`);
 
+    // Debug: Show first delivery record with shipper info
+    if (allDeliveries.length > 0) {
+      console.log('Sample delivery processed:', {
+        orderNumberRef: allDeliveries[0].orderNumberRef,
+        shipperCompanyName: allDeliveries[0].shipperCompanyName,
+        shipFromCompanyName: allDeliveries[0].shipFromCompanyName,
+        shipToCompanyName: allDeliveries[0].shipToCompanyName,
+        qty1: allDeliveries[0].qty1,
+        um1: allDeliveries[0].um1
+      });
+    }
+
     // Create response object with filtered deliveries
     const paginatedResponse = {
       itemList: filteredDeliveries,
