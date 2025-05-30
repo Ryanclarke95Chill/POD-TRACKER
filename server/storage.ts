@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard } from "@shared/schema";
+import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard, dataSyncLog, type DataSyncLog, type InsertDataSyncLog } from "@shared/schema";
 import { format, addDays, subDays } from "date-fns";
 import { db } from "./db";
 import { eq, sql, inArray } from "drizzle-orm";
@@ -29,6 +29,10 @@ export interface IStorage {
   updateDashboard(id: number, updates: Partial<Dashboard>): Promise<Dashboard>;
   deleteDashboard(id: number): Promise<void>;
   getPublicDashboards(): Promise<Dashboard[]>;
+  // Data sync management
+  logDataSync(syncLog: Omit<DataSyncLog, "id" | "syncDateTime">): Promise<DataSyncLog>;
+  getLastSuccessfulSync(): Promise<DataSyncLog | undefined>;
+  copyConsignmentsForNonAdminUsers(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -264,6 +268,59 @@ export class DatabaseStorage implements IStorage {
 
   async getPublicDashboards(): Promise<Dashboard[]> {
     return await db.select().from(dashboards).where(eq(dashboards.isPublic, true));
+  }
+
+  // Data sync management
+  async logDataSync(syncLog: Omit<DataSyncLog, "id" | "syncDateTime">): Promise<DataSyncLog> {
+    const [log] = await db
+      .insert(dataSyncLog)
+      .values({
+        ...syncLog,
+        syncDateTime: new Date(),
+      })
+      .returning();
+    return log;
+  }
+
+  async getLastSuccessfulSync(): Promise<DataSyncLog | undefined> {
+    const [lastSync] = await db
+      .select()
+      .from(dataSyncLog)
+      .where(eq(dataSyncLog.status, 'success'))
+      .orderBy(sql`${dataSyncLog.syncDateTime} DESC`)
+      .limit(1);
+    return lastSync || undefined;
+  }
+
+  async copyConsignmentsForNonAdminUsers(): Promise<void> {
+    // Get the admin user ID (user who performed the sync)
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return;
+
+    // Get all consignments from admin
+    const adminConsignments = await this.getConsignmentsByUserId(adminUser.id);
+    if (adminConsignments.length === 0) return;
+
+    // Get all non-admin users
+    const allUsers = await this.getAllUsers();
+    const nonAdminUsers = allUsers.filter(user => user.role !== 'admin');
+
+    // Copy consignments to each non-admin user
+    for (const user of nonAdminUsers) {
+      // Clear existing consignments for this user
+      await this.clearUserConsignments(user.id);
+
+      // Create copies of admin's consignments for this user
+      const consignmentsCopy = adminConsignments.map(consignment => ({
+        ...consignment,
+        id: undefined, // Remove ID so new ones are generated
+        userId: user.id, // Assign to the non-admin user
+      }));
+
+      if (consignmentsCopy.length > 0) {
+        await this.createConsignmentsBatch(consignmentsCopy as Omit<Consignment, "id">[]);
+      }
+    }
   }
 
   async createAdminUser(): Promise<User> {

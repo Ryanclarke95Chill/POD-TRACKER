@@ -59,6 +59,26 @@ export const insertDashboardSchema = createInsertSchema(dashboards).pick({
 export type Dashboard = typeof dashboards.$inferSelect;
 export type InsertDashboard = z.infer<typeof insertDashboardSchema>;
 
+// Data Sync Management
+export const dataSyncLog = pgTable("data_sync_log", {
+  id: serial("id").primaryKey(),
+  syncedByUserId: integer("synced_by_user_id").notNull(),
+  syncDateTime: timestamp("sync_date_time").defaultNow(),
+  recordCount: integer("record_count").notNull(),
+  status: text("status").notNull(), // 'success', 'failed'
+  errorMessage: text("error_message"),
+});
+
+export const insertDataSyncLogSchema = createInsertSchema(dataSyncLog).pick({
+  syncedByUserId: true,
+  recordCount: true,
+  status: true,
+  errorMessage: true,
+});
+
+export type DataSyncLog = typeof dataSyncLog.$inferSelect;
+export type InsertDataSyncLog = z.infer<typeof insertDataSyncLogSchema>;
+
 // Define temperature zones
 export const temperatureZones = [
   "Dry",

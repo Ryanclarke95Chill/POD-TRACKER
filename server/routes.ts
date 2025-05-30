@@ -140,14 +140,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Axylog sync endpoint
+  // Axylog sync endpoint (admin only)
   app.post("/api/axylog-sync", authenticate, async (req: AuthRequest, res: Response) => {
     console.log("=== AXYLOG SYNC ENDPOINT ===");
     res.setHeader('Content-Type', 'application/json');
     
     try {
-      if (!req.user?.email) {
-        return res.status(400).json({ success: false, message: "User email required" });
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "User not authenticated" });
+      }
+
+      // Check if user has permission to sync from Axylog
+      if (!hasPermission(req.user as any, 'canSyncAxylog')) {
+        return res.status(403).json({ success: false, message: "Permission denied: Only admins can sync from Axylog" });
       }
 
       const { syncFromDate, syncToDate } = req.body;
@@ -176,8 +181,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.clearUserConsignments(req.user.id);
       
-      if (axylogConsignments.length > 0) {
-        const consignmentsToInsert = axylogConsignments.map(consignment => ({
+      let syncStatus = 'success';
+      let errorMessage = null;
+      
+      try {
+        if (axylogConsignments.length > 0) {
+          const consignmentsToInsert = axylogConsignments.map(consignment => ({
           ...consignment,
           userId: req.user.id
         }));
