@@ -628,9 +628,9 @@ export default function Analytics() {
       acc[driverName].total++;
       const status = getStatusDisplay(c);
       
-      // Debug logging for Felix Igor
-      if (driverName === "Felix Igor") {
-        console.log("Felix Igor delivery:", (c as any).consignmentNo, "Status:", status, "Raw delivery:", (c as any).delivery_StateLabel, "Raw pickup:", (c as any).pickUp_StateLabel);
+      // Debug logging for failed deliveries
+      if (status === "Failed" || (c as any).delivery_StateLabel === "Not delivered" || (c as any).consignmentNo === "KKB113076") {
+        console.log("Failed delivery found:", (c as any).consignmentNo, "Driver:", driverName, "Status:", status, "Raw delivery:", (c as any).delivery_StateLabel, "Raw pickup:", (c as any).pickUp_StateLabel);
       }
       
       if (status === "Completed") {
