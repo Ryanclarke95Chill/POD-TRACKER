@@ -146,6 +146,8 @@ export class AxylogAPI {
       while (hasMoreData) {
         console.log(`Fetching page ${pageNumber} (skip: ${skip}, pageSize: ${pageSize})`);
         
+        console.log(`API Request - pickUp_Delivery_From: ${pickupFromDate}, pickUp_Delivery_To: ${pickupToDate}`);
+        
         const response = await axios.post(DELIVERIES_URL, {
           pagination: {
             skip: skip,
