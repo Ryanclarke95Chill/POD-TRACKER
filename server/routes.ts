@@ -490,8 +490,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Axylog authentication successful");
       
-      // Get deliveries from axylog
-      const axylogConsignments = await axylogAPI.getDeliveries(req.user.email);
+      // Get date range from request body
+      const { fromDate, toDate } = req.body;
+      
+      // Get deliveries from axylog with date range and filters
+      const axylogConsignments = await axylogAPI.getConsignmentsWithFilters({
+        deliveryEmail: req.user.email,
+        fromDate,
+        toDate
+      });
       console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
       
       if (axylogConsignments.length === 0) {
