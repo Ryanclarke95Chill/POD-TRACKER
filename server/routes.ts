@@ -65,6 +65,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user = await storage.getUserByEmail(email);
       
+      // Also try to find user by username if email lookup fails
+      if (!user) {
+        user = await storage.getUserByUsername(email);
+      }
+      
       if (!user) {
         if (email === "demo@chill.com.au" && password === "demo123") {
           const hashedPassword = await bcrypt.hash(password, 10);
