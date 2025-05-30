@@ -87,46 +87,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/login", async (req: Request, res: Response) => {
-            deliveryOutcomeInArea: null,
-            pickupOutcomeInArea: null,
-            deliveryOutcomePosition: null,
-            pickupOutcomePosition: null,
-            seals: null,
-            taskId: null,
-            idCreationImport: null,
-            expectedPaymentMethodCode: null,
-            expectedPaymentMethod: null,
-            deliveryOutcomeRegistrationDate: null,
-            pickupOutcomeRegistrationDate: null,
-            deliveryPinIsValid: null,
-            pickUpPinIsValid: null,
-            expectedPaymentNotes: null,
-            deliveryPodFiles: null,
-            pickupPodFiles: null,
-            departureDateInitiallyPlannedByTheContext: null,
-            orderCarrierMobileTelephoneNumber: null,
-            orderCarrierTelephoneNumber: null,
-            orderPickupEmail: null,
-            orderPickupMobileTelephoneNumber: null,
-            orderPickupTelephoneNumber: null,
-            orderDeliveryEmail: null,
-            orderDeliveryMobileTelephoneNumber: null,
-            orderDeliveryTelephoneNumber: null,
-            orderSubCarrierEmail: null,
-            orderSubCarrierMobileTelephoneNumber: null,
-            orderSubCarrierTelephoneNumber: null,
-            orderShipperEmail: null,
-            orderShipperMobileTelephoneNumber: null,
-            orderShipperTelephoneNumber: null,
-            forbiddenTags: null,
-            pickupPlannedServiceTime: null,
-            deliveryPlannedServiceTime: null,
-            externalReference: null,
-            depotPhoneNumberSpecifiedInTheOrder: null,
-            depotMobilePhoneNumberSpecifiedInTheOrder: null,
-            receivedPickupPodFiles: null,
-            requiredTagsDescription: null,
-            forbiddenTagsDescription: null,
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      let user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        if (email === "demo@chill.com.au" && password === "demo123") {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          user = await storage.createUser({
+            username: "demo",
+            email: email,
+            password: hashedPassword,
+            name: "Demo User"
+          });
+          
+          await storage.seedDemoConsignments(user.id);
+        } else {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "24h" }
+      );
+
+      res.json({
+        token,
+        user: { id: user.id, email: user.email, name: user.name }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/database/columns", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await db.select().from(consignments).limit(1);
+      const columns = result.length > 0 ? Object.keys(result[0]) : [];
+      res.json({ columns });
+    } catch (error) {
+      console.error("Database columns error:", error);
+      res.status(500).json({ error: "Failed to fetch database columns" });
+    }
+  });
+
+  app.get("/api/geocode/:lat/:lon", async (req: Request, res: Response) => {
+    try {
+      const { lat, lon } = req.params;
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      res.json({
+        address: data.display_name || `${lat}, ${lon}`,
+        location: { lat: parseFloat(lat), lon: parseFloat(lon) }
+      });
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      res.json({
+        address: `${req.params.lat}, ${req.params.lon}`,
+        location: { lat: parseFloat(req.params.lat), lon: parseFloat(req.params.lon) }
+      });
+    }
+  });
+
+  app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const consignments = await storage.getConsignmentsByUserId(userId);
+      res.json(consignments);
+    } catch (error) {
+      console.error("Get consignments error:", error);
+      res.status(500).json({ message: "Failed to fetch consignments" });
+    }
+  });
+
+  app.get("/api/consignments/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const consignment = await storage.getConsignmentById(id);
+      
+      if (!consignment) {
+        return res.status(404).json({ message: "Consignment not found" });
+      }
+      
+      res.json(consignment);
+    } catch (error) {
+      console.error("Get consignment error:", error);
+      res.status(500).json({ message: "Failed to fetch consignment" });
+    }
+  });
+
+  app.post("/api/test-axylog", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Axylog API test endpoint",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Test axylog error:", error);
+      res.status(500).json({ message: "Failed to test axylog API" });
+    }
+  });
+
+  app.post("/api/sync-axylog-now", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Axylog sync endpoint placeholder",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Sync axylog error:", error);
+      res.status(500).json({ message: "Failed to sync with axylog" });
+    }
+  });
+
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err.stack);
+    res.status(500).json({ message: "Something went wrong!" });
+  });
+
+  return httpServer;
+}
             fromPostalCode: null,
             toPostalCode: null,
             fromCountry: null,
