@@ -628,6 +628,11 @@ export default function Analytics() {
       acc[driverName].total++;
       const status = getStatusDisplay(c);
       
+      // Debug logging for Felix Igor
+      if (driverName === "Felix Igor") {
+        console.log("Felix Igor delivery:", (c as any).consignmentNo, "Status:", status, "Raw delivery:", (c as any).delivery_StateLabel, "Raw pickup:", (c as any).pickUp_StateLabel);
+      }
+      
       if (status === "Completed") {
         acc[driverName].completed++;
       } else if (status === "In Transit") {
