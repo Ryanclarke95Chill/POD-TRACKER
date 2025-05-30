@@ -79,10 +79,6 @@ router.post('/deliveries', async (req: Request, res: Response) => {
     const pageSize = 500;
 
     console.log(`Starting pagination for date range: ${dateFrom} to ${dateTo}`);
-    console.log(`=== DATE RANGE DEBUG ===`);
-    console.log(`From Date: ${dateFrom}`);
-    console.log(`To Date: ${dateTo}`);
-    console.log(`=== END DATE RANGE DEBUG ===`);
 
     while (hasMorePages) {
       const requestBody = {
@@ -93,7 +89,15 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         filters: {
           type: "",
           pickUp_Delivery_From: dateFrom,
-          pickUp_Delivery_To: dateTo
+          pickUp_Delivery_To: dateTo,
+          gridHeaderFilters: {
+            shipperMasterDataCode: "",
+            shipperCompanyName: "",
+            shipFromMasterDataCode: "",
+            shipFromCompanyName: "",
+            shipToMasterDataCode: "",
+            shipToCompanyName: ""
+          }
         }
       };
 
@@ -106,7 +110,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
           'User': userId,
           'Company': companyId,
           'ContextOwner': contextOwnerId,
-          'SourceDeviceType': '3',
+          'SourceDeviceType': '2',
           'LanguageCode': 'EN'
         }
       });

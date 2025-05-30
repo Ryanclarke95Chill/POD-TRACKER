@@ -130,22 +130,22 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
-      // Build dynamic date filters to match working Postman request
-      const fromDate = `${filters.pickupDateFrom}T00:00:00.000Z`;
-      const toDate = `${filters.pickupDateTo}T23:59:59.000Z`;
+      // Build dynamic date filters
+      const pickupFromDate = `${filters.pickupDateFrom}T00:00:00.000Z`;
+      const pickupToDate = `${filters.pickupDateTo}T23:59:59.000Z`;
       
-      console.log(`Requesting data from ${fromDate} to ${toDate}`);
+      console.log(`Requesting data from ${pickupFromDate} to ${pickupToDate}`);
 
-      // Make request using exact working Postman structure (without ETA filters initially)
+      // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
-          pageSize: 500
+          pageSize: 200
         },
         filters: {
           type: "",
-          departureDate_From: fromDate,
-          departureDate_To: toDate
+          pickUp_Delivery_From: pickupFromDate,
+          pickUp_Delivery_To: pickupToDate
         }
       }, {
         headers: {
@@ -162,16 +162,6 @@ export class AxylogAPI {
       console.log("Response status:", response.status);
       console.log("Response data keys:", Object.keys(response.data || {}));
       
-      // Debug the actual API response
-      if (response.data?.itemList && response.data.itemList.length > 0) {
-        const firstItem = response.data.itemList[0];
-        console.log("=== FIRST ITEM ETA DEBUG ===");
-        console.log("delivery_ETA:", firstItem.delivery_ETA);
-        console.log("delivery_FirstCalculatedETA:", firstItem.delivery_FirstCalculatedETA);
-        console.log("delivery_EtaCalculated:", firstItem.delivery_EtaCalculated);
-        console.log("pickUp_EtaCalculated:", firstItem.pickUp_EtaCalculated);
-      }
-      
       if (!response.data || !response.data.itemList) {
         console.warn("No deliveries found in Axylog response");
         console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");
@@ -180,28 +170,12 @@ export class AxylogAPI {
       
       console.log(`Received ${response.data.itemList.length} deliveries from Axylog API`);
 
-      // Debug: Check all ETA-related fields
-      console.log("=== ALL ETA FIELDS DEBUG ===");
+      // Debug: Check full first delivery record
+      console.log("=== FULL FIRST DELIVERY RECORD ===");
       if (response.data.itemList.length > 0) {
-        const firstDelivery = response.data.itemList[0];
-        console.log('All ETA-related fields from API:');
-        console.log('delivery_EtaCalculated:', firstDelivery.delivery_EtaCalculated);
-        console.log('delivery_ETA:', firstDelivery.delivery_ETA);
-        console.log('delivery_FirstCalculatedETA:', firstDelivery.delivery_FirstCalculatedETA);
-        console.log('delivery_PlannedETA:', firstDelivery.delivery_PlannedETA);
-        console.log('pickUp_EtaCalculated:', firstDelivery.pickUp_EtaCalculated);
-        console.log('pickUp_ETA:', firstDelivery.pickUp_ETA);
-        console.log('pickUp_FirstCalculatedETA:', firstDelivery.pickUp_FirstCalculatedETA);
-        console.log('pickUp_PlannedETA:', firstDelivery.pickUp_PlannedETA);
-        
-        // Check which ETA fields exist
-        const etaFields = ['delivery_EtaCalculated', 'delivery_ETA', 'delivery_FirstCalculatedETA', 'delivery_PlannedETA',
-                          'pickUp_EtaCalculated', 'pickUp_ETA', 'pickUp_FirstCalculatedETA', 'pickUp_PlannedETA'];
-        etaFields.forEach(field => {
-          console.log(`${field} exists:`, field in firstDelivery);
-        });
+        console.log('First delivery:', JSON.stringify(response.data.itemList[0], null, 2));
       }
-      console.log("=== END ETA FIELDS DEBUG ===");
+      console.log("=== END FULL DELIVERY RECORD ===");
 
       // Apply additional filters and convert to our format
       let deliveries = response.data.itemList;
@@ -433,10 +407,6 @@ export class AxylogAPI {
           pickupLiveTrackLink: delivery.pickupLiveTrackLink || null,
           delivery_EtaCalculated: delivery.delivery_EtaCalculated || null,
           pickUp_EtaCalculated: delivery.pickUp_EtaCalculated || null,
-          delivery_ETA: delivery.delivery_ETA || null,
-          pickUp_ETA: delivery.pickUp_ETA || null,
-          delivery_FirstCalculatedETA: delivery.delivery_FirstCalculatedETA || null,
-          pickUp_FirstCalculatedETA: delivery.pickUp_FirstCalculatedETA || null,
           deliveryLiveDistanceKm: delivery.deliveryLiveDistanceKm || null,
           pickupLiveDistanceKm: delivery.pickupLiveDistanceKm || null,
           deliveryDistanceKm: delivery.deliveryDistanceKm || null,
