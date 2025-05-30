@@ -43,7 +43,7 @@ router.post('/deliveries', async (req: Request, res: Response) => {
   try {
     console.log('=== AXYLOG PROXY DELIVERIES ===');
     
-    const { token, userId, companyId, contextOwnerId } = req.body;
+    const { token, userId, companyId, contextOwnerId, fromDate, toDate } = req.body;
 
     if (!token || !userId || !companyId || !contextOwnerId) {
       return res.status(400).json({
@@ -52,15 +52,33 @@ router.post('/deliveries', async (req: Request, res: Response) => {
       });
     }
 
-    const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
-    const todayString = new Date(todayAEST).toISOString().split('T')[0];
+    // Use provided date range or default to today in AEST
+    let dateFrom: string;
+    let dateTo: string;
+    
+    if (fromDate && toDate) {
+      dateFrom = `${fromDate}T00:00:00.000Z`;
+      dateTo = `${toDate}T23:59:59.000Z`;
+    } else if (fromDate) {
+      dateFrom = `${fromDate}T00:00:00.000Z`;
+      dateTo = `${fromDate}T23:59:59.000Z`;
+    } else if (toDate) {
+      dateFrom = `${toDate}T00:00:00.000Z`;
+      dateTo = `${toDate}T23:59:59.000Z`;
+    } else {
+      // Default to today in AEST
+      const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
+      const todayString = new Date(todayAEST).toISOString().split('T')[0];
+      dateFrom = `${todayString}T00:00:00.000Z`;
+      dateTo = `${todayString}T23:59:59.000Z`;
+    }
 
     let allDeliveries = [];
     let pageNumber = 1;
     let hasMorePages = true;
     const pageSize = 500;
 
-    console.log(`Starting pagination for date: ${todayString}`);
+    console.log(`Starting pagination for date range: ${dateFrom} to ${dateTo}`);
 
     while (hasMorePages) {
       const requestBody = {
@@ -70,8 +88,8 @@ router.post('/deliveries', async (req: Request, res: Response) => {
         },
         filters: {
           type: "",
-          pickUp_Delivery_From: "2025-05-30T00:00:00.000Z",
-          pickUp_Delivery_To: "2025-05-30T23:59:59.000Z"
+          pickUp_Delivery_From: dateFrom,
+          pickUp_Delivery_To: dateTo
         }
       };
 
