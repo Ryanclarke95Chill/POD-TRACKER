@@ -130,16 +130,23 @@ export class AxylogAPI {
 
       console.log("Fetching consignments from Axylog with filters:", filters);
 
+      // Build dynamic date filters
+      const pickupFromDate = `${filters.pickupDateFrom}T00:00:00.000Z`;
+      const pickupToDate = `${filters.pickupDateTo}T23:59:59.000Z`;
+      
+      console.log(`Requesting data from ${pickupFromDate} to ${pickupToDate}`);
+
       // Make request to get deliveries using exact working Postman structure
       const response = await axios.post(DELIVERIES_URL, {
         pagination: {
           skip: 0,
-          pageSize: 200
+          pageSize: 1000  // Increased page size for better performance
         },
         filters: {
           type: "",
-          pickUp_Delivery_From: "2025-05-30T00:00:00.000Z",
-          pickUp_Delivery_To: "2025-05-30T23:59:59.000Z"
+          pickUp_Delivery_From: pickupFromDate,
+          pickUp_Delivery_To: pickupToDate,
+          includeCargo: true
         }
       }, {
         headers: {
@@ -152,30 +159,9 @@ export class AxylogAPI {
         }
       });
 
-      // Write the complete response to a file for inspection
-      const fs = require('fs');
-      fs.writeFileSync('/tmp/axylog_response.json', JSON.stringify(response.data, null, 2));
-      
       console.log("=== AXYLOG RESPONSE SUMMARY ===");
       console.log("Response status:", response.status);
       console.log("Response data keys:", Object.keys(response.data || {}));
-      console.log("Full payload written to /tmp/axylog_response.json");
-      
-      // If there are deliveries, show the structure of the first delivery
-      if (response.data && response.data.itemList && response.data.itemList.length > 0) {
-        console.log("=== FIRST DELIVERY SAMPLE ===");
-        const firstDelivery = response.data.itemList[0];
-        fs.writeFileSync('/tmp/first_delivery.json', JSON.stringify(firstDelivery, null, 2));
-        console.log("First delivery structure written to /tmp/first_delivery.json");
-        
-        console.log("=== CARGO FIELD CHECK ===");
-        console.log("qty1:", firstDelivery.qty1);
-        console.log("qty2:", firstDelivery.qty2);
-        console.log("um1:", firstDelivery.um1);
-        console.log("um2:", firstDelivery.um2);
-        console.log("volumeInM3:", firstDelivery.volumeInM3);
-        console.log("totalWeightInKg:", firstDelivery.totalWeightInKg);
-      }
       
       if (!response.data || !response.data.itemList) {
         console.warn("No deliveries found in Axylog response");
