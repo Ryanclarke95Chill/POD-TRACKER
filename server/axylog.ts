@@ -164,6 +164,16 @@ export class AxylogAPI {
       console.log("Response status:", response.status);
       console.log("Response data keys:", Object.keys(response.data || {}));
       
+      // Debug the actual API response
+      if (response.data?.itemList && response.data.itemList.length > 0) {
+        const firstItem = response.data.itemList[0];
+        console.log("=== FIRST ITEM ETA DEBUG ===");
+        console.log("delivery_ETA:", firstItem.delivery_ETA);
+        console.log("delivery_FirstCalculatedETA:", firstItem.delivery_FirstCalculatedETA);
+        console.log("delivery_EtaCalculated:", firstItem.delivery_EtaCalculated);
+        console.log("pickUp_EtaCalculated:", firstItem.pickUp_EtaCalculated);
+      }
+      
       if (!response.data || !response.data.itemList) {
         console.warn("No deliveries found in Axylog response");
         console.log("Available data fields:", response.data ? Object.keys(response.data) : "No data");

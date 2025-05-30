@@ -494,10 +494,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { fromDate, toDate } = req.body;
       
       // Get deliveries from axylog with date range and filters
+      const todayString = new Date().toISOString().split('T')[0];
       const axylogConsignments = await axylogAPI.getConsignmentsWithFilters({
         deliveryEmail: req.user.email,
-        fromDate,
-        toDate
+        pickupDateFrom: fromDate || todayString,
+        pickupDateTo: toDate || todayString
       });
       console.log(`Retrieved ${axylogConsignments.length} consignments from axylog`);
       
