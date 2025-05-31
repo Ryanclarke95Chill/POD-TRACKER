@@ -1357,12 +1357,12 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </DialogTrigger>
-          <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden">
-            <DialogHeader className="pb-2">
+          <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden">
+            <DialogHeader className="pb-4">
               <DialogTitle>On-Time Performance Analysis</DialogTitle>
               <DialogDescription>Detailed breakdown of delivery punctuality across all routes</DialogDescription>
             </DialogHeader>
-            <div className="overflow-y-auto max-h-[calc(85vh-100px)]">
+            <div className="overflow-y-auto max-h-[calc(95vh-120px)]">
               <OnTimePerformanceBreakdown consignments={filteredConsignments as Consignment[]} />
             </div>
           </DialogContent>
