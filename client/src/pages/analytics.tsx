@@ -1981,7 +1981,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
   const [selectedDepot, setSelectedDepot] = useState<string | null>(null);
   const [selectedShipper, setSelectedShipper] = useState<string | null>(null);
   const [selectedConsignment, setSelectedConsignment] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'routes' | 'drivers' | 'depots' | 'shippers' | 'timeline'>('routes');
+  const [viewMode, setViewMode] = useState<'drivers' | 'depots' | 'shippers' | 'timeline'>('depots');
   
   const onTimeAnalysis = useMemo(() => {
     // Route-based analysis
@@ -2260,26 +2260,19 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
         renderSelectedDetails()
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="p-4 bg-green-50 rounded">
-              <div className="text-2xl font-bold text-green-600">
-                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 95).length}
+          {/* Depot Performance Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            {onTimeAnalysis.depots.slice(0, 4).map((depot, index) => (
+              <div key={depot.depot} className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                <div className="text-2xl font-bold text-blue-600">
+                  {depot.percentage}%
+                </div>
+                <div className="text-sm text-blue-700 font-medium">{depot.depot}</div>
+                <div className="text-xs text-blue-600 mt-1">
+                  {depot.onTime}/{depot.total} on-time
+                </div>
               </div>
-              <div className="text-sm text-green-700">Routes ≥95% On-Time</div>
-            </div>
-            <div className="p-4 bg-yellow-50 rounded">
-              <div className="text-2xl font-bold text-yellow-600">
-                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
-              </div>
-              <div className="text-sm text-yellow-700">Routes 85-95% On-Time</div>
-            </div>
-            <div className="p-4 bg-red-50 rounded">
-              <div className="text-2xl font-bold text-red-600">
-                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) < 85).length}
-              </div>
-              <div className="text-sm text-red-700">Routes Below 85% On-Time</div>
-            </div>
+            ))}
           </div>
         </>
       )}
@@ -2290,12 +2283,12 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
           {/* View Mode Selector */}
           <div className="flex gap-2 border-b">
             <Button 
-              variant={viewMode === 'routes' ? 'default' : 'ghost'}
+              variant={viewMode === 'depots' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('routes')}
+              onClick={() => setViewMode('depots')}
             >
-              <MapPin className="h-4 w-4 mr-1" />
-              By Routes ({onTimeAnalysis.routes.length})
+              <Building2 className="h-4 w-4 mr-1" />
+              By Depots ({onTimeAnalysis.depots.length})
             </Button>
             <Button 
               variant={viewMode === 'drivers' ? 'default' : 'ghost'}
@@ -2304,14 +2297,6 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
             >
               <Users className="h-4 w-4 mr-1" />
               By Drivers ({onTimeAnalysis.drivers.length})
-            </Button>
-            <Button 
-              variant={viewMode === 'depots' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('depots')}
-            >
-              <Building2 className="h-4 w-4 mr-1" />
-              By Depots ({onTimeAnalysis.depots.length})
             </Button>
             <Button 
               variant={viewMode === 'shippers' ? 'default' : 'ghost'}
@@ -2337,7 +2322,6 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="text-left p-2">
-                    {viewMode === 'routes' && 'Route'}
                     {viewMode === 'drivers' && 'Driver'}
                     {viewMode === 'depots' && 'Depot'}
                     {viewMode === 'shippers' && 'Shipper'}
@@ -2350,30 +2334,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                 </tr>
               </thead>
               <tbody>
-                {viewMode === 'routes' && onTimeAnalysis.routes.map((route, idx) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2 font-medium">{route.route}</td>
-                    <td className="text-center p-2">
-                      <Badge variant={parseFloat(route.percentage) >= 95 ? "default" : parseFloat(route.percentage) >= 85 ? "secondary" : "destructive"}>
-                        {route.percentage}%
-                      </Badge>
-                    </td>
-                    <td className="text-center p-2">
-                      <span className="text-green-600">{route.onTime}</span>/
-                      <span className="text-red-600">{route.late}</span>
-                    </td>
-                    <td className="text-center p-2">{route.total}</td>
-                    <td className="text-center p-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setSelectedRoute(route.route)}
-                      >
-                        Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+
                 
                 {viewMode === 'drivers' && onTimeAnalysis.drivers.map((driver, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
