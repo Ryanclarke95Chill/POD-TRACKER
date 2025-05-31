@@ -2123,215 +2123,227 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     );
   };
   
+  // Check if any details are selected
+  const hasSelectedDetails = selectedRoute || selectedDriver || selectedDepot || selectedShipper;
+  
   return (
     <div className="space-y-6">
-      {/* Selected Details - Show at top when something is selected */}
-      {renderSelectedDetails()}
-      
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <div className="p-4 bg-green-50 rounded">
-          <div className="text-2xl font-bold text-green-600">
-            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 95).length}
+      {/* Show details if something is selected, otherwise show main view */}
+      {hasSelectedDetails ? (
+        renderSelectedDetails()
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="p-4 bg-green-50 rounded">
+              <div className="text-2xl font-bold text-green-600">
+                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 95).length}
+              </div>
+              <div className="text-sm text-green-700">Routes ≥95% On-Time</div>
+            </div>
+            <div className="p-4 bg-yellow-50 rounded">
+              <div className="text-2xl font-bold text-yellow-600">
+                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
+              </div>
+              <div className="text-sm text-yellow-700">Routes 85-95% On-Time</div>
+            </div>
+            <div className="p-4 bg-red-50 rounded">
+              <div className="text-2xl font-bold text-red-600">
+                {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) < 85).length}
+              </div>
+              <div className="text-sm text-red-700">Routes Below 85% On-Time</div>
+            </div>
           </div>
-          <div className="text-sm text-green-700">Routes ≥95% On-Time</div>
-        </div>
-        <div className="p-4 bg-yellow-50 rounded">
-          <div className="text-2xl font-bold text-yellow-600">
-            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
-          </div>
-          <div className="text-sm text-yellow-700">Routes 85-95% On-Time</div>
-        </div>
-        <div className="p-4 bg-red-50 rounded">
-          <div className="text-2xl font-bold text-red-600">
-            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) < 85).length}
-          </div>
-          <div className="text-sm text-red-700">Routes Below 85% On-Time</div>
-        </div>
-      </div>
+        </>
+      )}
       
-      {/* View Mode Selector */}
-      <div className="flex gap-2 border-b">
-        <Button 
-          variant={viewMode === 'routes' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setViewMode('routes')}
-        >
-          <MapPin className="h-4 w-4 mr-1" />
-          By Routes ({onTimeAnalysis.routes.length})
-        </Button>
-        <Button 
-          variant={viewMode === 'drivers' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setViewMode('drivers')}
-        >
-          <Users className="h-4 w-4 mr-1" />
-          By Drivers ({onTimeAnalysis.drivers.length})
-        </Button>
-        <Button 
-          variant={viewMode === 'depots' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setViewMode('depots')}
-        >
-          <Building2 className="h-4 w-4 mr-1" />
-          By Depots ({onTimeAnalysis.depots.length})
-        </Button>
-        <Button 
-          variant={viewMode === 'shippers' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setViewMode('shippers')}
-        >
-          <Package className="h-4 w-4 mr-1" />
-          By Shippers ({onTimeAnalysis.shippers.length})
-        </Button>
-        <Button 
-          variant={viewMode === 'timeline' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setViewMode('timeline')}
-        >
-          <Calendar className="h-4 w-4 mr-1" />
-          Timeline ({onTimeAnalysis.timeline.length})
-        </Button>
-      </div>
-      
-      {/* Data Table */}
-      <div className="max-h-96 overflow-y-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr>
-              <th className="text-left p-2">
-                {viewMode === 'routes' && 'Route'}
-                {viewMode === 'drivers' && 'Driver'}
-                {viewMode === 'depots' && 'Depot'}
-                {viewMode === 'shippers' && 'Shipper'}
-                {viewMode === 'timeline' && 'Month'}
-              </th>
-              <th className="text-center p-2">On-Time %</th>
-              <th className="text-center p-2">Performance</th>
-              <th className="text-center p-2">Volume</th>
-              <th className="text-center p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {viewMode === 'routes' && onTimeAnalysis.routes.map((route, idx) => (
-              <tr key={idx} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-medium">{route.route}</td>
-                <td className="text-center p-2">
-                  <Badge variant={parseFloat(route.percentage) >= 95 ? "default" : parseFloat(route.percentage) >= 85 ? "secondary" : "destructive"}>
-                    {route.percentage}%
-                  </Badge>
-                </td>
-                <td className="text-center p-2">
-                  <span className="text-green-600">{route.onTime}</span>/
-                  <span className="text-red-600">{route.late}</span>
-                </td>
-                <td className="text-center p-2">{route.total}</td>
-                <td className="text-center p-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedRoute(route.route)}
-                  >
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            
-            {viewMode === 'drivers' && onTimeAnalysis.drivers.map((driver, idx) => (
-              <tr key={idx} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-medium">{driver.driver}</td>
-                <td className="text-center p-2">
-                  <Badge variant={parseFloat(driver.percentage) >= 95 ? "default" : parseFloat(driver.percentage) >= 85 ? "secondary" : "destructive"}>
-                    {driver.percentage}%
-                  </Badge>
-                </td>
-                <td className="text-center p-2">
-                  <span className="text-green-600">{driver.onTime}</span>/
-                  <span className="text-red-600">{driver.late}</span>
-                </td>
-                <td className="text-center p-2">{driver.total}</td>
-                <td className="text-center p-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedDriver(driver.driver)}
-                  >
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            
-            {viewMode === 'depots' && onTimeAnalysis.depots.map((depot, idx) => (
-              <tr key={idx} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-medium">{depot.depot}</td>
-                <td className="text-center p-2">
-                  <Badge variant={parseFloat(depot.percentage) >= 95 ? "default" : parseFloat(depot.percentage) >= 85 ? "secondary" : "destructive"}>
-                    {depot.percentage}%
-                  </Badge>
-                </td>
-                <td className="text-center p-2">
-                  <span className="text-green-600">{depot.onTime}</span>/
-                  <span className="text-red-600">{depot.late}</span>
-                </td>
-                <td className="text-center p-2">{depot.total}</td>
-                <td className="text-center p-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedDepot(depot.depot)}
-                  >
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            
-            {viewMode === 'shippers' && onTimeAnalysis.shippers.map((shipper, idx) => (
-              <tr key={idx} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-medium">{shipper.shipper}</td>
-                <td className="text-center p-2">
-                  <Badge variant={parseFloat(shipper.percentage) >= 95 ? "default" : parseFloat(shipper.percentage) >= 85 ? "secondary" : "destructive"}>
-                    {shipper.percentage}%
-                  </Badge>
-                </td>
-                <td className="text-center p-2">
-                  <span className="text-green-600">{shipper.onTime}</span>/
-                  <span className="text-red-600">{shipper.late}</span>
-                </td>
-                <td className="text-center p-2">{shipper.total}</td>
-                <td className="text-center p-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedShipper(shipper.shipper)}
-                  >
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            
-            {viewMode === 'timeline' && onTimeAnalysis.timeline.map((month, idx) => (
-              <tr key={idx} className="border-b hover:bg-gray-50">
-                <td className="p-2 font-medium">{month.month}</td>
-                <td className="text-center p-2">
-                  <Badge variant={parseFloat(month.percentage) >= 95 ? "default" : parseFloat(month.percentage) >= 85 ? "secondary" : "destructive"}>
-                    {month.percentage}%
-                  </Badge>
-                </td>
-                <td className="text-center p-2">
-                  <span className="text-green-600">{month.onTime}</span>/
-                  <span className="text-red-600">{month.late}</span>
-                </td>
-                <td className="text-center p-2">{month.total}</td>
-                <td className="text-center p-2">-</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Only show the main view when no details are selected */}
+      {!hasSelectedDetails && (
+        <>
+          {/* View Mode Selector */}
+          <div className="flex gap-2 border-b">
+            <Button 
+              variant={viewMode === 'routes' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('routes')}
+            >
+              <MapPin className="h-4 w-4 mr-1" />
+              By Routes ({onTimeAnalysis.routes.length})
+            </Button>
+            <Button 
+              variant={viewMode === 'drivers' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('drivers')}
+            >
+              <Users className="h-4 w-4 mr-1" />
+              By Drivers ({onTimeAnalysis.drivers.length})
+            </Button>
+            <Button 
+              variant={viewMode === 'depots' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('depots')}
+            >
+              <Building2 className="h-4 w-4 mr-1" />
+              By Depots ({onTimeAnalysis.depots.length})
+            </Button>
+            <Button 
+              variant={viewMode === 'shippers' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('shippers')}
+            >
+              <Package className="h-4 w-4 mr-1" />
+              By Shippers ({onTimeAnalysis.shippers.length})
+            </Button>
+            <Button 
+              variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('timeline')}
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              Timeline ({onTimeAnalysis.timeline.length})
+            </Button>
+          </div>
+          
+          {/* Data Table */}
+          <div className="max-h-96 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="text-left p-2">
+                    {viewMode === 'routes' && 'Route'}
+                    {viewMode === 'drivers' && 'Driver'}
+                    {viewMode === 'depots' && 'Depot'}
+                    {viewMode === 'shippers' && 'Shipper'}
+                    {viewMode === 'timeline' && 'Month'}
+                  </th>
+                  <th className="text-center p-2">On-Time %</th>
+                  <th className="text-center p-2">Performance</th>
+                  <th className="text-center p-2">Volume</th>
+                  <th className="text-center p-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {viewMode === 'routes' && onTimeAnalysis.routes.map((route, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{route.route}</td>
+                    <td className="text-center p-2">
+                      <Badge variant={parseFloat(route.percentage) >= 95 ? "default" : parseFloat(route.percentage) >= 85 ? "secondary" : "destructive"}>
+                        {route.percentage}%
+                      </Badge>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="text-green-600">{route.onTime}</span>/
+                      <span className="text-red-600">{route.late}</span>
+                    </td>
+                    <td className="text-center p-2">{route.total}</td>
+                    <td className="text-center p-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedRoute(route.route)}
+                      >
+                        Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {viewMode === 'drivers' && onTimeAnalysis.drivers.map((driver, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{driver.driver}</td>
+                    <td className="text-center p-2">
+                      <Badge variant={parseFloat(driver.percentage) >= 95 ? "default" : parseFloat(driver.percentage) >= 85 ? "secondary" : "destructive"}>
+                        {driver.percentage}%
+                      </Badge>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="text-green-600">{driver.onTime}</span>/
+                      <span className="text-red-600">{driver.late}</span>
+                    </td>
+                    <td className="text-center p-2">{driver.total}</td>
+                    <td className="text-center p-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedDriver(driver.driver)}
+                      >
+                        Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {viewMode === 'depots' && onTimeAnalysis.depots.map((depot, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{depot.depot}</td>
+                    <td className="text-center p-2">
+                      <Badge variant={parseFloat(depot.percentage) >= 95 ? "default" : parseFloat(depot.percentage) >= 85 ? "secondary" : "destructive"}>
+                        {depot.percentage}%
+                      </Badge>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="text-green-600">{depot.onTime}</span>/
+                      <span className="text-red-600">{depot.late}</span>
+                    </td>
+                    <td className="text-center p-2">{depot.total}</td>
+                    <td className="text-center p-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedDepot(depot.depot)}
+                      >
+                        Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {viewMode === 'shippers' && onTimeAnalysis.shippers.map((shipper, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{shipper.shipper}</td>
+                    <td className="text-center p-2">
+                      <Badge variant={parseFloat(shipper.percentage) >= 95 ? "default" : parseFloat(shipper.percentage) >= 85 ? "secondary" : "destructive"}>
+                        {shipper.percentage}%
+                      </Badge>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="text-green-600">{shipper.onTime}</span>/
+                      <span className="text-red-600">{shipper.late}</span>
+                    </td>
+                    <td className="text-center p-2">{shipper.total}</td>
+                    <td className="text-center p-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedShipper(shipper.shipper)}
+                      >
+                        Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {viewMode === 'timeline' && onTimeAnalysis.timeline.map((month, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{month.month}</td>
+                    <td className="text-center p-2">
+                      <Badge variant={parseFloat(month.percentage) >= 95 ? "default" : parseFloat(month.percentage) >= 85 ? "secondary" : "destructive"}>
+                        {month.percentage}%
+                      </Badge>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="text-green-600">{month.onTime}</span>/
+                      <span className="text-red-600">{month.late}</span>
+                    </td>
+                    <td className="text-center p-2">{month.total}</td>
+                    <td className="text-center p-2">-</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
     </div>
   );
