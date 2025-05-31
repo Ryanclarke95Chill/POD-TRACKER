@@ -2125,6 +2125,9 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
   
   return (
     <div className="space-y-6">
+      {/* Selected Details - Show at top when something is selected */}
+      {renderSelectedDetails()}
+      
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4 text-center">
         <div className="p-4 bg-green-50 rounded">
@@ -2329,9 +2332,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
           </tbody>
         </table>
       </div>
-      
-      {/* Selected Details */}
-      {renderSelectedDetails()}
+
     </div>
   );
 };
