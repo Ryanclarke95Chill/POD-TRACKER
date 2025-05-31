@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -2222,8 +2223,11 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                     <button 
                       className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                       onClick={() => {
-                        // Show detailed consignment modal
-                        setSelectedConsignment(detail);
+                        // Find the full consignment data from the original consignments array
+                        const fullConsignment = consignments.find(c => c.consignmentNo === detail.consignmentNo);
+                        if (fullConsignment) {
+                          setSelectedConsignment(fullConsignment);
+                        }
                       }}
                     >
                       {detail.consignmentNo}
@@ -2243,7 +2247,11 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                       size="sm"
                       className="text-xs px-2 py-1 h-6"
                       onClick={() => {
-                        setSelectedConsignment(detail);
+                        // Find the full consignment data from the original consignments array
+                        const fullConsignment = consignments.find(c => c.consignmentNo === detail.consignmentNo);
+                        if (fullConsignment) {
+                          setSelectedConsignment(fullConsignment);
+                        }
                       }}
                     >
                       View
@@ -2448,133 +2456,10 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
 
       {/* Consignment Detail Modal */}
       {selectedConsignment && (
-        <Dialog open={!!selectedConsignment} onOpenChange={() => setSelectedConsignment(null)}>
-          <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden">
-            <DialogHeader className="pb-2">
-              <DialogTitle>Consignment Details: {selectedConsignment.consignmentNo}</DialogTitle>
-              <DialogDescription>Complete delivery information and performance analysis</DialogDescription>
-            </DialogHeader>
-            <div className="overflow-y-auto max-h-[calc(85vh-100px)] space-y-4">
-              {/* Status and Performance Summary */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="text-sm font-medium text-gray-600">Delivery Status</div>
-                  <Badge variant={selectedConsignment.isOnTime ? "default" : "destructive"} className="mt-1">
-                    {selectedConsignment.isOnTime ? "On-Time" : "Late"}
-                  </Badge>
-                </div>
-                <div className="p-3 bg-gray-50 rounded">
-                  <div className="text-sm font-medium text-gray-600">Punctuality</div>
-                  <div className="font-medium">{selectedConsignment.punctuality || 'N/A'}</div>
-                </div>
-              </div>
-
-              {/* Customer and Route Information */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-lg">Delivery Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Customer:</span>
-                    <div>{selectedConsignment.customer}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Driver:</span>
-                    <div>{selectedConsignment.driver}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Vehicle:</span>
-                    <div>{selectedConsignment.vehicle || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Delivery Window:</span>
-                    <div>
-                      {selectedConsignment.deliveryWindowFrom && selectedConsignment.deliveryWindowTo 
-                        ? (() => {
-                            // Convert to AEST for display
-                            const aestOffset = 10 * 60 * 60 * 1000;
-                            const startAEST = new Date(new Date(selectedConsignment.deliveryWindowFrom).getTime() + aestOffset);
-                            const endAEST = new Date(new Date(selectedConsignment.deliveryWindowTo).getTime() + aestOffset);
-                            return `${startAEST.toLocaleString()} - ${endAEST.toLocaleString()} AEST`;
-                          })()
-                        : 'N/A'
-                      }
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Departure Time:</span>
-                    <div>{selectedConsignment.departureDateTime ? new Date(selectedConsignment.departureDateTime).toLocaleString() : 'N/A'}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Actual Delivery:</span>
-                    <div>{selectedConsignment.deliveryDateTime ? new Date(selectedConsignment.deliveryDateTime).toLocaleString() : 'N/A'}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Details from Axylog */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-lg">Performance Analysis</h4>
-                <div className="space-y-2 text-sm">
-                  {!selectedConsignment.wasDelivered && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded">
-                      <div className="font-medium text-red-800">Delivery Failed:</div>
-                      <div className="text-red-700 mt-1">
-                        This consignment was not delivered successfully (cancelled, returned, or failed delivery).
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedConsignment.wasDelivered && !selectedConsignment.isOnTime && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded">
-                      <div className="font-medium text-red-800">Late Delivery:</div>
-                      <div className="text-red-700 mt-1">
-                        This delivery was completed after the planned delivery time.
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedConsignment.isOnTime && selectedConsignment.wasDelivered && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded">
-                      <div className="font-medium text-green-800">Successful On-Time Delivery</div>
-                      <div className="text-green-700 mt-1">
-                        This delivery was completed on or before the scheduled time.
-                      </div>
-                    </div>
-                  )}
-                  
-                  {selectedConsignment.deliveryWindowFrom && selectedConsignment.deliveryWindowTo && selectedConsignment.deliveryDateTime && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                      <div className="font-medium text-blue-800">Delivery Window Analysis:</div>
-                      <div className="text-blue-700 mt-1">
-                        {(() => {
-                          const actual = new Date(selectedConsignment.deliveryDateTime);
-                          const windowStart = new Date(selectedConsignment.deliveryWindowFrom);
-                          const windowEnd = new Date(selectedConsignment.deliveryWindowTo);
-                          
-                          // Convert to AEST for comparison
-                          const aestOffset = 10 * 60 * 60 * 1000;
-                          const actualAEST = new Date(actual.getTime() + aestOffset);
-                          const windowStartAEST = new Date(windowStart.getTime() + aestOffset);
-                          const windowEndAEST = new Date(windowEnd.getTime() + aestOffset);
-                          
-                          if (actualAEST < windowStartAEST) {
-                            const diffMinutes = Math.round((windowStartAEST.getTime() - actualAEST.getTime()) / (1000 * 60));
-                            return `Delivered ${diffMinutes} minutes before delivery window (AEST)`;
-                          } else if (actualAEST > windowEndAEST) {
-                            const diffMinutes = Math.round((actualAEST.getTime() - windowEndAEST.getTime()) / (1000 * 60));
-                            return `Delivered ${diffMinutes} minutes after delivery window (AEST)`;
-                          } else {
-                            return `Delivered within the scheduled delivery window (AEST)`;
-                          }
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ConsignmentDetailModal
+          consignment={selectedConsignment}
+          onClose={() => setSelectedConsignment(null)}
+        />
       )}
 
     </div>
