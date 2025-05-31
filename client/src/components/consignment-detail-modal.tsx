@@ -54,20 +54,25 @@ export default function ConsignmentDetailModal({
       return { isAtRisk: false, reason: "" };
     }
 
-    const calculatedETA = consignment.delivery_calculatedETA || consignment.pickUp_calculatedETA;
+    // Try multiple ETA field variations from the Axylog API
+    const calculatedETA = consignment.delivery_calculatedETA || 
+                          consignment.pickUp_calculatedETA ||
+                          consignment.delivery_FirstCalculatedETA ||
+                          consignment.pickUp_FirstCalculatedETA ||
+                          consignment.delivery_ETA ||
+                          consignment.pickUp_ETA;
+                          
     if (!calculatedETA) {
       return { isAtRisk: false, reason: "" };
     }
 
     const etaDate = new Date(calculatedETA);
-    const now = new Date();
 
-    // Check delivery window
-    const deliveryFromTime = consignment.delivery_FromTime;
-    const deliveryToTime = consignment.delivery_ToTime;
+    // Check delivery window - try multiple field variations
+    const deliveryFromTime = consignment.delivery_FromTime || consignment.deliveryFromTime;
+    const deliveryToTime = consignment.delivery_ToTime || consignment.deliveryToTime;
     
     if (deliveryFromTime && deliveryToTime) {
-      const deliveryStart = new Date(deliveryFromTime);
       const deliveryEnd = new Date(deliveryToTime);
       
       if (etaDate > deliveryEnd) {
@@ -89,12 +94,11 @@ export default function ConsignmentDetailModal({
       }
     }
 
-    // Check pickup window
-    const pickupFromTime = consignment.pickUp_FromTime;
-    const pickupToTime = consignment.pickUp_ToTime;
+    // Check pickup window - try multiple field variations
+    const pickupFromTime = consignment.pickUp_FromTime || consignment.pickupFromTime;
+    const pickupToTime = consignment.pickUp_ToTime || consignment.pickupToTime;
     
     if (pickupFromTime && pickupToTime) {
-      const pickupStart = new Date(pickupFromTime);
       const pickupEnd = new Date(pickupToTime);
       
       if (etaDate > pickupEnd) {
@@ -114,6 +118,14 @@ export default function ConsignmentDetailModal({
           reason: `Pickup is expected ${delayText} after the scheduled window ends (${formatDate(pickupToTime)}).`
         };
       }
+    }
+
+    // Debug: For testing, let's add a temporary condition to show warning for GPS not present
+    if (status === "GPS not present" || (consignment.delivery_StateLabel && consignment.delivery_StateLabel.includes('GPS not present'))) {
+      return { 
+        isAtRisk: true, 
+        reason: `Delivery tracking is unavailable - GPS signal not present. Unable to monitor real-time progress.`
+      };
     }
 
     return { isAtRisk: false, reason: "" };
