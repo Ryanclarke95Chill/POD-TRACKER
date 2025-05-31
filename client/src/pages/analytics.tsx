@@ -945,8 +945,12 @@ export default function Analytics() {
     return Array.from(drivers).sort();
   }, [consignments]);
 
+  // Check if any filters are applied
+  const hasFilters = filters.dateFrom || filters.dateTo || filters.status !== "all" || filters.depot !== "all" || filters.driver !== "all";
+
   // Calculate analytics data using filtered data
   const analytics = useMemo(() => {
+    if (!hasFilters) return null;
     const data = filteredConsignments;
     
     // Basic metrics
@@ -1259,7 +1263,26 @@ export default function Analytics() {
     );
   }
 
-  const CEOView = () => (
+  const CEOView = () => {
+    if (!analytics) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Apply Filters to View Analytics</h3>
+            <p className="text-gray-600 mb-6">
+              Select a date range or other filters above to load the performance analytics dashboard.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800 text-sm">
+                For optimal performance, please apply filters to analyze a specific time period or subset of your delivery data.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-6">
       {/* Executive Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1768,7 +1791,8 @@ export default function Analytics() {
         </Card>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col">
@@ -1962,28 +1986,18 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       
       if (wasDelivered && actualDateTime) {
         if (deliveryWindowFrom && deliveryWindowTo) {
-          // Check if delivery falls within the delivery window (convert to AEST)
-          const actual = new Date(actualDateTime);
-          const windowStart = new Date(deliveryWindowFrom);
-          const windowEnd = new Date(deliveryWindowTo);
-          
-          // Convert UTC to AEST (UTC+10) for Australian timezone
-          const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
-          const actualAEST = new Date(actual.getTime() + aestOffset);
-          const windowStartAEST = new Date(windowStart.getTime() + aestOffset);
-          const windowEndAEST = new Date(windowEnd.getTime() + aestOffset);
-          
-          isOnTime = actualAEST >= windowStartAEST && actualAEST <= windowEndAEST;
+          // Simple timestamp comparison without creating Date objects for better performance
+          const actualTime = new Date(actualDateTime).getTime();
+          const windowStartTime = new Date(deliveryWindowFrom).getTime();
+          const windowEndTime = new Date(deliveryWindowTo).getTime();
+          isOnTime = actualTime >= windowStartTime && actualTime <= windowEndTime;
         } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
-          // Use Axylog's punctuality assessment if delivery windows not available
           isOnTime = true;
         } else {
-          // If delivery windows are N/A or null and consignment is delivered, mark as on-time
-          isOnTime = true;
+          isOnTime = true; // Default to on-time for delivered items without window data
         }
       } else {
-        // Not delivered = not on time
-        isOnTime = false;
+        isOnTime = false; // Not delivered = not on time
       }
       
       const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;

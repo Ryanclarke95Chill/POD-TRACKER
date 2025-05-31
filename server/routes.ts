@@ -147,9 +147,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let consignments;
       
       if (permissions.canViewAllConsignments) {
-        // Admin and Manager can see all data - limit to most recent 2000 for performance
-        const limit = parseInt(req.query.limit as string) || 2000;
-        consignments = await storage.getRecentConsignments(limit);
+        // Admin and Manager can see all data
+        consignments = await storage.getAllConsignments();
       } else if (permissions.canViewDepartmentConsignments) {
         // Supervisor can see department data
         consignments = await storage.getConsignmentsByDepartment(user.department || '');
