@@ -1149,22 +1149,36 @@ export default function Analytics() {
     // Performance metrics
     const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
     
-    // Calculate on-time deliveries using proper delivery performance logic
+    // Calculate on-time deliveries using delivery window logic
     const onTimeDeliveries = data.filter(c => {
       const wasDelivered = (c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd;
-      const plannedDateTime = (c as any).delivery_PlannedETA || (c as any).contextPlannedDeliveryDateTime;
       const actualDateTime = (c as any).delivery_OutcomeDateTime;
+      const deliveryWindowFrom = (c as any).pickUp_Delivery_From;
+      const deliveryWindowTo = (c as any).pickUp_Delivery_To;
       
-      if (wasDelivered && plannedDateTime && actualDateTime) {
-        // Compare actual delivery time to planned time
-        const planned = new Date(plannedDateTime);
-        const actual = new Date(actualDateTime);
-        return actual <= planned; // On time if delivered at or before planned time
-      } else if ((c as any).deliveryPunctuality === 'On time' || (c as any).deliveryPunctuality === 'Early') {
-        // Use Axylog's punctuality assessment if available
-        return true;
+      if (wasDelivered && actualDateTime) {
+        if (deliveryWindowFrom && deliveryWindowTo) {
+          // Check if delivery falls within the delivery window (convert to AEST)
+          const actual = new Date(actualDateTime);
+          const windowStart = new Date(deliveryWindowFrom);
+          const windowEnd = new Date(deliveryWindowTo);
+          
+          // Convert UTC to AEST (UTC+10) for Australian timezone
+          const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
+          const actualAEST = new Date(actual.getTime() + aestOffset);
+          const windowStartAEST = new Date(windowStart.getTime() + aestOffset);
+          const windowEndAEST = new Date(windowEnd.getTime() + aestOffset);
+          
+          return actualAEST >= windowStartAEST && actualAEST <= windowEndAEST;
+        } else if ((c as any).deliveryPunctuality === 'On time' || (c as any).deliveryPunctuality === 'Early') {
+          // Use Axylog's punctuality assessment if delivery windows not available
+          return true;
+        } else {
+          // No delivery window data and no punctuality data = assume late
+          return false;
+        }
       } else {
-        // Not delivered, delivered late, or missing critical data = not on time
+        // Not delivered = not on time
         return false;
       }
     }).length;
@@ -1940,21 +1954,35 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     consignments.forEach(consignment => {
       // Check if delivery was completed successfully
       const wasDelivered = (consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd;
-      const plannedDateTime = (consignment as any).delivery_PlannedETA || (consignment as any).contextPlannedDeliveryDateTime;
       const actualDateTime = (consignment as any).delivery_OutcomeDateTime;
+      const deliveryWindowFrom = (consignment as any).pickUp_Delivery_From;
+      const deliveryWindowTo = (consignment as any).pickUp_Delivery_To;
       
       let isOnTime = false;
       
-      if (wasDelivered && plannedDateTime && actualDateTime) {
-        // Compare actual delivery time to planned time
-        const planned = new Date(plannedDateTime);
-        const actual = new Date(actualDateTime);
-        isOnTime = actual <= planned; // On time if delivered at or before planned time
-      } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
-        // Use Axylog's punctuality assessment if available
-        isOnTime = true;
+      if (wasDelivered && actualDateTime) {
+        if (deliveryWindowFrom && deliveryWindowTo) {
+          // Check if delivery falls within the delivery window (convert to AEST)
+          const actual = new Date(actualDateTime);
+          const windowStart = new Date(deliveryWindowFrom);
+          const windowEnd = new Date(deliveryWindowTo);
+          
+          // Convert UTC to AEST (UTC+10) for Australian timezone
+          const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
+          const actualAEST = new Date(actual.getTime() + aestOffset);
+          const windowStartAEST = new Date(windowStart.getTime() + aestOffset);
+          const windowEndAEST = new Date(windowEnd.getTime() + aestOffset);
+          
+          isOnTime = actualAEST >= windowStartAEST && actualAEST <= windowEndAEST;
+        } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
+          // Use Axylog's punctuality assessment if delivery windows not available
+          isOnTime = true;
+        } else {
+          // No delivery window data and no punctuality data = assume late
+          isOnTime = false;
+        }
       } else {
-        // Not delivered, delivered late, or missing critical data = not on time
+        // Not delivered = not on time
         isOnTime = false;
       }
       
@@ -1972,7 +2000,8 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
         customer: (consignment as any).shipToCompanyName,
         departureDateTime: (consignment as any).departureDateTime,
         deliveryDateTime: actualDateTime,
-        plannedDelivery: plannedDateTime,
+        deliveryWindowFrom: deliveryWindowFrom,
+        deliveryWindowTo: deliveryWindowTo,
         punctuality: (consignment as any).deliveryPunctuality,
         driver: driver,
         vehicle: (consignment as any).vehicleCode,
@@ -2445,8 +2474,19 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                     <div>{selectedConsignment.vehicle || 'N/A'}</div>
                   </div>
                   <div>
-                    <span className="font-medium">Planned Delivery:</span>
-                    <div>{selectedConsignment.plannedDelivery ? new Date(selectedConsignment.plannedDelivery).toLocaleString() : 'N/A'}</div>
+                    <span className="font-medium">Delivery Window:</span>
+                    <div>
+                      {selectedConsignment.deliveryWindowFrom && selectedConsignment.deliveryWindowTo 
+                        ? (() => {
+                            // Convert to AEST for display
+                            const aestOffset = 10 * 60 * 60 * 1000;
+                            const startAEST = new Date(new Date(selectedConsignment.deliveryWindowFrom).getTime() + aestOffset);
+                            const endAEST = new Date(new Date(selectedConsignment.deliveryWindowTo).getTime() + aestOffset);
+                            return `${startAEST.toLocaleString()} - ${endAEST.toLocaleString()} AEST`;
+                          })()
+                        : 'N/A'
+                      }
+                    </div>
                   </div>
                   <div>
                     <span className="font-medium">Departure Time:</span>
@@ -2490,23 +2530,31 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                     </div>
                   )}
                   
-                  {selectedConsignment.plannedDelivery && selectedConsignment.deliveryDateTime && (
+                  {selectedConsignment.deliveryWindowFrom && selectedConsignment.deliveryWindowTo && selectedConsignment.deliveryDateTime && (
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                      <div className="font-medium text-blue-800">Timing Details:</div>
+                      <div className="font-medium text-blue-800">Delivery Window Analysis:</div>
                       <div className="text-blue-700 mt-1">
-                        {selectedConsignment.deliveryDateTime && selectedConsignment.plannedDelivery ? 
-                          (() => {
-                            const planned = new Date(selectedConsignment.plannedDelivery);
-                            const actual = new Date(selectedConsignment.deliveryDateTime);
-                            const diffMinutes = Math.round((actual.getTime() - planned.getTime()) / (1000 * 60));
-                            if (diffMinutes <= 0) {
-                              return `Delivered ${Math.abs(diffMinutes)} minutes early`;
-                            } else {
-                              return `Delivered ${diffMinutes} minutes late`;
-                            }
-                          })()
-                          : 'Timing information not available'
-                        }
+                        {(() => {
+                          const actual = new Date(selectedConsignment.deliveryDateTime);
+                          const windowStart = new Date(selectedConsignment.deliveryWindowFrom);
+                          const windowEnd = new Date(selectedConsignment.deliveryWindowTo);
+                          
+                          // Convert to AEST for comparison
+                          const aestOffset = 10 * 60 * 60 * 1000;
+                          const actualAEST = new Date(actual.getTime() + aestOffset);
+                          const windowStartAEST = new Date(windowStart.getTime() + aestOffset);
+                          const windowEndAEST = new Date(windowEnd.getTime() + aestOffset);
+                          
+                          if (actualAEST < windowStartAEST) {
+                            const diffMinutes = Math.round((windowStartAEST.getTime() - actualAEST.getTime()) / (1000 * 60));
+                            return `Delivered ${diffMinutes} minutes before delivery window (AEST)`;
+                          } else if (actualAEST > windowEndAEST) {
+                            const diffMinutes = Math.round((actualAEST.getTime() - windowEndAEST.getTime()) / (1000 * 60));
+                            return `Delivered ${diffMinutes} minutes after delivery window (AEST)`;
+                          } else {
+                            return `Delivered within the scheduled delivery window (AEST)`;
+                          }
+                        })()}
                       </div>
                     </div>
                   )}
