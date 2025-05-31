@@ -140,6 +140,10 @@ export default function Dashboard() {
         const status = getStatusDisplay(consignment);
         return status !== "Traveling" && status !== "In Transit" && status !== "Delivered" && status !== "Complete";
       }
+      if (isAtRiskFilter) {
+        // Check if this consignment is in the at-risk list
+        return atRiskConsignments.some(atRisk => atRisk.id === consignment.id);
+      }
       return selectedStatus === "all" || getStatusDisplay(consignment) === selectedStatus;
     })();
     
