@@ -227,7 +227,7 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Consignments</p>
+                <p className="text-sm font-medium text-gray-600">Consignments</p>
                 <p className="text-3xl font-bold text-gray-900">{(consignments as Consignment[]).length}</p>
               </div>
               <div className="bg-primary/10 p-3 rounded-lg">

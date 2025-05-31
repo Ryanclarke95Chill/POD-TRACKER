@@ -40,8 +40,14 @@ export default function ConsignmentDetailModal({
     const mapStatus = (status: string | null, isPickup: boolean = false) => {
       if (!status) return null;
       if (status === 'Traveling') return 'In Transit';
+      if (status === 'GPS not present') return 'In Transit'; // Show GPS not present as In Transit
       if (status === 'Positive outcome') return isPickup ? 'Picked Up' : 'Delivered';
-      return status;
+      if (status === 'Delivered') return 'Delivered';
+      if (status === 'Not delivered') return 'Failed Delivery';
+      if (status === 'Not picked up') return 'Failed Pickup';
+      if (status === 'Negative outcome') return isPickup ? 'Failed Pickup' : 'Failed Delivery';
+      if (status === 'Arrived') return 'Arrived';
+      return status; // Return exact value for anything else
     };
     
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
