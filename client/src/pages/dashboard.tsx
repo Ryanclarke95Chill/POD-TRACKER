@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [selectedShipper, setSelectedShipper] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [isPendingFilter, setIsPendingFilter] = useState<boolean>(false);
+  const [isAtRiskFilter, setIsAtRiskFilter] = useState<boolean>(false);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
@@ -217,6 +218,7 @@ export default function Dashboard() {
             onClick={() => {
               setSelectedStatus("all");
               setIsPendingFilter(false);
+              setIsAtRiskFilter(false);
             }}
           >
             <div className="flex items-center justify-between">
@@ -235,6 +237,7 @@ export default function Dashboard() {
             onClick={() => {
               setSelectedStatus("In Transit");
               setIsPendingFilter(false);
+              setIsAtRiskFilter(false);
             }}
           >
             <div className="flex items-center justify-between">
@@ -253,6 +256,7 @@ export default function Dashboard() {
             onClick={() => {
               setSelectedStatus("Delivered");
               setIsPendingFilter(false);
+              setIsAtRiskFilter(false);
             }}
           >
             <div className="flex items-center justify-between">
@@ -271,6 +275,7 @@ export default function Dashboard() {
             onClick={() => {
               setSelectedStatus("all");
               setIsPendingFilter(true);
+              setIsAtRiskFilter(false);
             }}
           >
             <div className="flex items-center justify-between">
@@ -293,7 +298,7 @@ export default function Dashboard() {
               // Filter to show only at-risk consignments
               setSelectedStatus("all");
               setIsPendingFilter(false);
-              // You could add a specific filter for at-risk items here
+              setIsAtRiskFilter(true);
             }}
           >
             <div className="flex items-center justify-between">

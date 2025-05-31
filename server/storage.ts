@@ -93,11 +93,31 @@ export class DatabaseStorage implements IStorage {
     // Optimized query with configurable limit to prevent memory issues
     const query = db.select().from(consignments);
     
-    if (limit) {
-      return await query.limit(limit);
-    }
+    const results = limit ? await query.limit(limit) : await query.limit(20000);
     
-    return await query.limit(20000);
+    // Filter out internal depot transfers
+    return results.filter(consignment => {
+      const from = consignment.shipFromMasterDataCode;
+      const to = consignment.shipToMasterDataCode;
+      
+      // Filter out depot transfer patterns
+      const depotTransferPatterns = [
+        { from: 'WA_8', to: 'WA_8D' },
+        { from: 'WA_8D', to: 'WA_8' },
+        { from: 'NSW_5', to: 'NSW_5D' },
+        { from: 'NSW_5D', to: 'NSW_5' },
+        { from: 'VIC_29963', to: 'VIC_29963D' },
+        { from: 'VIC_29963D', to: 'VIC_29963' },
+        { from: 'QLD_829', to: 'QLD_829D' },
+        { from: 'QLD_829D', to: 'QLD_829' }
+      ];
+      
+      const isDepotTransfer = depotTransferPatterns.some(pattern => 
+        pattern.from === from && pattern.to === to
+      );
+      
+      return !isDepotTransfer;
+    });
   }
 
   async getDashboardStats(): Promise<{
