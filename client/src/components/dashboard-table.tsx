@@ -212,25 +212,35 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            {columns.map((column, index) => (
-              <TableHead 
-                key={column.key} 
-                className={`font-semibold text-gray-700 cursor-move select-none ${
-                  draggedColumn === index ? 'opacity-50' : ''
-                }`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-              >
-                <div className="flex items-center gap-2">
-                  <GripVertical className="h-4 w-4 text-gray-400" />
-                  {column.label}
-                </div>
-              </TableHead>
-            ))}
-            <TableHead className="font-semibold text-gray-700">View Details</TableHead>
+            {columns.map((column, index) => {
+              // Define column-specific widths
+              let widthClass = '';
+              if (column.key === 'delivery_StateLabel') widthClass = 'w-32'; // More space for status
+              if (column.key === 'qty1' || column.key === 'qty2') widthClass = 'w-16'; // Less space for pallets/cartons
+              if (column.key === 'consignmentNo') widthClass = 'w-28';
+              if (column.key === 'shipperCompanyName') widthClass = 'w-32';
+              if (column.key === 'shipFromCity' || column.key === 'shipToCity') widthClass = 'w-36';
+              
+              return (
+                <TableHead 
+                  key={column.key} 
+                  className={`font-semibold text-gray-700 cursor-move select-none ${widthClass} ${
+                    draggedColumn === index ? 'opacity-50' : ''
+                  }`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-gray-400" />
+                    {column.label}
+                  </div>
+                </TableHead>
+              );
+            })}
+            <TableHead className="font-semibold text-gray-700 w-24">View Details</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
