@@ -90,7 +90,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllConsignments(): Promise<Consignment[]> {
-    return await db.select().from(consignments);
+    // Optimized query with limit to prevent memory issues
+    return await db.select().from(consignments).limit(20000);
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
@@ -100,17 +101,17 @@ export class DatabaseStorage implements IStorage {
 
     // If user is admin, show their own consignments
     if (user.role === 'admin') {
-      return await db.select().from(consignments).where(eq(consignments.userId, userId));
+      return await db.select().from(consignments).where(eq(consignments.userId, userId)).limit(20000);
     }
 
     // For non-admin users, show admin's consignments (latest synced data)
     const adminUser = await this.getUserByUsername('admin');
     if (adminUser) {
-      return await db.select().from(consignments).where(eq(consignments.userId, adminUser.id));
+      return await db.select().from(consignments).where(eq(consignments.userId, adminUser.id)).limit(20000);
     }
 
     // Fallback to user's own consignments if no admin found
-    return await db.select().from(consignments).where(eq(consignments.userId, userId));
+    return await db.select().from(consignments).where(eq(consignments.userId, userId)).limit(20000);
   }
 
   async getConsignmentsByDepartment(department: string): Promise<Consignment[]> {

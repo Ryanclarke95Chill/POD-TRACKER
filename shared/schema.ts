@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -314,7 +314,24 @@ export const consignments = pgTable("consignments", {
   
   // Events data
   events: text("events").default('[]'),
-});
+}, (table) => ({
+  // Add indexes for frequently queried columns to improve performance
+  userIdIdx: index("consignments_user_id_idx").on(table.userId),
+  consignmentNoIdx: index("consignments_consignment_no_idx").on(table.consignmentNo),
+  driverNameIdx: index("consignments_driver_name_idx").on(table.driverName),
+  vehicleCodeIdx: index("consignments_vehicle_code_idx").on(table.vehicleCode),
+  shipFromCityIdx: index("consignments_ship_from_city_idx").on(table.shipFromCity),
+  shipToCityIdx: index("consignments_ship_to_city_idx").on(table.shipToCity),
+  deliveryStateIdx: index("consignments_delivery_state_idx").on(table.deliveryState),
+  pickupStateIdx: index("consignments_pickup_state_idx").on(table.pickupState),
+  expectedTemperatureIdx: index("consignments_expected_temperature_idx").on(table.expectedTemperature),
+  departureDateTimeIdx: index("consignments_departure_date_time_idx").on(table.departureDateTime),
+  deliveryOutcomeDateTimeIdx: index("consignments_delivery_outcome_date_time_idx").on(table.delivery_OutcomeDateTime),
+  // Composite indexes for common query patterns
+  userDriverIdx: index("consignments_user_driver_idx").on(table.userId, table.driverName),
+  userCityIdx: index("consignments_user_city_idx").on(table.userId, table.shipFromCity),
+  userStateIdx: index("consignments_user_state_idx").on(table.userId, table.deliveryState),
+}));
 
 export const insertConsignmentSchema = createInsertSchema(consignments);
 
