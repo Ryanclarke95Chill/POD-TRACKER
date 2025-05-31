@@ -61,11 +61,25 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     setDraggedColumn(null);
   };
 
+  // Sort consignments by most recent first (using delivery_PlannedETA as primary sort field)
+  const sortedConsignments = [...consignments].sort((a, b) => {
+    // Try delivery_PlannedETA first
+    const dateA = (a as any).delivery_PlannedETA;
+    const dateB = (b as any).delivery_PlannedETA;
+    
+    if (dateA && dateB) {
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    }
+    
+    // Fallback to ID (higher ID = more recent)
+    return b.id - a.id;
+  });
+
   // Calculate pagination
-  const totalPages = Math.ceil(consignments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedConsignments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentConsignments = consignments.slice(startIndex, endIndex);
+  const currentConsignments = sortedConsignments.slice(startIndex, endIndex);
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
