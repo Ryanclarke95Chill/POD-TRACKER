@@ -2198,6 +2198,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                 {viewMode === 'routes' && 'Route'}
                 {viewMode === 'drivers' && 'Driver'}
                 {viewMode === 'depots' && 'Depot'}
+                {viewMode === 'shippers' && 'Shipper'}
                 {viewMode === 'timeline' && 'Month'}
               </th>
               <th className="text-center p-2">On-Time %</th>
@@ -2275,6 +2276,31 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                     variant="outline" 
                     size="sm"
                     onClick={() => setSelectedDepot(depot.depot)}
+                  >
+                    Details
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            
+            {viewMode === 'shippers' && onTimeAnalysis.shippers.map((shipper, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-medium">{shipper.shipper}</td>
+                <td className="text-center p-2">
+                  <Badge variant={parseFloat(shipper.percentage) >= 95 ? "default" : parseFloat(shipper.percentage) >= 85 ? "secondary" : "destructive"}>
+                    {shipper.percentage}%
+                  </Badge>
+                </td>
+                <td className="text-center p-2">
+                  <span className="text-green-600">{shipper.onTime}</span>/
+                  <span className="text-red-600">{shipper.late}</span>
+                </td>
+                <td className="text-center p-2">{shipper.total}</td>
+                <td className="text-center p-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedShipper(shipper.shipper)}
                   >
                     Details
                   </Button>
