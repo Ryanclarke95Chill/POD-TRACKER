@@ -48,35 +48,32 @@ export default function ConsignmentDetailModal({
   };
 
   const isConsignmentAtRisk = () => {
+    // Use the same at-risk logic as the dashboard
     const status = getStatusDisplay();
-    // Only check active consignments
-    if (status === "Delivered" || status === "Picked Up" || status === "Complete" || status === "Failed") {
-      return { isAtRisk: false, reason: "" };
-    }
-
-    // Try multiple ETA field variations from the Axylog API
-    const calculatedETA = consignment.delivery_calculatedETA || 
-                          consignment.pickUp_calculatedETA ||
-                          consignment.delivery_FirstCalculatedETA ||
-                          consignment.pickUp_FirstCalculatedETA ||
-                          consignment.delivery_ETA ||
-                          consignment.pickUp_ETA;
-                          
-    if (!calculatedETA) {
-      return { isAtRisk: false, reason: "" };
-    }
-
-    const etaDate = new Date(calculatedETA);
-
-    // Check delivery window - try multiple field variations
-    const deliveryFromTime = consignment.delivery_FromTime || consignment.deliveryFromTime;
-    const deliveryToTime = consignment.delivery_ToTime || consignment.deliveryToTime;
     
-    if (deliveryFromTime && deliveryToTime) {
-      const deliveryEnd = new Date(deliveryToTime);
+    // Only check active consignments - exclude completed, failed, or delivered
+    if (status === 'Delivered' || status === 'Picked Up' || status === 'Complete' || status === 'Failed' || status === 'Cancelled') {
+      return { isAtRisk: false, reason: "" };
+    }
+    
+    // Check if delivery was already attempted and failed
+    const deliveryOutcome = consignment.delivery_Outcome;
+    const deliveryNotDelivered = consignment.delivery_NotDeliverd;
+    if (deliveryOutcome || deliveryNotDelivered) {
+      return { isAtRisk: false, reason: "" }; // Already completed (success or failure)
+    }
+    
+    const calculatedETA = consignment.delivery_CalculatedETA || consignment.delivery_PlannedETA;
+    const windowStart = consignment.minScheduledDeliveryTime || consignment.minScheduledPickupTime;
+    const windowEnd = consignment.maxScheduledDeliveryTime || consignment.maxScheduledPickupTime;
+    
+    if (calculatedETA && windowEnd) {
+      const etaTime = new Date(calculatedETA);
+      const windowEndTime = new Date(windowEnd);
       
-      if (etaDate > deliveryEnd) {
-        const delayMinutes = Math.round((etaDate.getTime() - deliveryEnd.getTime()) / (1000 * 60));
+      // At risk if ETA is after the delivery window end
+      if (etaTime > windowEndTime) {
+        const delayMinutes = Math.round((etaTime.getTime() - windowEndTime.getTime()) / (1000 * 60));
         const delayHours = Math.floor(delayMinutes / 60);
         const remainingMinutes = delayMinutes % 60;
         
@@ -89,46 +86,11 @@ export default function ConsignmentDetailModal({
         
         return { 
           isAtRisk: true, 
-          reason: `Delivery is expected ${delayText} after the scheduled window ends (${formatDate(deliveryToTime)}).`
+          reason: `Delivery is expected ${delayText} after the scheduled window ends (${formatDate(windowEnd)}).`
         };
       }
     }
-
-    // Check pickup window - try multiple field variations
-    const pickupFromTime = consignment.pickUp_FromTime || consignment.pickupFromTime;
-    const pickupToTime = consignment.pickUp_ToTime || consignment.pickupToTime;
     
-    if (pickupFromTime && pickupToTime) {
-      const pickupEnd = new Date(pickupToTime);
-      
-      if (etaDate > pickupEnd) {
-        const delayMinutes = Math.round((etaDate.getTime() - pickupEnd.getTime()) / (1000 * 60));
-        const delayHours = Math.floor(delayMinutes / 60);
-        const remainingMinutes = delayMinutes % 60;
-        
-        let delayText = "";
-        if (delayHours > 0) {
-          delayText = `${delayHours}h ${remainingMinutes}m`;
-        } else {
-          delayText = `${remainingMinutes}m`;
-        }
-        
-        return { 
-          isAtRisk: true, 
-          reason: `Pickup is expected ${delayText} after the scheduled window ends (${formatDate(pickupToTime)}).`
-        };
-      }
-    }
-
-    // For testing - show warning for In Transit status to verify functionality
-    if (status === "In Transit") {
-      console.log('Modal debug - showing at-risk warning for In Transit status');
-      return { 
-        isAtRisk: true, 
-        reason: `Delivery tracking is unavailable - GPS signal not present. Unable to monitor real-time progress.`
-      };
-    }
-
     return { isAtRisk: false, reason: "" };
   };
 
