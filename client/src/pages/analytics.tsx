@@ -1174,8 +1174,8 @@ export default function Analytics() {
           // Use Axylog's punctuality assessment if delivery windows not available
           return true;
         } else {
-          // No delivery window data and no punctuality data = assume late
-          return false;
+          // If delivery windows are N/A or null and consignment is delivered, mark as on-time
+          return true;
         }
       } else {
         // Not delivered = not on time
@@ -1978,8 +1978,8 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
           // Use Axylog's punctuality assessment if delivery windows not available
           isOnTime = true;
         } else {
-          // No delivery window data and no punctuality data = assume late
-          isOnTime = false;
+          // If delivery windows are N/A or null and consignment is delivered, mark as on-time
+          isOnTime = true;
         }
       } else {
         // Not delivered = not on time
