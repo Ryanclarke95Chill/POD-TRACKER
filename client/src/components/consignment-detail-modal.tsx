@@ -229,110 +229,126 @@ export default function ConsignmentDetailModal({
           </div>
 
           {/* Delivery Window Analysis */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center mb-4">
-              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                Delivery Window Analysis
-              </h3>
-            </div>
-            <div className="space-y-4">
-              {/* Pickup Window */}
-              <div className="border-l-4 border-orange-400 pl-4">
-                <h4 className="text-xs font-semibold text-gray-700 mb-2">PICKUP WINDOW</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Planned Pickup</p>
-                    <p className="text-sm font-medium">
-                      {formatDate(consignment.pickUp_PlannedDateTime) || formatDate(consignment.pickupDate) || 'Not specified'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Actual Pickup</p>
-                    <p className="text-sm font-medium">
-                      {formatDate(consignment.pickUp_ActualDateTime) || formatDate(consignment.pickupActualDateTime) || 'Not recorded'}
-                    </p>
-                  </div>
+          {(() => {
+            const status = getStatusDisplay();
+            const isDelivered = status === 'Delivered' || status === 'Complete';
+            const isPickedUp = status === 'Picked Up';
+            const hasPickupData = consignment.pickUp_PlannedDateTime || consignment.pickUp_ActualDateTime || consignment.pickupDate || consignment.pickupActualDateTime;
+            const hasDeliveryData = consignment.delivery_PlannedDateTime || consignment.delivery_ActualDateTime || consignment.deliveryDate || consignment.deliveryActualDateTime || consignment.estimatedDeliveryDate;
+            
+            if (!hasPickupData && !hasDeliveryData) return null;
+            
+            return (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center mb-4">
+                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    {isDelivered ? 'Delivery Window Analysis' : isPickedUp ? 'Pickup Window Analysis' : 'Time Window Analysis'}
+                  </h3>
                 </div>
-                {consignment.pickUp_PlannedDateTime && consignment.pickUp_ActualDateTime && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Pickup Performance</p>
-                    <Badge className={
-                      new Date(consignment.pickUp_ActualDateTime) <= new Date(consignment.pickUp_PlannedDateTime) 
-                        ? 'bg-green-100 text-green-800 border-green-200' 
-                        : 'bg-red-100 text-red-800 border-red-200'
-                    }>
-                      {new Date(consignment.pickUp_ActualDateTime) <= new Date(consignment.pickUp_PlannedDateTime) 
-                        ? 'On Time' 
-                        : 'Late'}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-
-              {/* Delivery Window */}
-              <div className="border-l-4 border-green-400 pl-4">
-                <h4 className="text-xs font-semibold text-gray-700 mb-2">DELIVERY WINDOW</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Planned Delivery</p>
-                    <p className="text-sm font-medium">
-                      {formatDate(consignment.delivery_PlannedDateTime) || formatDate(consignment.deliveryDate) || formatDate(consignment.estimatedDeliveryDate) || 'Not specified'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Actual Delivery</p>
-                    <p className="text-sm font-medium">
-                      {formatDate(consignment.delivery_ActualDateTime) || formatDate(consignment.deliveryActualDateTime) || 'Not delivered'}
-                    </p>
-                  </div>
-                </div>
-                {(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate) && 
-                 (consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Delivery Performance</p>
-                    <Badge className={
-                      new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) <= 
-                      new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate)
-                        ? 'bg-green-100 text-green-800 border-green-200' 
-                        : 'bg-red-100 text-red-800 border-red-200'
-                    }>
-                      {new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) <= 
-                       new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate)
-                        ? 'On Time' 
-                        : 'Late'}
-                    </Badge>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {(() => {
-                        const planned = new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate);
-                        const actual = new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime);
-                        const diffMs = actual.getTime() - planned.getTime();
-                        const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-                        return diffHours > 0 ? `${diffHours}h late` : `${Math.abs(diffHours)}h early`;
-                      })()}
+                <div className="space-y-4">
+                  {/* Show Pickup Window only if we have pickup data and it's relevant */}
+                  {hasPickupData && (
+                    <div className="border-l-4 border-orange-400 pl-4">
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">PICKUP WINDOW</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Planned Pickup</p>
+                          <p className="text-sm font-medium">
+                            {formatDate(consignment.pickUp_PlannedDateTime) || formatDate(consignment.pickupDate) || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Actual Pickup</p>
+                          <p className="text-sm font-medium">
+                            {formatDate(consignment.pickUp_ActualDateTime) || formatDate(consignment.pickupActualDateTime) || '-'}
+                          </p>
+                        </div>
+                      </div>
+                      {consignment.pickUp_PlannedDateTime && consignment.pickUp_ActualDateTime && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-1">Pickup Performance</p>
+                          <Badge className={
+                            new Date(consignment.pickUp_ActualDateTime) <= new Date(consignment.pickUp_PlannedDateTime) 
+                              ? 'bg-green-100 text-green-800 border-green-200' 
+                              : 'bg-red-100 text-red-800 border-red-200'
+                          }>
+                            {new Date(consignment.pickUp_ActualDateTime) <= new Date(consignment.pickUp_PlannedDateTime) 
+                              ? 'On Time' 
+                              : 'Late'}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              {/* Transit Time */}
-              {consignment.pickUp_ActualDateTime && (consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) && (
-                <div className="border-l-4 border-blue-400 pl-4">
-                  <h4 className="text-xs font-semibold text-gray-700 mb-2">TRANSIT TIME</h4>
-                  <p className="text-sm font-medium">
-                    {(() => {
-                      const pickup = new Date(consignment.pickUp_ActualDateTime);
-                      const delivery = new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime);
-                      const diffMs = delivery.getTime() - pickup.getTime();
-                      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                      const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                      return diffDays > 0 ? `${diffDays}d ${diffHours}h` : `${diffHours}h`;
-                    })()}
-                  </p>
+                  {/* Show Delivery Window only if we have delivery data and it's a delivery */}
+                  {hasDeliveryData && !isPickedUp && (
+                    <div className="border-l-4 border-green-400 pl-4">
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">DELIVERY WINDOW</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Planned Delivery</p>
+                          <p className="text-sm font-medium">
+                            {formatDate(consignment.delivery_PlannedDateTime) || formatDate(consignment.deliveryDate) || formatDate(consignment.estimatedDeliveryDate) || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Actual Delivery</p>
+                          <p className="text-sm font-medium">
+                            {formatDate(consignment.delivery_ActualDateTime) || formatDate(consignment.deliveryActualDateTime) || '-'}
+                          </p>
+                        </div>
+                      </div>
+                      {(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate) && 
+                       (consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-1">Delivery Performance</p>
+                          <Badge className={
+                            new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) <= 
+                            new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate)
+                              ? 'bg-green-100 text-green-800 border-green-200' 
+                              : 'bg-red-100 text-red-800 border-red-200'
+                          }>
+                            {new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) <= 
+                             new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate)
+                              ? 'On Time' 
+                              : 'Late'}
+                          </Badge>
+                          <div className="mt-1 text-xs text-gray-500">
+                            {(() => {
+                              const planned = new Date(consignment.delivery_PlannedDateTime || consignment.deliveryDate || consignment.estimatedDeliveryDate);
+                              const actual = new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime);
+                              const diffMs = actual.getTime() - planned.getTime();
+                              const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                              return diffHours > 0 ? `${diffHours}h late` : `${Math.abs(diffHours)}h early`;
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Transit Time - only show if we have both pickup and delivery actual times */}
+                  {consignment.pickUp_ActualDateTime && (consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime) && (
+                    <div className="border-l-4 border-blue-400 pl-4">
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">TRANSIT TIME</h4>
+                      <p className="text-sm font-medium">
+                        {(() => {
+                          const pickup = new Date(consignment.pickUp_ActualDateTime);
+                          const delivery = new Date(consignment.delivery_ActualDateTime || consignment.deliveryActualDateTime);
+                          const diffMs = delivery.getTime() - pickup.getTime();
+                          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                          const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                          return diffDays > 0 ? `${diffDays}d ${diffHours}h` : `${diffHours}h`;
+                        })()}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           {/* Location Information */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
