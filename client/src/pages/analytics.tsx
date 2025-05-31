@@ -1934,11 +1934,35 @@ export default function Analytics() {
           </TabsContent>
 
           <TabsContent value="allocator">
-            <AllocatorView />
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Apply Filters to View Analytics</h3>
+                <p className="text-gray-600 mb-6">
+                  Select a date range or other filters above to load the performance analytics dashboard.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-blue-800 text-sm">
+                    For optimal performance, please apply filters to analyze a specific time period or subset of your delivery data.
+                  </p>
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="deepdive">
-            <DeepDiveView />
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Apply Filters to View Analytics</h3>
+                <p className="text-gray-600 mb-6">
+                  Select a date range or other filters above to load the performance analytics dashboard.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-blue-800 text-sm">
+                    For optimal performance, please apply filters to analyze a specific time period or subset of your delivery data.
+                  </p>
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="executive">
