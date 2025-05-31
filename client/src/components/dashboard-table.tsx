@@ -141,8 +141,44 @@ export default function DashboardTable({ consignments, onViewDetails }: Dashboar
     return String(value);
   };
 
+  // Helper function to map status labels to user-friendly text
+  const getStatusDisplay = (consignment: Consignment) => {
+    const deliveryStateLabel = (consignment as any).delivery_StateLabel;
+    const pickupStateLabel = (consignment as any).pickUp_StateLabel;
+    
+    const mapStatus = (status: string | null, isPickup: boolean = false) => {
+      if (!status) return null;
+      if (status === 'Traveling') return 'In Transit';
+      if (status === 'GPS not present') return 'In Transit';
+      if (status === 'Positive outcome') return isPickup ? 'Picked Up' : 'Delivered';
+      if (status === 'Delivered') return 'Delivered';
+      if (status === 'Not delivered') return 'Failed Delivery';
+      if (status === 'Not picked up') return 'Failed Pickup';
+      if (status === 'Negative outcome') return isPickup ? 'Failed Pickup' : 'Failed Delivery';
+      if (status === 'Arrived') return 'Arrived';
+      return status; // Return exact value for anything else
+    };
+    
+    return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
+  };
+
   const renderCellContent = (consignment: Consignment, column: { key: string; label: string }) => {
-    const value = (consignment as any)[column.key];
+    let value = (consignment as any)[column.key];
+
+    // Handle status display with user-friendly labels
+    if (column.key === 'delivery_StateLabel') {
+      value = getStatusDisplay(consignment);
+      const statusColor = value === 'Delivered' ? 'bg-green-100 text-green-800' :
+                         value === 'Picked Up' ? 'bg-blue-100 text-blue-800' :
+                         value === 'In Transit' ? 'bg-yellow-100 text-yellow-800' :
+                         value === 'Arrived' ? 'bg-purple-100 text-purple-800' :
+                         'bg-red-100 text-red-800';
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+          {value}
+        </span>
+      );
+    }
 
     // Add status badges for better visibility
     if (column.key === 'status') {
