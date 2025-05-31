@@ -1148,11 +1148,16 @@ export default function Analytics() {
 
     // Performance metrics
     const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
+    
+    // Calculate on-time deliveries using the same logic as the detailed breakdown
     const onTimeDeliveries = data.filter(c => {
-      const status = getStatusDisplay(c);
-      return status === "Completed"; // Simplified - in real scenario would check ETA vs actual
+      return (
+        (c as any).deliveryPunctuality === 'On time' || 
+        (c as any).deliveryPunctuality === 'Early' ||
+        ((c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd)
+      );
     }).length;
-    const onTimeRate = completed > 0 ? (onTimeDeliveries / completed * 100) : 0;
+    const onTimeRate = totalConsignments > 0 ? (onTimeDeliveries / totalConsignments * 100) : 0;
 
 
 
