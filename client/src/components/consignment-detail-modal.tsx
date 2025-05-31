@@ -120,8 +120,17 @@ export default function ConsignmentDetailModal({
       }
     }
 
-    // Debug: For testing, let's add a temporary condition to show warning for GPS not present
-    if (status === "GPS not present" || (consignment.delivery_StateLabel && consignment.delivery_StateLabel.includes('GPS not present'))) {
+    // Check for GPS tracking issues
+    if (status === "GPS not present" || 
+        status === "In Transit" || 
+        (consignment.delivery_StateLabel && consignment.delivery_StateLabel.includes('GPS not present')) ||
+        (consignment.pickUp_StateLabel && consignment.pickUp_StateLabel.includes('GPS not present'))) {
+      
+      // Debug log to see what we have
+      console.log('Modal debug - consignment status:', status);
+      console.log('Modal debug - delivery_StateLabel:', consignment.delivery_StateLabel);
+      console.log('Modal debug - pickUp_StateLabel:', consignment.pickUp_StateLabel);
+      
       return { 
         isAtRisk: true, 
         reason: `Delivery tracking is unavailable - GPS signal not present. Unable to monitor real-time progress.`
