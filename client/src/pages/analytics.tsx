@@ -1153,8 +1153,8 @@ export default function Analytics() {
     const onTimeDeliveries = data.filter(c => {
       const wasDelivered = (c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd;
       const actualDateTime = (c as any).delivery_OutcomeDateTime;
-      const deliveryWindowFrom = (c as any).pickUp_Delivery_From;
-      const deliveryWindowTo = (c as any).pickUp_Delivery_To;
+      const deliveryWindowFrom = (c as any).minScheduledDeliveryTime;
+      const deliveryWindowTo = (c as any).maxScheduledDeliveryTime;
       
       if (wasDelivered && actualDateTime) {
         if (deliveryWindowFrom && deliveryWindowTo) {
@@ -1955,8 +1955,8 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       // Check if delivery was completed successfully
       const wasDelivered = (consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd;
       const actualDateTime = (consignment as any).delivery_OutcomeDateTime;
-      const deliveryWindowFrom = (consignment as any).pickUp_Delivery_From;
-      const deliveryWindowTo = (consignment as any).pickUp_Delivery_To;
+      const deliveryWindowFrom = (consignment as any).minScheduledDeliveryTime;
+      const deliveryWindowTo = (consignment as any).maxScheduledDeliveryTime;
       
       let isOnTime = false;
       
