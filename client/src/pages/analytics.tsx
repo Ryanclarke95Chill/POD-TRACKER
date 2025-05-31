@@ -571,6 +571,16 @@ function ExecutiveView() {
       return acc;
     }, {} as Record<string, number>);
 
+    // Calculate on-time performance using the same logic as the detailed breakdown
+    const onTimeCount = data.reduce((count, consignment) => {
+      const isOnTime = (
+        (consignment as any).deliveryPunctuality === 'On time' || 
+        (consignment as any).deliveryPunctuality === 'Early' ||
+        ((consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd)
+      );
+      return count + (isOnTime ? 1 : 0);
+    }, 0);
+
     return {
       totalConsignments,
       statusCounts,
@@ -582,7 +592,10 @@ function ExecutiveView() {
         .slice(0, 5),
       tempZoneAnalysis,
       completionRate: totalConsignments > 0 ? (statusCounts.completed / totalConsignments * 100) : 0,
-      failureRate: totalConsignments > 0 ? (statusCounts.failed / totalConsignments * 100) : 0
+      failureRate: totalConsignments > 0 ? (statusCounts.failed / totalConsignments * 100) : 0,
+      onTimeRate: totalConsignments > 0 ? (onTimeCount / totalConsignments * 100) : 0,
+      onTimeDeliveries: onTimeCount,
+      totalDeliveries: totalConsignments
     };
   }, [consignments]);
 
