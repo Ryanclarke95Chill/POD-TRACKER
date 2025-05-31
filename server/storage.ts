@@ -89,59 +89,9 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getAllConsignments(limit?: number): Promise<Consignment[]> {
-    // Optimized query with configurable limit to prevent memory issues
-    const query = db.select().from(consignments);
-    
-    if (limit) {
-      return await query.limit(limit);
-    }
-    
-    return await query.limit(20000);
-  }
-
-  async getConsignmentsWithFilters(filters: {
-    status?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    depot?: string;
-    driver?: string;
-    limit?: number;
-  }): Promise<Consignment[]> {
-    let query = db.select().from(consignments);
-    
-    // Apply filters dynamically
-    if (filters.status) {
-      query = query.where(eq(consignments.status, filters.status));
-    }
-    
-    if (filters.dateFrom) {
-      query = query.where(gte(consignments.pickupDate, filters.dateFrom));
-    }
-    
-    if (filters.dateTo) {
-      query = query.where(lte(consignments.pickupDate, filters.dateTo));
-    }
-    
-    if (filters.depot) {
-      query = query.where(or(
-        like(consignments.shipFromCity, `%${filters.depot}%`),
-        like(consignments.shipToCity, `%${filters.depot}%`)
-      ));
-    }
-    
-    if (filters.driver) {
-      query = query.where(or(
-        like(consignments.driverName, `%${filters.driver}%`),
-        like(consignments.driverDescription, `%${filters.driver}%`)
-      ));
-    }
-    
-    // Apply limit - if no filters are applied, use default limit for performance
-    const hasFilters = filters.status || filters.dateFrom || filters.dateTo || filters.depot || filters.driver;
-    const defaultLimit = hasFilters ? 10000 : (filters.limit || 100);
-    
-    return await query.limit(defaultLimit);
+  async getAllConsignments(): Promise<Consignment[]> {
+    // Optimized query with limit to prevent memory issues
+    return await db.select().from(consignments).limit(20000);
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {

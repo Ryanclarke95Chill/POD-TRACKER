@@ -147,16 +147,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let consignments;
       
       if (permissions.canViewAllConsignments) {
-        // Admin and Manager can see all data with dynamic filtering
-        const filters = {
-          status: req.query.status as string,
-          dateFrom: req.query.dateFrom as string,
-          dateTo: req.query.dateTo as string,
-          depot: req.query.depot as string,
-          driver: req.query.driver as string,
-          limit: req.query.all === 'true' ? undefined : (req.query.limit ? parseInt(req.query.limit as string) : 100)
-        };
-        consignments = await storage.getConsignmentsWithFilters(filters);
+        // Admin and Manager can see all data
+        consignments = await storage.getAllConsignments();
       } else if (permissions.canViewDepartmentConsignments) {
         // Supervisor can see department data
         consignments = await storage.getConsignmentsByDepartment(user.department || '');
