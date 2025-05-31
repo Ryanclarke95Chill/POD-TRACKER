@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Clock, MapPin, ExternalLink, Map, Thermometer, CheckCircle, Truck } from "lucide-react";
+import { Package, Clock, MapPin, ExternalLink, Map, Thermometer, CheckCircle, Truck, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 
 interface ConsignmentDetailModalProps {
@@ -46,6 +46,80 @@ export default function ConsignmentDetailModal({
     
     return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
   };
+
+  const isConsignmentAtRisk = () => {
+    const status = getStatusDisplay();
+    // Only check active consignments
+    if (status === "Delivered" || status === "Picked Up" || status === "Complete" || status === "Failed") {
+      return { isAtRisk: false, reason: "" };
+    }
+
+    const calculatedETA = consignment.delivery_calculatedETA || consignment.pickUp_calculatedETA;
+    if (!calculatedETA) {
+      return { isAtRisk: false, reason: "" };
+    }
+
+    const etaDate = new Date(calculatedETA);
+    const now = new Date();
+
+    // Check delivery window
+    const deliveryFromTime = consignment.delivery_FromTime;
+    const deliveryToTime = consignment.delivery_ToTime;
+    
+    if (deliveryFromTime && deliveryToTime) {
+      const deliveryStart = new Date(deliveryFromTime);
+      const deliveryEnd = new Date(deliveryToTime);
+      
+      if (etaDate > deliveryEnd) {
+        const delayMinutes = Math.round((etaDate.getTime() - deliveryEnd.getTime()) / (1000 * 60));
+        const delayHours = Math.floor(delayMinutes / 60);
+        const remainingMinutes = delayMinutes % 60;
+        
+        let delayText = "";
+        if (delayHours > 0) {
+          delayText = `${delayHours}h ${remainingMinutes}m`;
+        } else {
+          delayText = `${remainingMinutes}m`;
+        }
+        
+        return { 
+          isAtRisk: true, 
+          reason: `Delivery is expected ${delayText} after the scheduled window ends (${formatDate(deliveryToTime)}).`
+        };
+      }
+    }
+
+    // Check pickup window
+    const pickupFromTime = consignment.pickUp_FromTime;
+    const pickupToTime = consignment.pickUp_ToTime;
+    
+    if (pickupFromTime && pickupToTime) {
+      const pickupStart = new Date(pickupFromTime);
+      const pickupEnd = new Date(pickupToTime);
+      
+      if (etaDate > pickupEnd) {
+        const delayMinutes = Math.round((etaDate.getTime() - pickupEnd.getTime()) / (1000 * 60));
+        const delayHours = Math.floor(delayMinutes / 60);
+        const remainingMinutes = delayMinutes % 60;
+        
+        let delayText = "";
+        if (delayHours > 0) {
+          delayText = `${delayHours}h ${remainingMinutes}m`;
+        } else {
+          delayText = `${remainingMinutes}m`;
+        }
+        
+        return { 
+          isAtRisk: true, 
+          reason: `Pickup is expected ${delayText} after the scheduled window ends (${formatDate(pickupToTime)}).`
+        };
+      }
+    }
+
+    return { isAtRisk: false, reason: "" };
+  };
+
+  const riskStatus = isConsignmentAtRisk();
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -104,6 +178,18 @@ export default function ConsignmentDetailModal({
         </DialogHeader>
 
         <div className="p-6 space-y-6">
+          {/* At Risk Warning */}
+          {riskStatus.isAtRisk && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-800 mb-1">Delivery At Risk</h3>
+                  <p className="text-sm text-amber-700">{riskStatus.reason}</p>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Address Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Pickup Address */}
