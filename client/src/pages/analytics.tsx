@@ -2001,28 +2001,51 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     const timelinePerformance: Record<string, { onTime: number; late: number; total: number }> = {};
     
     consignments.forEach(consignment => {
-      // Check if delivery was completed successfully
-      const wasDelivered = (consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd;
-      const actualDateTime = (consignment as any).delivery_OutcomeDateTime;
-      const deliveryWindowFrom = (consignment as any).minScheduledDeliveryTime;
-      const deliveryWindowTo = (consignment as any).maxScheduledDeliveryTime;
+      // Determine if this is a pickup or delivery consignment
+      const isPickupConsignment = (consignment as any).pickUp_StateLabel !== null;
+      const isDeliveryConsignment = (consignment as any).delivery_StateLabel !== null;
       
       let isOnTime = false;
+      let wasCompleted = false;
+      let actualDateTime = null;
       
-      if (wasDelivered && actualDateTime) {
-        if (deliveryWindowFrom && deliveryWindowTo) {
-          // Simple timestamp comparison without creating Date objects for better performance
-          const actualTime = new Date(actualDateTime).getTime();
-          const windowStartTime = new Date(deliveryWindowFrom).getTime();
-          const windowEndTime = new Date(deliveryWindowTo).getTime();
-          isOnTime = actualTime >= windowStartTime && actualTime <= windowEndTime;
-        } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
-          isOnTime = true;
+      if (isPickupConsignment) {
+        // For pickup consignments, check pickup completion
+        wasCompleted = (consignment as any).pickUp_Outcome && !(consignment as any).pickUp_NotPickedup;
+        actualDateTime = (consignment as any).pickUp_OutcomeDateTime;
+        
+        if (wasCompleted && actualDateTime) {
+          // Check pickup punctuality or default to on-time if completed
+          if ((consignment as any).pickupPunctuality === 'On time' || (consignment as any).pickupPunctuality === 'Early') {
+            isOnTime = true;
+          } else {
+            isOnTime = true; // Default to on-time for completed pickups without punctuality data
+          }
         } else {
-          isOnTime = true; // Default to on-time for delivered items without window data
+          isOnTime = false; // Not picked up = not on time
         }
-      } else {
-        isOnTime = false; // Not delivered = not on time
+      } else if (isDeliveryConsignment) {
+        // For delivery consignments, check delivery completion
+        wasCompleted = (consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd;
+        actualDateTime = (consignment as any).delivery_OutcomeDateTime;
+        const deliveryWindowFrom = (consignment as any).minScheduledDeliveryTime;
+        const deliveryWindowTo = (consignment as any).maxScheduledDeliveryTime;
+        
+        if (wasCompleted && actualDateTime) {
+          if (deliveryWindowFrom && deliveryWindowTo) {
+            // Check if delivery falls within the delivery window
+            const actualTime = new Date(actualDateTime).getTime();
+            const windowStartTime = new Date(deliveryWindowFrom).getTime();
+            const windowEndTime = new Date(deliveryWindowTo).getTime();
+            isOnTime = actualTime >= windowStartTime && actualTime <= windowEndTime;
+          } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
+            isOnTime = true;
+          } else {
+            isOnTime = true; // Default to on-time for delivered items without window data
+          }
+        } else {
+          isOnTime = false; // Not delivered = not on time
+        }
       }
       
       const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;
@@ -2034,17 +2057,27 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       const departureDate = (consignment as any).departureDateTime;
       const month = departureDate ? new Date(departureDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Unknown';
       
+      // Get window data based on consignment type
+      const windowFrom = isDeliveryConsignment ? 
+        (consignment as any).minScheduledDeliveryTime : 
+        (consignment as any).minScheduledPickupTime;
+      const windowTo = isDeliveryConsignment ? 
+        (consignment as any).maxScheduledDeliveryTime : 
+        (consignment as any).maxScheduledPickupTime;
+      
       const deliveryDetail = {
         consignmentNo: (consignment as any).consignmentNo,
         customer: (consignment as any).shipToCompanyName,
         departureDateTime: (consignment as any).departureDateTime,
         deliveryDateTime: actualDateTime,
-        deliveryWindowFrom: deliveryWindowFrom,
-        deliveryWindowTo: deliveryWindowTo,
-        punctuality: (consignment as any).deliveryPunctuality,
+        deliveryWindowFrom: windowFrom,
+        deliveryWindowTo: windowTo,
+        punctuality: isDeliveryConsignment ? 
+          (consignment as any).deliveryPunctuality : 
+          (consignment as any).pickupPunctuality,
         driver: driver,
         vehicle: (consignment as any).vehicleCode,
-        wasDelivered: wasDelivered,
+        wasDelivered: wasCompleted,
         isOnTime
       };
       
