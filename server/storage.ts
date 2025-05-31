@@ -89,9 +89,15 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getAllConsignments(): Promise<Consignment[]> {
-    // Optimized query with limit to prevent memory issues
-    return await db.select().from(consignments).limit(20000);
+  async getAllConsignments(limit?: number): Promise<Consignment[]> {
+    // Optimized query with configurable limit to prevent memory issues
+    const query = db.select().from(consignments);
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    
+    return await query.limit(20000);
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
