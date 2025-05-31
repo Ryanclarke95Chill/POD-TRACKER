@@ -1971,11 +1971,12 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
         consignmentNo: (consignment as any).consignmentNo,
         customer: (consignment as any).shipToCompanyName,
         departureDateTime: (consignment as any).departureDateTime,
-        deliveryDateTime: (consignment as any).delivery_OutcomeDateTime,
-        plannedDelivery: (consignment as any).maxScheduledDeliveryTime,
+        deliveryDateTime: actualDateTime,
+        plannedDelivery: plannedDateTime,
         punctuality: (consignment as any).deliveryPunctuality,
         driver: driver,
         vehicle: (consignment as any).vehicleCode,
+        wasDelivered: wasDelivered,
         isOnTime
       };
       
@@ -2462,20 +2463,50 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
               <div className="space-y-3">
                 <h4 className="font-medium text-lg">Performance Analysis</h4>
                 <div className="space-y-2 text-sm">
-                  {!selectedConsignment.isOnTime && (
+                  {!selectedConsignment.wasDelivered && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded">
-                      <div className="font-medium text-red-800">Delivery Issues Identified:</div>
+                      <div className="font-medium text-red-800">Delivery Failed:</div>
                       <div className="text-red-700 mt-1">
-                        This delivery was marked as late based on punctuality data or delivery outcome records.
+                        This consignment was not delivered successfully (cancelled, returned, or failed delivery).
                       </div>
                     </div>
                   )}
                   
-                  {selectedConsignment.isOnTime && (
+                  {selectedConsignment.wasDelivered && !selectedConsignment.isOnTime && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded">
+                      <div className="font-medium text-red-800">Late Delivery:</div>
+                      <div className="text-red-700 mt-1">
+                        This delivery was completed after the planned delivery time.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedConsignment.isOnTime && selectedConsignment.wasDelivered && (
                     <div className="p-3 bg-green-50 border border-green-200 rounded">
-                      <div className="font-medium text-green-800">Successful Delivery</div>
+                      <div className="font-medium text-green-800">Successful On-Time Delivery</div>
                       <div className="text-green-700 mt-1">
-                        This delivery met the scheduled timeline requirements.
+                        This delivery was completed on or before the scheduled time.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedConsignment.plannedDelivery && selectedConsignment.deliveryDateTime && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                      <div className="font-medium text-blue-800">Timing Details:</div>
+                      <div className="text-blue-700 mt-1">
+                        {selectedConsignment.deliveryDateTime && selectedConsignment.plannedDelivery ? 
+                          (() => {
+                            const planned = new Date(selectedConsignment.plannedDelivery);
+                            const actual = new Date(selectedConsignment.deliveryDateTime);
+                            const diffMinutes = Math.round((actual.getTime() - planned.getTime()) / (1000 * 60));
+                            if (diffMinutes <= 0) {
+                              return `Delivered ${Math.abs(diffMinutes)} minutes early`;
+                            } else {
+                              return `Delivered ${diffMinutes} minutes late`;
+                            }
+                          })()
+                          : 'Timing information not available'
+                        }
                       </div>
                     </div>
                   )}
