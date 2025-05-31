@@ -590,56 +590,100 @@ function ExecutiveView() {
     <div className="space-y-8">
       {/* Executive KPI Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
-            <Package className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{executiveAnalytics.totalConsignments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Active consignments
-              {analytics.dateRange && (
-                <span className="block">
-                  {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
-                </span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="border-l-4 border-l-blue-500 cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
+                <Package className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600">{executiveAnalytics.totalConsignments.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Active consignments
+                  {analytics.dateRange && (
+                    <span className="block">
+                      {analytics.dateRange.earliest.toLocaleDateString()} - {analytics.dateRange.latest.toLocaleDateString()}
+                    </span>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Total Operations Breakdown ({executiveAnalytics.totalConsignments.toLocaleString()})</DialogTitle>
+              <DialogDescription>Complete operational overview and volume analysis</DialogDescription>
+            </DialogHeader>
+            <AllDeliveriesBreakdown consignments={consignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">{executiveAnalytics.completionRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.completed.toLocaleString()} completed</p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="border-l-4 border-l-green-500 cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600">{executiveAnalytics.completionRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.completed.toLocaleString()} completed</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Success Rate Analysis ({executiveAnalytics.completionRate.toFixed(1)}%)</DialogTitle>
+              <DialogDescription>Detailed breakdown of successful vs failed deliveries</DialogDescription>
+            </DialogHeader>
+            <DeliveryRateBreakdown consignments={consignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card className="border-l-4 border-l-red-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Risk Exposure</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">{executiveAnalytics.failureRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.failed.toLocaleString()} failed deliveries</p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="border-l-4 border-l-red-500 cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Risk Exposure</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-red-600">{executiveAnalytics.failureRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground mt-1">{executiveAnalytics.statusCounts.failed.toLocaleString()} failed deliveries</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Risk Exposure Analysis ({executiveAnalytics.failureRate.toFixed(1)}%)</DialogTitle>
+              <DialogDescription>Failed deliveries and operational risk factors</DialogDescription>
+            </DialogHeader>
+            <RiskExposureBreakdown consignments={consignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card className="border-l-4 border-l-purple-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Network</CardTitle>
-            <Building2 className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{executiveAnalytics.topCustomers.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Major customers</p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="border-l-4 border-l-purple-500 cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Network</CardTitle>
+                <Building2 className="h-4 w-4 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-600">{executiveAnalytics.topCustomers.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">Major customers</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Active Network Analysis ({executiveAnalytics.topCustomers.length} Major Customers)</DialogTitle>
+              <DialogDescription>Customer portfolio and network insights</DialogDescription>
+            </DialogHeader>
+            <CustomerNetworkBreakdown consignments={consignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* State Performance Overview */}
