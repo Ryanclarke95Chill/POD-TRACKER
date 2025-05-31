@@ -1277,12 +1277,14 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
+          <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden">
+            <DialogHeader className="pb-2">
               <DialogTitle>On-Time Performance Analysis</DialogTitle>
               <DialogDescription>Detailed breakdown of delivery punctuality across all routes</DialogDescription>
             </DialogHeader>
-            <OnTimePerformanceBreakdown consignments={filteredConsignments as Consignment[]} />
+            <div className="overflow-y-auto max-h-[calc(85vh-100px)]">
+              <OnTimePerformanceBreakdown consignments={filteredConsignments as Consignment[]} />
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -2069,22 +2071,22 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
           </Button>
         </div>
         
-        <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-          <div className="p-3 bg-green-50 rounded">
-            <div className="text-xl font-bold text-green-600">{selectedData.onTime}</div>
-            <div className="text-sm text-green-700">On-Time Deliveries</div>
+        <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+          <div className="p-2 bg-green-50 rounded">
+            <div className="text-lg font-bold text-green-600">{selectedData.onTime}</div>
+            <div className="text-xs text-green-700">On-Time</div>
           </div>
-          <div className="p-3 bg-red-50 rounded">
-            <div className="text-xl font-bold text-red-600">{selectedData.late}</div>
-            <div className="text-sm text-red-700">Late Deliveries</div>
+          <div className="p-2 bg-red-50 rounded">
+            <div className="text-lg font-bold text-red-600">{selectedData.late}</div>
+            <div className="text-xs text-red-700">Late</div>
           </div>
-          <div className="p-3 bg-blue-50 rounded">
-            <div className="text-xl font-bold text-blue-600">{selectedData.percentage}%</div>
-            <div className="text-sm text-blue-700">Success Rate</div>
+          <div className="p-2 bg-blue-50 rounded">
+            <div className="text-lg font-bold text-blue-600">{selectedData.percentage}%</div>
+            <div className="text-xs text-blue-700">Success Rate</div>
           </div>
         </div>
         
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-48 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
