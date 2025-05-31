@@ -841,15 +841,21 @@ export default function Analytics() {
   const filteredConsignments = useMemo(() => {
     let filtered = consignments as Consignment[];
 
-    // Date filtering
+    // Date filtering with proper AEST timezone handling
     if (filters.dateFrom || filters.dateTo) {
       filtered = filtered.filter(c => {
         const consignmentDate = (c as any).departureDateTime || (c as any).delivery_PlannedETA;
         if (!consignmentDate) return true;
         
-        const date = new Date(consignmentDate).toISOString().split('T')[0];
-        const fromMatch = !filters.dateFrom || date >= filters.dateFrom;
-        const toMatch = !filters.dateTo || date <= filters.dateTo;
+        // Parse the original date and convert to AEST for proper local date comparison
+        const utcDate = new Date(consignmentDate);
+        // Convert to AEST (UTC+10) for date comparison
+        const aestOffset = 10 * 60; // 10 hours in minutes
+        const localDate = new Date(utcDate.getTime() + (aestOffset * 60 * 1000));
+        const dateString = localDate.toISOString().split('T')[0];
+        
+        const fromMatch = !filters.dateFrom || dateString >= filters.dateFrom;
+        const toMatch = !filters.dateTo || dateString <= filters.dateTo;
         return fromMatch && toMatch;
       });
     }
