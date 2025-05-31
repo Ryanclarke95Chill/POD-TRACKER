@@ -2212,6 +2212,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                 <th className="text-left p-2">Driver</th>
                 <th className="text-left p-2">Status</th>
                 <th className="text-left p-2">Punctuality</th>
+                <th className="text-center p-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2236,6 +2237,18 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
                     </Badge>
                   </td>
                   <td className="p-2">{detail.punctuality || 'N/A'}</td>
+                  <td className="text-center p-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-xs px-2 py-1 h-6"
+                      onClick={() => {
+                        setSelectedConsignment(detail);
+                      }}
+                    >
+                      View
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
