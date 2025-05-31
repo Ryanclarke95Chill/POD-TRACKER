@@ -1907,6 +1907,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [selectedDepot, setSelectedDepot] = useState<string | null>(null);
   const [selectedShipper, setSelectedShipper] = useState<string | null>(null);
+  const [selectedConsignment, setSelectedConsignment] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'routes' | 'drivers' | 'depots' | 'shippers' | 'timeline'>('routes');
   
   const onTimeAnalysis = useMemo(() => {
@@ -2124,7 +2125,17 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
             <tbody>
               {selectedData.details.slice(0, 50).map((detail: any, idx: number) => (
                 <tr key={idx} className="border-b hover:bg-gray-50">
-                  <td className="p-2 font-medium">{detail.consignmentNo}</td>
+                  <td className="p-2">
+                    <button 
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      onClick={() => {
+                        // Show detailed consignment modal
+                        setSelectedConsignment(detail);
+                      }}
+                    >
+                      {detail.consignmentNo}
+                    </button>
+                  </td>
                   <td className="p-2">{detail.customer}</td>
                   <td className="p-2">{detail.driver}</td>
                   <td className="p-2">
@@ -2367,6 +2378,88 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
             </table>
           </div>
         </>
+      )}
+
+      {/* Consignment Detail Modal */}
+      {selectedConsignment && (
+        <Dialog open={!!selectedConsignment} onOpenChange={() => setSelectedConsignment(null)}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden">
+            <DialogHeader className="pb-2">
+              <DialogTitle>Consignment Details: {selectedConsignment.consignmentNo}</DialogTitle>
+              <DialogDescription>Complete delivery information and performance analysis</DialogDescription>
+            </DialogHeader>
+            <div className="overflow-y-auto max-h-[calc(85vh-100px)] space-y-4">
+              {/* Status and Performance Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-gray-50 rounded">
+                  <div className="text-sm font-medium text-gray-600">Delivery Status</div>
+                  <Badge variant={selectedConsignment.isOnTime ? "default" : "destructive"} className="mt-1">
+                    {selectedConsignment.isOnTime ? "On-Time" : "Late"}
+                  </Badge>
+                </div>
+                <div className="p-3 bg-gray-50 rounded">
+                  <div className="text-sm font-medium text-gray-600">Punctuality</div>
+                  <div className="font-medium">{selectedConsignment.punctuality || 'N/A'}</div>
+                </div>
+              </div>
+
+              {/* Customer and Route Information */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-lg">Delivery Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Customer:</span>
+                    <div>{selectedConsignment.customer}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Driver:</span>
+                    <div>{selectedConsignment.driver}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Vehicle:</span>
+                    <div>{selectedConsignment.vehicle || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Planned Delivery:</span>
+                    <div>{selectedConsignment.plannedDelivery ? new Date(selectedConsignment.plannedDelivery).toLocaleString() : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Departure Time:</span>
+                    <div>{selectedConsignment.departureDateTime ? new Date(selectedConsignment.departureDateTime).toLocaleString() : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Actual Delivery:</span>
+                    <div>{selectedConsignment.deliveryDateTime ? new Date(selectedConsignment.deliveryDateTime).toLocaleString() : 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details from Axylog */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-lg">Performance Analysis</h4>
+                <div className="space-y-2 text-sm">
+                  {!selectedConsignment.isOnTime && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded">
+                      <div className="font-medium text-red-800">Delivery Issues Identified:</div>
+                      <div className="text-red-700 mt-1">
+                        This delivery was marked as late based on punctuality data or delivery outcome records.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedConsignment.isOnTime && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded">
+                      <div className="font-medium text-green-800">Successful Delivery</div>
+                      <div className="text-green-700 mt-1">
+                        This delivery met the scheduled timeline requirements.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
     </div>
