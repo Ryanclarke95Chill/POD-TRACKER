@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar, Activity } from "lucide-react";
+import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar, Activity, AlertTriangle } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import SyncDataButton from "@/components/sync-data-button";
@@ -93,6 +93,28 @@ export default function Dashboard() {
     new Set((consignments as Consignment[]).map(c => getStatusDisplay(c)).filter(Boolean))
   ).sort();
 
+  // Calculate at-risk consignments (comparing calculated ETA vs delivery windows)
+  const atRiskConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
+    const status = getStatusDisplay(consignment);
+    
+    // Only check active consignments (not delivered/completed)
+    if (status === 'Delivered' || status === 'Picked Up') return false;
+    
+    const calculatedETA = (consignment as any).delivery_CalculatedETA || (consignment as any).delivery_PlannedETA;
+    const windowStart = (consignment as any).minScheduledDeliveryTime || (consignment as any).minScheduledPickupTime;
+    const windowEnd = (consignment as any).maxScheduledDeliveryTime || (consignment as any).maxScheduledPickupTime;
+    
+    if (calculatedETA && windowEnd) {
+      const etaTime = new Date(calculatedETA);
+      const windowEndTime = new Date(windowEnd);
+      
+      // At risk if ETA is after the delivery window end
+      return etaTime > windowEndTime;
+    }
+    
+    return false;
+  });
+
   // Filter consignments based on search term, temperature zone, warehouse company, shipper, status, and date range
   const filteredConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const matchesSearch = searchTerm === "" || 
@@ -180,7 +202,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div 
             className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
             onClick={() => {
