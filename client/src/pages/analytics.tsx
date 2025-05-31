@@ -1212,31 +1212,53 @@ export default function Analytics() {
           </DialogContent>
         </Dialog>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On-Time Performance</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.onTimeRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              Industry target: 95%
-            </p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">On-Time Performance</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.onTimeRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">
+                  Industry target: 95%
+                </p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>On-Time Performance Analysis</DialogTitle>
+              <DialogDescription>Detailed breakdown of delivery punctuality across all routes</DialogDescription>
+            </DialogHeader>
+            <OnTimePerformanceBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Shipments</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.inTransit}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently in transit
-            </p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:bg-gray-50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Shipments</CardTitle>
+                <Truck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analytics.inTransit}</div>
+                <p className="text-xs text-muted-foreground">
+                  Currently in transit
+                </p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Active Shipments Overview</DialogTitle>
+              <DialogDescription>Real-time tracking of all shipments currently in transit</DialogDescription>
+            </DialogHeader>
+            <ActiveShipmentsBreakdown consignments={filteredConsignments as Consignment[]} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Business Insights */}
@@ -1802,3 +1824,161 @@ export default function Analytics() {
     </div>
   );
 }
+
+// Drill-down component for on-time performance analysis
+const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({ consignments }) => {
+  const onTimeAnalysis = useMemo(() => {
+    const routePerformance: Record<string, { onTime: number; total: number; routes: string[] }> = {};
+    
+    consignments.forEach(consignment => {
+      const route = `${consignment.shipFromCity || 'Unknown'} → ${consignment.shipToCity || 'Unknown'}`;
+      const isOnTime = consignment.deliveryPunctuality === 'On time' || 
+                      consignment.deliveryPunctuality === 'Early' ||
+                      (consignment.delivery_Outcome && !consignment.delivery_NotDeliverd);
+      
+      if (!routePerformance[route]) {
+        routePerformance[route] = { onTime: 0, total: 0, routes: [] };
+      }
+      
+      routePerformance[route].total++;
+      if (isOnTime) routePerformance[route].onTime++;
+    });
+    
+    return Object.entries(routePerformance)
+      .map(([route, stats]) => ({
+        route,
+        percentage: (stats.onTime / stats.total * 100).toFixed(1),
+        onTime: stats.onTime,
+        total: stats.total
+      }))
+      .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
+  }, [consignments]);
+  
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="p-4 bg-green-50 rounded">
+          <div className="text-2xl font-bold text-green-600">
+            {onTimeAnalysis.filter(r => parseFloat(r.percentage) >= 95).length}
+          </div>
+          <div className="text-sm text-green-700">Routes ≥95% On-Time</div>
+        </div>
+        <div className="p-4 bg-yellow-50 rounded">
+          <div className="text-2xl font-bold text-yellow-600">
+            {onTimeAnalysis.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
+          </div>
+          <div className="text-sm text-yellow-700">Routes 85-95% On-Time</div>
+        </div>
+        <div className="p-4 bg-red-50 rounded">
+          <div className="text-2xl font-bold text-red-600">
+            {onTimeAnalysis.filter(r => parseFloat(r.percentage) < 85).length}
+          </div>
+          <div className="text-sm text-red-700">Routes &lt;85% On-Time</div>
+        </div>
+      </div>
+      
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 sticky top-0">
+            <tr>
+              <th className="text-left p-2">Route</th>
+              <th className="text-center p-2">On-Time %</th>
+              <th className="text-center p-2">Performance</th>
+              <th className="text-center p-2">Volume</th>
+            </tr>
+          </thead>
+          <tbody>
+            {onTimeAnalysis.map((route, idx) => (
+              <tr key={idx} className="border-b">
+                <td className="p-2 font-medium">{route.route}</td>
+                <td className="text-center p-2">
+                  <Badge variant={parseFloat(route.percentage) >= 95 ? "default" : parseFloat(route.percentage) >= 85 ? "secondary" : "destructive"}>
+                    {route.percentage}%
+                  </Badge>
+                </td>
+                <td className="text-center p-2">{route.onTime}/{route.total}</td>
+                <td className="text-center p-2">{route.total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// Drill-down component for active shipments
+const ActiveShipmentsBreakdown: React.FC<{ consignments: Consignment[] }> = ({ consignments }) => {
+  const activeShipments = useMemo(() => {
+    return consignments
+      .filter(c => !c.delivery_Outcome && !c.delivery_NotDeliverd)
+      .map(consignment => ({
+        id: consignment.id,
+        consignmentNo: consignment.consignmentNo || 'N/A',
+        driver: consignment.driverName || 'Unassigned',
+        vehicle: consignment.vehicleCode || 'N/A',
+        route: `${consignment.shipFromCity || 'Unknown'} → ${consignment.shipToCity || 'Unknown'}`,
+        customer: consignment.shipToCompanyName || 'Unknown',
+        tempZone: consignment.expectedTemperature || 'Standard',
+        departureTime: consignment.departureDateTime,
+        estimatedDelivery: consignment.delivery_OutcomeDateTime || consignment.maxScheduledDeliveryTime
+      }))
+      .slice(0, 50);
+  }, [consignments]);
+  
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-4 text-center">
+        <div className="p-4 bg-blue-50 rounded">
+          <div className="text-2xl font-bold text-blue-600">{activeShipments.length}</div>
+          <div className="text-sm text-blue-700">Active Shipments</div>
+        </div>
+        <div className="p-4 bg-purple-50 rounded">
+          <div className="text-2xl font-bold text-purple-600">
+            {new Set(activeShipments.map(s => s.driver)).size}
+          </div>
+          <div className="text-sm text-purple-700">Active Drivers</div>
+        </div>
+        <div className="p-4 bg-orange-50 rounded">
+          <div className="text-2xl font-bold text-orange-600">
+            {new Set(activeShipments.map(s => s.vehicle)).size}
+          </div>
+          <div className="text-sm text-orange-700">Vehicles in Use</div>
+        </div>
+        <div className="p-4 bg-green-50 rounded">
+          <div className="text-2xl font-bold text-green-600">
+            {new Set(activeShipments.map(s => s.tempZone)).size}
+          </div>
+          <div className="text-sm text-green-700">Temp Zones</div>
+        </div>
+      </div>
+      
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 sticky top-0">
+            <tr>
+              <th className="text-left p-2">Consignment</th>
+              <th className="text-left p-2">Driver</th>
+              <th className="text-left p-2">Route</th>
+              <th className="text-left p-2">Customer</th>
+              <th className="text-left p-2">Temp Zone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeShipments.map((shipment, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-medium">{shipment.consignmentNo}</td>
+                <td className="p-2">{shipment.driver}</td>
+                <td className="p-2">{shipment.route}</td>
+                <td className="p-2">{shipment.customer}</td>
+                <td className="p-2">
+                  <Badge variant="outline">{shipment.tempZone}</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
