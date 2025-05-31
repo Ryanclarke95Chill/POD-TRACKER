@@ -97,8 +97,17 @@ export default function Dashboard() {
   const atRiskConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
     const status = getStatusDisplay(consignment);
     
-    // Only check active consignments (not delivered/completed)
-    if (status === 'Delivered' || status === 'Picked Up') return false;
+    // Only check active consignments - exclude completed, failed, or delivered
+    if (status === 'Delivered' || status === 'Picked Up' || status === 'Complete' || status === 'Failed' || status === 'Cancelled') {
+      return false;
+    }
+    
+    // Check if delivery was already attempted and failed
+    const deliveryOutcome = (consignment as any).delivery_Outcome;
+    const deliveryNotDelivered = (consignment as any).delivery_NotDeliverd;
+    if (deliveryOutcome || deliveryNotDelivered) {
+      return false; // Already completed (success or failure)
+    }
     
     const calculatedETA = (consignment as any).delivery_CalculatedETA || (consignment as any).delivery_PlannedETA;
     const windowStart = (consignment as any).minScheduledDeliveryTime || (consignment as any).minScheduledPickupTime;
@@ -274,6 +283,26 @@ export default function Dashboard() {
               </div>
               <div className="bg-amber-50 p-3 rounded-lg">
                 <Clock className="h-6 w-6 text-amber-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div 
+            className="gradient-card shadow-card rounded-xl p-6 border border-white/20 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+            onClick={() => {
+              // Filter to show only at-risk consignments
+              setSelectedStatus("all");
+              setIsPendingFilter(false);
+              // You could add a specific filter for at-risk items here
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">At Risk</p>
+                <p className="text-3xl font-bold text-red-600">{atRiskConsignments.length}</p>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
             </div>
           </div>
