@@ -47,7 +47,14 @@ export default function Dashboard() {
 
   // Helper function to extract temperature from documentNote
   const getTemperatureZone = (consignment: Consignment) => {
-    return consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
+    const tempZone = consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
+    
+    // Filter out internal depot operations
+    if (tempZone === 'Return to depot' || tempZone?.toLowerCase().includes('return to depot')) {
+      return 'Internal Transfer';
+    }
+    
+    return tempZone;
   };
 
   // Helper function to map status labels
