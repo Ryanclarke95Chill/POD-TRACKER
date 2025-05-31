@@ -34,7 +34,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
 
   const { data: consignments = [], isLoading, refetch } = useQuery({
-    queryKey: ["/api/consignments"],
+    queryKey: ["/api/consignments", { limit: 1000 }],
     staleTime: 0,
     gcTime: 0,
   });

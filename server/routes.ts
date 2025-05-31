@@ -147,8 +147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let consignments;
       
       if (permissions.canViewAllConsignments) {
-        // Admin and Manager can see all data
-        consignments = await storage.getAllConsignments();
+        // Admin and Manager can see all data with optional limit for performance
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        consignments = await storage.getAllConsignments(limit);
       } else if (permissions.canViewDepartmentConsignments) {
         // Supervisor can see department data
         consignments = await storage.getConsignmentsByDepartment(user.department || '');
@@ -170,6 +171,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(consignments);
     } catch (error) {
       console.error("Error fetching consignments:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Dashboard statistics endpoint - fast summary data
+  app.get("/api/dashboard-stats", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const user = req.user;
+      const userWithRole = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        department: user.department || null,
+        isActive: true
+      };
+      const permissions = getUserPermissions(userWithRole);
+      
+      let stats;
+      
+      if (permissions.canViewAllConsignments) {
+        stats = await storage.getDashboardStats();
+      } else if (permissions.canViewDepartmentConsignments) {
+        stats = await storage.getDashboardStatsByDepartment(user.department || '');
+      } else if (permissions.canViewOwnConsignments) {
+        if (user.email.includes('shipper@')) {
+          stats = await storage.getDashboardStatsByShipper(user.email);
+        } else {
+          stats = await storage.getDashboardStatsByDriver(user.email);
+        }
+      } else {
+        stats = await storage.getDashboardStatsByUserId(user.id);
+      }
+      
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

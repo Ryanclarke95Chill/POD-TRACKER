@@ -1,7 +1,7 @@
 import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard, dataSyncLog, type DataSyncLog, type InsertDataSyncLog } from "@shared/schema";
 import { format, addDays, subDays } from "date-fns";
 import { db } from "./db";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql, inArray, and, or, like } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export interface IStorage {
@@ -89,9 +89,121 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getAllConsignments(): Promise<Consignment[]> {
-    // Optimized query with limit to prevent memory issues
-    return await db.select().from(consignments).limit(20000);
+  async getAllConsignments(limit?: number): Promise<Consignment[]> {
+    // Optimized query with configurable limit to prevent memory issues
+    const query = db.select().from(consignments);
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    
+    return await query.limit(20000);
+  }
+
+  async getDashboardStats(): Promise<{
+    total: number;
+    inTransit: number;
+    delivered: number;
+    pending: number;
+  }> {
+    // Fast aggregation query for dashboard statistics
+    const results = await db.select({
+      total: sql<number>`COUNT(*)`,
+      inTransit: sql<number>`COUNT(CASE WHEN ${consignments.status} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+      delivered: sql<number>`COUNT(CASE WHEN ${consignments.status} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+      pending: sql<number>`COUNT(CASE WHEN ${consignments.status} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+    }).from(consignments);
+    
+    return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+  }
+
+  async getDashboardStatsByDepartment(department: string): Promise<{
+    total: number;
+    inTransit: number;
+    delivered: number;
+    pending: number;
+  }> {
+    // For department filtering, we'll filter similar to getConsignmentsByDepartment
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+    
+    const results = await db.select({
+      total: sql<number>`COUNT(*)`,
+      inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+      delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+      pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+    }).from(consignments).where(eq(consignments.userId, adminUser.id));
+    
+    return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+  }
+
+  async getDashboardStatsByShipper(shipperEmail: string): Promise<{
+    total: number;
+    inTransit: number;
+    delivered: number;
+    pending: number;
+  }> {
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+    
+    const results = await db.select({
+      total: sql<number>`COUNT(*)`,
+      inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+      delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+      pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+    }).from(consignments).where(
+      and(
+        eq(consignments.userId, adminUser.id),
+        eq(consignments.shipperCompanyName, 'GREENCROSS')
+      )
+    );
+    
+    return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+  }
+
+  async getDashboardStatsByDriver(driverEmail: string): Promise<{
+    total: number;
+    inTransit: number;
+    delivered: number;
+    pending: number;
+  }> {
+    const adminUser = await this.getUserByUsername('admin');
+    if (!adminUser) return { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+    
+    const driverName = driverEmail.split('@')[0];
+    
+    const results = await db.select({
+      total: sql<number>`COUNT(*)`,
+      inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+      delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+      pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+    }).from(consignments).where(
+      and(
+        eq(consignments.userId, adminUser.id),
+        or(
+          like(consignments.driverName, `%${driverName}%`),
+          like(consignments.driverDescription, `%${driverName}%`)
+        )
+      )
+    );
+    
+    return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
+  }
+
+  async getDashboardStatsByUserId(userId: number): Promise<{
+    total: number;
+    inTransit: number;
+    delivered: number;
+    pending: number;
+  }> {
+    const results = await db.select({
+      total: sql<number>`COUNT(*)`,
+      inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+      delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+      pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+    }).from(consignments).where(eq(consignments.userId, userId));
+    
+    return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
   }
 
   async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
