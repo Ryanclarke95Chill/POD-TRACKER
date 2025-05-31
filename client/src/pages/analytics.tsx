@@ -1149,13 +1149,24 @@ export default function Analytics() {
     // Performance metrics
     const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
     
-    // Calculate on-time deliveries using the same logic as the detailed breakdown
+    // Calculate on-time deliveries using proper delivery performance logic
     const onTimeDeliveries = data.filter(c => {
-      return (
-        (c as any).deliveryPunctuality === 'On time' || 
-        (c as any).deliveryPunctuality === 'Early' ||
-        ((c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd)
-      );
+      const wasDelivered = (c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd;
+      const plannedDateTime = (c as any).delivery_PlannedETA || (c as any).contextPlannedDeliveryDateTime;
+      const actualDateTime = (c as any).delivery_OutcomeDateTime;
+      
+      if (wasDelivered && plannedDateTime && actualDateTime) {
+        // Compare actual delivery time to planned time
+        const planned = new Date(plannedDateTime);
+        const actual = new Date(actualDateTime);
+        return actual <= planned; // On time if delivered at or before planned time
+      } else if ((c as any).deliveryPunctuality === 'On time' || (c as any).deliveryPunctuality === 'Early') {
+        // Use Axylog's punctuality assessment if available
+        return true;
+      } else {
+        // Not delivered, delivered late, or missing critical data = not on time
+        return false;
+      }
     }).length;
     const onTimeRate = totalConsignments > 0 ? (onTimeDeliveries / totalConsignments * 100) : 0;
 
@@ -1927,12 +1938,25 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     const timelinePerformance: Record<string, { onTime: number; late: number; total: number }> = {};
     
     consignments.forEach(consignment => {
-      // Determine if delivery was on time using multiple data points
-      const isOnTime = (
-        (consignment as any).deliveryPunctuality === 'On time' || 
-        (consignment as any).deliveryPunctuality === 'Early' ||
-        ((consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd)
-      );
+      // Check if delivery was completed successfully
+      const wasDelivered = (consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd;
+      const plannedDateTime = (consignment as any).delivery_PlannedETA || (consignment as any).contextPlannedDeliveryDateTime;
+      const actualDateTime = (consignment as any).delivery_OutcomeDateTime;
+      
+      let isOnTime = false;
+      
+      if (wasDelivered && plannedDateTime && actualDateTime) {
+        // Compare actual delivery time to planned time
+        const planned = new Date(plannedDateTime);
+        const actual = new Date(actualDateTime);
+        isOnTime = actual <= planned; // On time if delivered at or before planned time
+      } else if ((consignment as any).deliveryPunctuality === 'On time' || (consignment as any).deliveryPunctuality === 'Early') {
+        // Use Axylog's punctuality assessment if available
+        isOnTime = true;
+      } else {
+        // Not delivered, delivered late, or missing critical data = not on time
+        isOnTime = false;
+      }
       
       const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;
       const driver = (consignment as any).driverName || 'Unassigned';
