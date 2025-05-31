@@ -2000,7 +2000,24 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     // Timeline analysis (by month)
     const timelinePerformance: Record<string, { onTime: number; late: number; total: number }> = {};
     
+    // Track unassigned driver consignments separately
+    const unassignedDriverConsignments: any[] = [];
+    
     consignments.forEach(consignment => {
+      // Check if driver is assigned
+      const driverName = (consignment as any).driverName || 'Unassigned';
+      
+      if (driverName === 'Unassigned' || !driverName) {
+        // Track separately but don't include in performance metrics
+        unassignedDriverConsignments.push({
+          consignmentNo: (consignment as any).consignmentNo,
+          customer: (consignment as any).shipToCompanyName,
+          status: (consignment as any).delivery_StateLabel || (consignment as any).pickUp_StateLabel,
+          departureDateTime: (consignment as any).departureDateTime
+        });
+        return; // Skip this consignment for on-time performance calculations
+      }
+      
       // Determine if this is a pickup or delivery consignment
       const isPickupConsignment = (consignment as any).pickUp_StateLabel !== null;
       const isDeliveryConsignment = (consignment as any).delivery_StateLabel !== null;
@@ -2049,7 +2066,6 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       }
       
       const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;
-      const driver = (consignment as any).driverName || 'Unassigned';
       const depot = (consignment as any).shipFromMasterDataCode?.split('_')[0] || 'Unknown';
       const shipper = (consignment as any).shipperCompanyName || (consignment as any).shipFromCompanyName || 'Unknown';
       
@@ -2075,7 +2091,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
         punctuality: isDeliveryConsignment ? 
           (consignment as any).deliveryPunctuality : 
           (consignment as any).pickupPunctuality,
-        driver: driver,
+        driver: driverName,
         vehicle: (consignment as any).vehicleCode,
         wasDelivered: wasCompleted,
         isOnTime
