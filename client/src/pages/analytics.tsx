@@ -1873,7 +1873,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
           <div className="text-2xl font-bold text-red-600">
             {onTimeAnalysis.filter(r => parseFloat(r.percentage) < 85).length}
           </div>
-          <div className="text-sm text-red-700">Routes &lt;85% On-Time</div>
+          <div className="text-sm text-red-700">Routes Below 85% On-Time</div>
         </div>
       </div>
       
