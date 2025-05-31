@@ -2107,13 +2107,13 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       else routePerformance[route].late++;
       
       // Driver analysis
-      if (!driverPerformance[driver]) {
-        driverPerformance[driver] = { onTime: 0, late: 0, total: 0, details: [] };
+      if (!driverPerformance[driverName]) {
+        driverPerformance[driverName] = { onTime: 0, late: 0, total: 0, details: [] };
       }
-      driverPerformance[driver].total++;
-      driverPerformance[driver].details.push(deliveryDetail);
-      if (isOnTime) driverPerformance[driver].onTime++;
-      else driverPerformance[driver].late++;
+      driverPerformance[driverName].total++;
+      driverPerformance[driverName].details.push(deliveryDetail);
+      if (isOnTime) driverPerformance[driverName].onTime++;
+      else driverPerformance[driverName].late++;
       
       // Depot analysis
       if (!depotPerformance[depot]) {
