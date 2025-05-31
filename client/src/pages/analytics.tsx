@@ -1154,8 +1154,13 @@ export default function Analytics() {
     // Performance metrics
     const completionRate = totalConsignments > 0 ? (completed / totalConsignments * 100) : 0;
     
-    // Calculate on-time deliveries using delivery window logic
-    const onTimeDeliveries = data.filter(c => {
+    // Calculate on-time deliveries using delivery window logic - exclude consignments without drivers
+    const consignmentsWithDrivers = data.filter(c => {
+      const driverName = (c as any).driverName;
+      return driverName && driverName.trim() !== '' && driverName !== 'Unassigned';
+    });
+    
+    const onTimeDeliveries = consignmentsWithDrivers.filter(c => {
       const wasDelivered = (c as any).delivery_Outcome && !(c as any).delivery_NotDeliverd;
       const actualDateTime = (c as any).delivery_OutcomeDateTime;
       const deliveryWindowFrom = (c as any).minScheduledDeliveryTime;
@@ -1187,7 +1192,9 @@ export default function Analytics() {
         return false;
       }
     }).length;
-    const onTimeRate = totalConsignments > 0 ? (onTimeDeliveries / totalConsignments * 100) : 0;
+    
+    const totalConsignmentsWithDrivers = consignmentsWithDrivers.length;
+    const onTimeRate = totalConsignmentsWithDrivers > 0 ? (onTimeDeliveries / totalConsignmentsWithDrivers * 100) : 0;
 
 
 
