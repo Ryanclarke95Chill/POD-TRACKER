@@ -659,7 +659,10 @@ function ExecutiveView() {
               <DialogTitle>Risk Exposure Analysis ({executiveAnalytics.failureRate.toFixed(1)}%)</DialogTitle>
               <DialogDescription>Failed deliveries and operational risk factors</DialogDescription>
             </DialogHeader>
-            <RiskExposureBreakdown consignments={consignments as Consignment[]} />
+            <div className="p-8 text-center">
+              <h3 className="text-lg font-medium mb-2">Risk Analysis</h3>
+              <p className="text-muted-foreground">Detailed risk exposure analysis for your delivery operations</p>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -681,7 +684,10 @@ function ExecutiveView() {
               <DialogTitle>Active Network Analysis ({executiveAnalytics.topCustomers.length} Major Customers)</DialogTitle>
               <DialogDescription>Customer portfolio and network insights</DialogDescription>
             </DialogHeader>
-            <CustomerNetworkBreakdown consignments={consignments as Consignment[]} />
+            <div className="p-8 text-center">
+              <h3 className="text-lg font-medium mb-2">Network Analysis</h3>
+              <p className="text-muted-foreground">Customer portfolio and network insights for your active customer base</p>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -1869,84 +1875,398 @@ export default function Analytics() {
   );
 }
 
-// Drill-down component for on-time performance analysis
+// Enhanced on-time performance analysis with comprehensive drill-downs
 const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({ consignments }) => {
+  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [selectedDepot, setSelectedDepot] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'routes' | 'drivers' | 'depots' | 'timeline'>('routes');
+  
   const onTimeAnalysis = useMemo(() => {
-    const routePerformance: Record<string, { onTime: number; total: number; routes: string[] }> = {};
+    // Route-based analysis
+    const routePerformance: Record<string, { onTime: number; late: number; total: number; details: any[] }> = {};
+    
+    // Driver-based analysis  
+    const driverPerformance: Record<string, { onTime: number; late: number; total: number; details: any[] }> = {};
+    
+    // Depot-based analysis
+    const depotPerformance: Record<string, { onTime: number; late: number; total: number; details: any[] }> = {};
+    
+    // Timeline analysis (by month)
+    const timelinePerformance: Record<string, { onTime: number; late: number; total: number }> = {};
     
     consignments.forEach(consignment => {
-      const route = `${consignment.shipFromCity || 'Unknown'} → ${consignment.shipToCity || 'Unknown'}`;
-      const isOnTime = consignment.deliveryPunctuality === 'On time' || 
-                      consignment.deliveryPunctuality === 'Early' ||
-                      (consignment.delivery_Outcome && !consignment.delivery_NotDeliverd);
+      // Determine if delivery was on time using multiple data points
+      const isOnTime = (
+        (consignment as any).deliveryPunctuality === 'On time' || 
+        (consignment as any).deliveryPunctuality === 'Early' ||
+        ((consignment as any).delivery_Outcome && !(consignment as any).delivery_NotDeliverd)
+      );
       
+      const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;
+      const driver = (consignment as any).driverName || 'Unassigned';
+      const depot = (consignment as any).shipFromMasterDataCode?.split('_')[0] || 'Unknown';
+      
+      // Get month from departure date
+      const departureDate = (consignment as any).departureDateTime;
+      const month = departureDate ? new Date(departureDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Unknown';
+      
+      const deliveryDetail = {
+        consignmentNo: (consignment as any).consignmentNo,
+        customer: (consignment as any).shipToCompanyName,
+        departureDateTime: (consignment as any).departureDateTime,
+        deliveryDateTime: (consignment as any).delivery_OutcomeDateTime,
+        plannedDelivery: (consignment as any).maxScheduledDeliveryTime,
+        punctuality: (consignment as any).deliveryPunctuality,
+        driver: driver,
+        vehicle: (consignment as any).vehicleCode,
+        isOnTime
+      };
+      
+      // Route analysis
       if (!routePerformance[route]) {
-        routePerformance[route] = { onTime: 0, total: 0, routes: [] };
+        routePerformance[route] = { onTime: 0, late: 0, total: 0, details: [] };
       }
-      
       routePerformance[route].total++;
+      routePerformance[route].details.push(deliveryDetail);
       if (isOnTime) routePerformance[route].onTime++;
+      else routePerformance[route].late++;
+      
+      // Driver analysis
+      if (!driverPerformance[driver]) {
+        driverPerformance[driver] = { onTime: 0, late: 0, total: 0, details: [] };
+      }
+      driverPerformance[driver].total++;
+      driverPerformance[driver].details.push(deliveryDetail);
+      if (isOnTime) driverPerformance[driver].onTime++;
+      else driverPerformance[driver].late++;
+      
+      // Depot analysis
+      if (!depotPerformance[depot]) {
+        depotPerformance[depot] = { onTime: 0, late: 0, total: 0, details: [] };
+      }
+      depotPerformance[depot].total++;
+      depotPerformance[depot].details.push(deliveryDetail);
+      if (isOnTime) depotPerformance[depot].onTime++;
+      else depotPerformance[depot].late++;
+      
+      // Timeline analysis
+      if (!timelinePerformance[month]) {
+        timelinePerformance[month] = { onTime: 0, late: 0, total: 0 };
+      }
+      timelinePerformance[month].total++;
+      if (isOnTime) timelinePerformance[month].onTime++;
+      else timelinePerformance[month].late++;
     });
     
-    return Object.entries(routePerformance)
+    const routes = Object.entries(routePerformance)
       .map(([route, stats]) => ({
         route,
-        percentage: (stats.onTime / stats.total * 100).toFixed(1),
+        percentage: stats.total > 0 ? (stats.onTime / stats.total * 100).toFixed(1) : '0.0',
         onTime: stats.onTime,
-        total: stats.total
+        late: stats.late,
+        total: stats.total,
+        details: stats.details
       }))
       .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
+    
+    const drivers = Object.entries(driverPerformance)
+      .map(([driver, stats]) => ({
+        driver,
+        percentage: stats.total > 0 ? (stats.onTime / stats.total * 100).toFixed(1) : '0.0',
+        onTime: stats.onTime,
+        late: stats.late,
+        total: stats.total,
+        details: stats.details
+      }))
+      .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
+    
+    const depots = Object.entries(depotPerformance)
+      .map(([depot, stats]) => ({
+        depot,
+        percentage: stats.total > 0 ? (stats.onTime / stats.total * 100).toFixed(1) : '0.0',
+        onTime: stats.onTime,
+        late: stats.late,
+        total: stats.total,
+        details: stats.details
+      }))
+      .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
+    
+    const timeline = Object.entries(timelinePerformance)
+      .map(([month, stats]) => ({
+        month,
+        percentage: stats.total > 0 ? (stats.onTime / stats.total * 100).toFixed(1) : '0.0',
+        onTime: stats.onTime,
+        late: stats.late,
+        total: stats.total
+      }))
+      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+    
+    return { routes, drivers, depots, timeline };
   }, [consignments]);
   
+  const renderSelectedDetails = () => {
+    let selectedData: any = null;
+    let title = '';
+    
+    if (selectedRoute) {
+      selectedData = onTimeAnalysis.routes.find(r => r.route === selectedRoute);
+      title = `Route Details: ${selectedRoute}`;
+    } else if (selectedDriver) {
+      selectedData = onTimeAnalysis.drivers.find(d => d.driver === selectedDriver);
+      title = `Driver Details: ${selectedDriver}`;
+    } else if (selectedDepot) {
+      selectedData = onTimeAnalysis.depots.find(d => d.depot === selectedDepot);
+      title = `Depot Details: ${selectedDepot}`;
+    }
+    
+    if (!selectedData) return null;
+    
+    return (
+      <div className="border-t pt-4 mt-4">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="font-medium text-lg">{title}</h4>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setSelectedRoute(null);
+              setSelectedDriver(null);
+              setSelectedDepot(null);
+            }}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Close
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-4 mb-4 text-center">
+          <div className="p-3 bg-green-50 rounded">
+            <div className="text-xl font-bold text-green-600">{selectedData.onTime}</div>
+            <div className="text-sm text-green-700">On-Time Deliveries</div>
+          </div>
+          <div className="p-3 bg-red-50 rounded">
+            <div className="text-xl font-bold text-red-600">{selectedData.late}</div>
+            <div className="text-sm text-red-700">Late Deliveries</div>
+          </div>
+          <div className="p-3 bg-blue-50 rounded">
+            <div className="text-xl font-bold text-blue-600">{selectedData.percentage}%</div>
+            <div className="text-sm text-blue-700">Success Rate</div>
+          </div>
+        </div>
+        
+        <div className="max-h-64 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="text-left p-2">Consignment</th>
+                <th className="text-left p-2">Customer</th>
+                <th className="text-left p-2">Driver</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Punctuality</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedData.details.slice(0, 50).map((detail: any, idx: number) => (
+                <tr key={idx} className="border-b hover:bg-gray-50">
+                  <td className="p-2 font-medium">{detail.consignmentNo}</td>
+                  <td className="p-2">{detail.customer}</td>
+                  <td className="p-2">{detail.driver}</td>
+                  <td className="p-2">
+                    <Badge variant={detail.isOnTime ? "default" : "destructive"} className="text-xs">
+                      {detail.isOnTime ? "On-Time" : "Late"}
+                    </Badge>
+                  </td>
+                  <td className="p-2">{detail.punctuality || 'N/A'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {selectedData.details.length > 50 && (
+            <div className="text-center text-sm text-muted-foreground p-2">
+              Showing first 50 of {selectedData.details.length} deliveries
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4 text-center">
         <div className="p-4 bg-green-50 rounded">
           <div className="text-2xl font-bold text-green-600">
-            {onTimeAnalysis.filter(r => parseFloat(r.percentage) >= 95).length}
+            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 95).length}
           </div>
           <div className="text-sm text-green-700">Routes ≥95% On-Time</div>
         </div>
         <div className="p-4 bg-yellow-50 rounded">
           <div className="text-2xl font-bold text-yellow-600">
-            {onTimeAnalysis.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
+            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) >= 85 && parseFloat(r.percentage) < 95).length}
           </div>
           <div className="text-sm text-yellow-700">Routes 85-95% On-Time</div>
         </div>
         <div className="p-4 bg-red-50 rounded">
           <div className="text-2xl font-bold text-red-600">
-            {onTimeAnalysis.filter(r => parseFloat(r.percentage) < 85).length}
+            {onTimeAnalysis.routes.filter(r => parseFloat(r.percentage) < 85).length}
           </div>
           <div className="text-sm text-red-700">Routes Below 85% On-Time</div>
         </div>
       </div>
       
+      {/* View Mode Selector */}
+      <div className="flex gap-2 border-b">
+        <Button 
+          variant={viewMode === 'routes' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('routes')}
+        >
+          <MapPin className="h-4 w-4 mr-1" />
+          By Routes ({onTimeAnalysis.routes.length})
+        </Button>
+        <Button 
+          variant={viewMode === 'drivers' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('drivers')}
+        >
+          <Users className="h-4 w-4 mr-1" />
+          By Drivers ({onTimeAnalysis.drivers.length})
+        </Button>
+        <Button 
+          variant={viewMode === 'depots' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('depots')}
+        >
+          <Building2 className="h-4 w-4 mr-1" />
+          By Depots ({onTimeAnalysis.depots.length})
+        </Button>
+        <Button 
+          variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('timeline')}
+        >
+          <Calendar className="h-4 w-4 mr-1" />
+          Timeline ({onTimeAnalysis.timeline.length})
+        </Button>
+      </div>
+      
+      {/* Data Table */}
       <div className="max-h-96 overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="text-left p-2">Route</th>
+              <th className="text-left p-2">
+                {viewMode === 'routes' && 'Route'}
+                {viewMode === 'drivers' && 'Driver'}
+                {viewMode === 'depots' && 'Depot'}
+                {viewMode === 'timeline' && 'Month'}
+              </th>
               <th className="text-center p-2">On-Time %</th>
               <th className="text-center p-2">Performance</th>
               <th className="text-center p-2">Volume</th>
+              <th className="text-center p-2">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {onTimeAnalysis.map((route, idx) => (
-              <tr key={idx} className="border-b">
+            {viewMode === 'routes' && onTimeAnalysis.routes.map((route, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
                 <td className="p-2 font-medium">{route.route}</td>
                 <td className="text-center p-2">
                   <Badge variant={parseFloat(route.percentage) >= 95 ? "default" : parseFloat(route.percentage) >= 85 ? "secondary" : "destructive"}>
                     {route.percentage}%
                   </Badge>
                 </td>
-                <td className="text-center p-2">{route.onTime}/{route.total}</td>
+                <td className="text-center p-2">
+                  <span className="text-green-600">{route.onTime}</span>/
+                  <span className="text-red-600">{route.late}</span>
+                </td>
                 <td className="text-center p-2">{route.total}</td>
+                <td className="text-center p-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedRoute(route.route)}
+                  >
+                    Details
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            
+            {viewMode === 'drivers' && onTimeAnalysis.drivers.map((driver, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-medium">{driver.driver}</td>
+                <td className="text-center p-2">
+                  <Badge variant={parseFloat(driver.percentage) >= 95 ? "default" : parseFloat(driver.percentage) >= 85 ? "secondary" : "destructive"}>
+                    {driver.percentage}%
+                  </Badge>
+                </td>
+                <td className="text-center p-2">
+                  <span className="text-green-600">{driver.onTime}</span>/
+                  <span className="text-red-600">{driver.late}</span>
+                </td>
+                <td className="text-center p-2">{driver.total}</td>
+                <td className="text-center p-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedDriver(driver.driver)}
+                  >
+                    Details
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            
+            {viewMode === 'depots' && onTimeAnalysis.depots.map((depot, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-medium">{depot.depot}</td>
+                <td className="text-center p-2">
+                  <Badge variant={parseFloat(depot.percentage) >= 95 ? "default" : parseFloat(depot.percentage) >= 85 ? "secondary" : "destructive"}>
+                    {depot.percentage}%
+                  </Badge>
+                </td>
+                <td className="text-center p-2">
+                  <span className="text-green-600">{depot.onTime}</span>/
+                  <span className="text-red-600">{depot.late}</span>
+                </td>
+                <td className="text-center p-2">{depot.total}</td>
+                <td className="text-center p-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedDepot(depot.depot)}
+                  >
+                    Details
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            
+            {viewMode === 'timeline' && onTimeAnalysis.timeline.map((month, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-medium">{month.month}</td>
+                <td className="text-center p-2">
+                  <Badge variant={parseFloat(month.percentage) >= 95 ? "default" : parseFloat(month.percentage) >= 85 ? "secondary" : "destructive"}>
+                    {month.percentage}%
+                  </Badge>
+                </td>
+                <td className="text-center p-2">
+                  <span className="text-green-600">{month.onTime}</span>/
+                  <span className="text-red-600">{month.late}</span>
+                </td>
+                <td className="text-center p-2">{month.total}</td>
+                <td className="text-center p-2">-</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      
+      {/* Selected Details */}
+      {renderSelectedDetails()}
     </div>
   );
 };
