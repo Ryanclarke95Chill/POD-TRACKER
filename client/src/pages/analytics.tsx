@@ -1880,7 +1880,8 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [selectedDepot, setSelectedDepot] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'routes' | 'drivers' | 'depots' | 'timeline'>('routes');
+  const [selectedShipper, setSelectedShipper] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'routes' | 'drivers' | 'depots' | 'shippers' | 'timeline'>('routes');
   
   const onTimeAnalysis = useMemo(() => {
     // Route-based analysis
@@ -1891,6 +1892,9 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     
     // Depot-based analysis
     const depotPerformance: Record<string, { onTime: number; late: number; total: number; details: any[] }> = {};
+    
+    // Shipper-based analysis
+    const shipperPerformance: Record<string, { onTime: number; late: number; total: number; details: any[] }> = {};
     
     // Timeline analysis (by month)
     const timelinePerformance: Record<string, { onTime: number; late: number; total: number }> = {};
@@ -1906,6 +1910,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       const route = `${(consignment as any).shipFromCity || 'Unknown'} → ${(consignment as any).shipToCity || 'Unknown'}`;
       const driver = (consignment as any).driverName || 'Unassigned';
       const depot = (consignment as any).shipFromMasterDataCode?.split('_')[0] || 'Unknown';
+      const shipper = (consignment as any).shipperCompanyName || (consignment as any).shipFromCompanyName || 'Unknown';
       
       // Get month from departure date
       const departureDate = (consignment as any).departureDateTime;
@@ -1950,6 +1955,15 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       if (isOnTime) depotPerformance[depot].onTime++;
       else depotPerformance[depot].late++;
       
+      // Shipper analysis
+      if (!shipperPerformance[shipper]) {
+        shipperPerformance[shipper] = { onTime: 0, late: 0, total: 0, details: [] };
+      }
+      shipperPerformance[shipper].total++;
+      shipperPerformance[shipper].details.push(deliveryDetail);
+      if (isOnTime) shipperPerformance[shipper].onTime++;
+      else shipperPerformance[shipper].late++;
+      
       // Timeline analysis
       if (!timelinePerformance[month]) {
         timelinePerformance[month] = { onTime: 0, late: 0, total: 0 };
@@ -1992,6 +2006,17 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       }))
       .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
     
+    const shippers = Object.entries(shipperPerformance)
+      .map(([shipper, stats]) => ({
+        shipper,
+        percentage: stats.total > 0 ? (stats.onTime / stats.total * 100).toFixed(1) : '0.0',
+        onTime: stats.onTime,
+        late: stats.late,
+        total: stats.total,
+        details: stats.details
+      }))
+      .sort((a, b) => parseFloat(b.percentage) - parseFloat(a.percentage));
+    
     const timeline = Object.entries(timelinePerformance)
       .map(([month, stats]) => ({
         month,
@@ -2002,7 +2027,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
       }))
       .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
     
-    return { routes, drivers, depots, timeline };
+    return { routes, drivers, depots, shippers, timeline };
   }, [consignments]);
   
   const renderSelectedDetails = () => {
@@ -2018,6 +2043,9 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
     } else if (selectedDepot) {
       selectedData = onTimeAnalysis.depots.find(d => d.depot === selectedDepot);
       title = `Depot Details: ${selectedDepot}`;
+    } else if (selectedShipper) {
+      selectedData = onTimeAnalysis.shippers.find(s => s.shipper === selectedShipper);
+      title = `Shipper Details: ${selectedShipper}`;
     }
     
     if (!selectedData) return null;
@@ -2033,6 +2061,7 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
               setSelectedRoute(null);
               setSelectedDriver(null);
               setSelectedDepot(null);
+              setSelectedShipper(null);
             }}
           >
             <X className="h-4 w-4 mr-1" />
@@ -2141,6 +2170,14 @@ const OnTimePerformanceBreakdown: React.FC<{ consignments: Consignment[] }> = ({
         >
           <Building2 className="h-4 w-4 mr-1" />
           By Depots ({onTimeAnalysis.depots.length})
+        </Button>
+        <Button 
+          variant={viewMode === 'shippers' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setViewMode('shippers')}
+        >
+          <Package className="h-4 w-4 mr-1" />
+          By Shippers ({onTimeAnalysis.shippers.length})
         </Button>
         <Button 
           variant={viewMode === 'timeline' ? 'default' : 'ghost'}
