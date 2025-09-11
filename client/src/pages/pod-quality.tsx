@@ -626,14 +626,28 @@ export default function PODQuality() {
   // Helper function to check if consignment is a return
   const isReturn = (consignment: Consignment): boolean => {
     const orderType = consignment.type?.toLowerCase();
+    const shipToCompany = (consignment as any).shipToCompanyName?.toLowerCase();
+    const shipFromCompany = (consignment as any).shipFromCompanyName?.toLowerCase();
+    const warehouseCompany = consignment.warehouseCompanyName?.toLowerCase();
+    const receiverCompany = (consignment as any).receiverCompanyName?.toLowerCase();
     
     // Check for return indicators in the type field
-    return !!(orderType && (
+    const hasReturnType = !!(orderType && (
       orderType.includes('return') ||
       orderType.includes('rts') ||  // Return to sender
       orderType.includes('reverse') ||
-      orderType.includes('pickup') // Some returns might be labeled as pickups
+      orderType.includes('pickup') ||
+      orderType.includes('collect')
     ));
+    
+    // Check if shipTo or receiver is the same as warehouse (indicating return to depot)
+    const isReturnToDepot = !!(
+      (shipToCompany && warehouseCompany && shipToCompany.includes(warehouseCompany)) ||
+      (receiverCompany && warehouseCompany && receiverCompany.includes(warehouseCompany)) ||
+      (shipToCompany && shipFromCompany && shipToCompany === shipFromCompany)
+    );
+    
+    return hasReturnType || isReturnToDepot;
   };
 
   // Filter for delivered consignments, excluding returns and internal transfers
@@ -642,6 +656,11 @@ export default function PODQuality() {
     const isDelivered = status === 'Delivered';
     const isInternalTx = isInternalTransfer(consignment);
     const isReturnOrder = isReturn(consignment);
+    
+    // Debug: Log filtering for first few items to verify logic
+    if ((allConsignments as Consignment[]).indexOf(consignment) < 5) {
+      console.log(`Consignment ${consignment.consignmentNo}: Delivered=${isDelivered}, Internal=${isInternalTx}, Return=${isReturnOrder}, Type="${consignment.type}", ShipTo="${(consignment as any).shipToCompanyName}", Warehouse="${consignment.warehouseCompanyName}"`);
+    }
     
     // Only include delivered consignments that are NOT returns or internal transfers
     return isDelivered && !isInternalTx && !isReturnOrder;
@@ -1214,6 +1233,9 @@ export default function PODQuality() {
   const nonCompliantCount = allFilteredAnalyses.filter(a => a.metrics.qualityScore === 0).length;
   
   const missingPhotosCount = allFilteredAnalyses.filter(a => a.metrics.photoCount === 0).length;
+  const onePhotoCount = allFilteredAnalyses.filter(a => a.metrics.photoCount === 1).length;
+  const twoPhotosCount = allFilteredAnalyses.filter(a => a.metrics.photoCount === 2).length;
+  const threeOrMorePhotosCount = allFilteredAnalyses.filter(a => a.metrics.photoCount >= 3).length;
   const missingSignatureCount = allFilteredAnalyses.filter(a => !a.metrics.hasSignature).length;
   const tempIssuesCount = allFilteredAnalyses.filter(a => !a.metrics.temperatureCompliant).length;
   const hasReceiverNameCount = allFilteredAnalyses.filter(a => a.metrics.hasReceiverName).length;
@@ -1225,6 +1247,61 @@ export default function PODQuality() {
     bronze: totalDeliveries > 0 ? ((bronzeCount / totalDeliveries) * 100) : 0,
     nonCompliant: totalDeliveries > 0 ? ((nonCompliantCount / totalDeliveries) * 100) : 0
   };
+
+  // Calculate driver performance
+  const driverPerformance = (() => {
+    const driverStats = new Map<string, { 
+      totalDeliveries: number; 
+      totalScore: number; 
+      goldCount: number;
+      nonCompliantCount: number;
+    }>();
+
+    allFilteredAnalyses.forEach(analysis => {
+      const driverName = analysis.consignment.driverName;
+      if (!driverName) return;
+
+      if (!driverStats.has(driverName)) {
+        driverStats.set(driverName, { 
+          totalDeliveries: 0, 
+          totalScore: 0, 
+          goldCount: 0,
+          nonCompliantCount: 0
+        });
+      }
+
+      const stats = driverStats.get(driverName)!;
+      stats.totalDeliveries++;
+      stats.totalScore += analysis.metrics.qualityScore;
+      
+      if (analysis.metrics.qualityScore >= 90) {
+        stats.goldCount++;
+      } else if (analysis.metrics.qualityScore === 0) {
+        stats.nonCompliantCount++;
+      }
+    });
+
+    // Convert to array and calculate averages
+    const drivers = Array.from(driverStats.entries()).map(([name, stats]) => ({
+      name,
+      totalDeliveries: stats.totalDeliveries,
+      avgScore: stats.totalScore / stats.totalDeliveries,
+      goldRate: (stats.goldCount / stats.totalDeliveries) * 100,
+      nonCompliantRate: (stats.nonCompliantCount / stats.totalDeliveries) * 100
+    }));
+
+    // Filter drivers with at least 3 deliveries for meaningful statistics
+    const qualifiedDrivers = drivers.filter(d => d.totalDeliveries >= 3);
+    
+    // Sort by average score
+    qualifiedDrivers.sort((a, b) => b.avgScore - a.avgScore);
+
+    return {
+      topPerformers: qualifiedDrivers.slice(0, 3),
+      bottomPerformers: qualifiedDrivers.slice(-3).reverse(),
+      totalQualifiedDrivers: qualifiedDrivers.length
+    };
+  })();
 
   // Generate summary analysis text
   const generateSummaryAnalysis = () => {
@@ -1293,6 +1370,18 @@ export default function PODQuality() {
     const receiverNameRate = totalDeliveries > 0 ? ((hasReceiverNameCount / totalDeliveries) * 100) : 0;
     if (receiverNameRate < 85) {
       analysisPoints.push(`👤 **Receiver name capture needs improvement** - Only ${receiverNameRate.toFixed(1)}% have receiver names recorded.`);
+    }
+
+    // Driver performance insights
+    if (driverPerformance.totalQualifiedDrivers > 0) {
+      const topDriver = driverPerformance.topPerformers[0];
+      const bottomDriver = driverPerformance.bottomPerformers[0];
+      
+      if (topDriver && bottomDriver && topDriver.avgScore - bottomDriver.avgScore > 20) {
+        analysisPoints.push(`🚛 **Significant driver performance gap** - Top performer (${topDriver.name}: ${topDriver.avgScore.toFixed(1)}) vs bottom performer (${bottomDriver.name}: ${bottomDriver.avgScore.toFixed(1)}).`);
+      } else if (topDriver) {
+        analysisPoints.push(`🚛 **Driver performance** - ${driverPerformance.totalQualifiedDrivers} drivers analyzed, top performer: ${topDriver.name} (${topDriver.avgScore.toFixed(1)} avg score).`);
+      }
     }
 
     return analysisPoints.join("\n\n");
@@ -1629,6 +1718,92 @@ export default function PODQuality() {
                 {generateSummaryAnalysis()}
               </div>
             </div>
+
+            {/* Photo Breakdown */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
+              <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                <Camera className="h-5 w-5 text-blue-600" />
+                Photo Documentation Breakdown
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-800">{missingPhotosCount}</div>
+                  <div className="text-sm text-red-600">0 Photos</div>
+                  <div className="text-xs text-gray-500 mt-1">{totalDeliveries > 0 ? ((missingPhotosCount / totalDeliveries) * 100).toFixed(1) : 0}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-800">{onePhotoCount}</div>
+                  <div className="text-sm text-orange-600">1 Photo</div>
+                  <div className="text-xs text-gray-500 mt-1">{totalDeliveries > 0 ? ((onePhotoCount / totalDeliveries) * 100).toFixed(1) : 0}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-800">{twoPhotosCount}</div>
+                  <div className="text-sm text-yellow-600">2 Photos</div>
+                  <div className="text-xs text-gray-500 mt-1">{totalDeliveries > 0 ? ((twoPhotosCount / totalDeliveries) * 100).toFixed(1) : 0}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-800">{threeOrMorePhotosCount}</div>
+                  <div className="text-sm text-green-600">3+ Photos</div>
+                  <div className="text-xs text-gray-500 mt-1">{totalDeliveries > 0 ? ((threeOrMorePhotosCount / totalDeliveries) * 100).toFixed(1) : 0}%</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Driver Performance */}
+            {driverPerformance.totalQualifiedDrivers > 0 && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mt-6">
+                <h4 className="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                  Driver Performance ({driverPerformance.totalQualifiedDrivers} drivers with 3+ deliveries)
+                </h4>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Top Performers */}
+                  <div>
+                    <h5 className="text-md font-semibold text-green-800 mb-3">🏆 Top Performers</h5>
+                    <div className="space-y-2">
+                      {driverPerformance.topPerformers.map((driver, index) => (
+                        <div key={driver.name} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                          <div className="flex justify-between items-center">
+                            <div className="font-medium text-green-900">
+                              #{index + 1} {driver.name}
+                            </div>
+                            <div className="text-green-700 font-bold">
+                              {driver.avgScore.toFixed(1)}
+                            </div>
+                          </div>
+                          <div className="text-xs text-green-600 mt-1">
+                            {driver.totalDeliveries} deliveries • {driver.goldRate.toFixed(1)}% gold • {driver.nonCompliantRate.toFixed(1)}% non-compliant
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bottom Performers */}
+                  <div>
+                    <h5 className="text-md font-semibold text-red-800 mb-3">📉 Needs Improvement</h5>
+                    <div className="space-y-2">
+                      {driverPerformance.bottomPerformers.map((driver, index) => (
+                        <div key={driver.name} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <div className="flex justify-between items-center">
+                            <div className="font-medium text-red-900">
+                              #{driverPerformance.totalQualifiedDrivers - index} {driver.name}
+                            </div>
+                            <div className="text-red-700 font-bold">
+                              {driver.avgScore.toFixed(1)}
+                            </div>
+                          </div>
+                          <div className="text-xs text-red-600 mt-1">
+                            {driver.totalDeliveries} deliveries • {driver.goldRate.toFixed(1)}% gold • {driver.nonCompliantRate.toFixed(1)}% non-compliant
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Issue Breakdown */}
             {(missingPhotosCount > 0 || missingSignatureCount > 0 || tempIssuesCount > 0) && (
