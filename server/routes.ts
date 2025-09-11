@@ -416,12 +416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const page = await browser.newPage();
         
-        // Block unnecessary resources for faster loading
+        // Block unnecessary resources for faster loading (but keep images!)
         await page.setRequestInterception(true);
         page.on('request', (req) => {
           const resourceType = req.resourceType();
-          // Block CSS, fonts, media that aren't essential for image extraction
-          if (resourceType === 'stylesheet' || resourceType === 'font' || resourceType === 'media') {
+          // Only block fonts - keep CSS and images for proper rendering
+          if (resourceType === 'font') {
             req.abort();
           } else {
             req.continue();
@@ -437,18 +437,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Navigating to: ${trackingUrl}`);
         
         await page.goto(trackingUrl, { 
-          waitUntil: 'domcontentloaded', // Faster than networkidle2
-          timeout: 15000 // Reduced timeout
+          waitUntil: 'networkidle0', // Wait for network to be completely idle
+          timeout: 20000
         });
         
-        // Reduced wait time for Angular to load
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait longer for Angular to load and render images
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Try to wait for images to appear with shorter timeout
+        // Wait for images to appear
         try {
-          await page.waitForSelector('img', { timeout: 3000 });
+          await page.waitForSelector('img', { timeout: 8000 });
+          console.log('Images found, proceeding with extraction...');
         } catch (e) {
-          console.log('Images may still be loading, proceeding anyway...');
+          console.log('No images found or timeout, but proceeding anyway...');
         }
         
         // Extract all image URLs from the page
