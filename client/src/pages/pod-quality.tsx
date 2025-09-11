@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiRequest } from "@/lib/queryClient";
 import { 
   Camera, 
   ExternalLink, 
@@ -26,165 +25,6 @@ import {
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
 import { Consignment } from "@shared/schema";
-
-interface PhotoGalleryProps {
-  trackingLink: string;
-  consignmentNo: string;
-}
-
-function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const extractPhotosFromTracking = async (trackingLink: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch the tracking page HTML through our authenticated proxy
-      const response = await apiRequest('GET', `/api/proxy-tracking?url=${encodeURIComponent(trackingLink)}`);
-      const html = await response.text();
-      
-      // Debug: Log a snippet of the HTML to see what we're working with
-      console.log('HTML snippet:', html.substring(0, 1000));
-      
-      // Extract Azure blob storage URLs for images
-      // Looking for URLs like: https://axylogdata.blob.core.windows.net/...jpg
-      let imageUrlRegex = /https:\/\/axylogdata\.blob\.core\.windows\.net\/[^"'\s]+\.(jpg|jpeg|png|gif)/gi;
-      let matches = html.match(imageUrlRegex) || [];
-      
-      // If no matches, try broader patterns
-      if (matches.length === 0) {
-        console.log('No Azure blob URLs found, trying broader patterns...');
-        
-        // Try any image URLs
-        imageUrlRegex = /https:\/\/[^"'\s]+\.(jpg|jpeg|png|gif)/gi;
-        matches = html.match(imageUrlRegex) || [];
-        console.log('Found image URLs:', matches);
-        
-        // Try looking for specific patterns in the HTML
-        const srcPattern = /src\s*=\s*["']([^"']*\.(jpg|jpeg|png|gif)[^"']*)["']/gi;
-        const srcMatches = [];
-        let match;
-        while ((match = srcPattern.exec(html)) !== null) {
-          srcMatches.push(match[1]);
-        }
-        console.log('Found src attributes:', srcMatches);
-        
-        // Combine all found images
-        matches = [...matches, ...srcMatches];
-      }
-      
-      // Remove duplicates and filter valid image URLs
-      const uniquePhotos = Array.from(new Set(matches));
-      console.log('Final photo URLs:', uniquePhotos);
-      
-      setPhotos(uniquePhotos);
-    } catch (err) {
-      console.error('Error extracting photos:', err);
-      setError('Unable to extract photos from tracking link');
-      setPhotos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Extract photos when component mounts or tracking link changes
-  useEffect(() => {
-    if (trackingLink) {
-      extractPhotosFromTracking(trackingLink);
-    }
-  }, [trackingLink]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full py-8">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-lg font-medium">Loading photos...</p>
-          <p className="text-sm text-gray-500">Extracting images from tracking system</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full py-8">
-        <div className="text-center text-red-500">
-          <AlertTriangle className="h-8 w-8 mx-auto mb-4" />
-          <p className="text-lg font-medium">{error}</p>
-          <Button 
-            onClick={() => window.open(trackingLink, '_blank')} 
-            variant="outline" 
-            className="mt-4"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View Full Tracking Page
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (photos.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full py-8 text-gray-500">
-        <div className="text-center">
-          <Camera className="h-8 w-8 mx-auto mb-4 text-gray-400" />
-          <p className="text-lg font-medium">No photos found</p>
-          <p className="text-sm">Photos may not be available for this consignment</p>
-          <Button 
-            onClick={() => window.open(trackingLink, '_blank')} 
-            variant="outline" 
-            className="mt-4"
-            size="sm"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View Tracking Page
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4">
-      <div className="mb-4">
-        <p className="text-sm text-gray-600">
-          Found {photos.length} photo{photos.length !== 1 ? 's' : ''} for {consignmentNo}
-        </p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto">
-        {photos.map((photoUrl, index) => (
-          <div 
-            key={index}
-            className="relative group cursor-pointer border rounded-lg overflow-hidden hover:shadow-lg transition-shadow bg-white"
-            onClick={() => window.open(photoUrl, '_blank')}
-            data-testid={`photo-${index}`}
-          >
-            <img
-              src={photoUrl}
-              alt={`POD Photo ${index + 1} for ${consignmentNo}`}
-              className="w-full h-48 object-cover"
-              onError={(e) => {
-                // Hide broken images
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-              <ExternalLink className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-sm font-medium">Photo {index + 1}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 interface PODMetrics {
   photoCount: number;
@@ -1144,10 +984,14 @@ export default function PODQuality() {
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
               {selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink ? (
-                <PhotoGallery 
-                  trackingLink={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
-                  consignmentNo={selectedConsignment.consignmentNo || ''}
-                />
+                <div className="h-[70vh] border rounded-lg overflow-hidden">
+                  <iframe
+                    src={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
+                    className="w-full h-full"
+                    title="Live Tracking with POD Photos"
+                    data-testid="iframe-photo-viewer"
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[70vh] text-gray-500 bg-gray-50 rounded-lg">
                   <div className="text-center">
@@ -1160,7 +1004,7 @@ export default function PODQuality() {
             </div>
             <div className="flex justify-between items-center pt-4 border-t">
               <p className="text-sm text-gray-600">
-                Click any photo to view in full size. Photos are extracted from the live tracking system.
+                Live tracking system with POD photos. Navigate within the tracking interface to view and assess photo quality.
               </p>
               {(selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink) && (
                 <Button
@@ -1172,7 +1016,7 @@ export default function PODQuality() {
                   data-testid="button-open-external"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  View Full Tracking Page
+                  Open in New Tab
                 </Button>
               )}
             </div>
