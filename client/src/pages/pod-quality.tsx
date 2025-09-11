@@ -20,11 +20,14 @@ import {
   BarChart3,
   RefreshCw,
   Home,
-  X
+  X,
+  Info,
+  FileText,
+  Eye
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
-import { Consignment } from "@shared/schema";
+import { Consignment, ScoreBreakdown } from "@shared/schema";
 
 interface PODMetrics {
   photoCount: number;
@@ -34,6 +37,7 @@ interface PODMetrics {
   deliveryTime: string | null;
   qualityScore: number;
   hasReceiverName: boolean;
+  scoreBreakdown?: ScoreBreakdown;
 }
 
 interface PhotoGalleryProps {
@@ -45,12 +49,13 @@ interface PhotoThumbnailsProps {
   consignment: Consignment;
   photoCount: number;
   onPhotoLoad: (consignmentId: number, photos: string[]) => void;
+  loadImmediately?: boolean; // For current page items - load right away
 }
 
 // Global cache for photos to avoid re-extraction
 const photoCache = new Map<string, string[]>();
 
-function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnailsProps) {
+function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately = false }: PhotoThumbnailsProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -74,7 +79,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnai
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}`, {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -96,8 +101,15 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnai
     }
   }, [trackingLink, cacheKey, consignment.id, onPhotoLoad]);
 
-  // Intersection Observer for lazy loading
+  // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
   useEffect(() => {
+    if (loadImmediately) {
+      // Load immediately for current page items
+      loadPhotos();
+      return;
+    }
+
+    // Use intersection observer for future page items with large margin
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -106,7 +118,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnai
           }
         });
       },
-      { threshold: 0.1, rootMargin: '100px' }
+      { threshold: 0.1, rootMargin: '800px' } // Even larger margin for ahead-of-scroll loading
     );
 
     if (elementRef.current) {
@@ -114,7 +126,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnai
     }
 
     return () => observer.disconnect();
-  }, [loadPhotos]);
+  }, [loadPhotos, loadImmediately]);
 
   if (loading) {
     return (
@@ -254,7 +266,7 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}`, {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -380,6 +392,8 @@ interface PODAnalysis {
   metrics: PODMetrics;
 }
 
+// Remove duplicate ScoreBreakdown interface - it's now defined in shared/schema.ts
+
 export default function PODQuality() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -393,6 +407,12 @@ export default function PODQuality() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
+  const [scoreBreakdownOpen, setScoreBreakdownOpen] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<PODAnalysis | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   
   // Track loaded photos for instant modal opening
   const [loadedPhotos, setLoadedPhotos] = useState<Map<number, string[]>>(new Map());
@@ -472,33 +492,61 @@ export default function PODQuality() {
     const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
     const deliveryTime = consignment.delivery_OutcomeDateTime;
     
-    // Calculate quality score based on your 5 criteria:
-    // 1. 3+ photos (required - negative scoring if less)
-    // 2. Signed 
-    // 3. Name of receiver
-    // 4. Temperature compliance
-    // 5. Clear photos (TBD - not implemented yet)
-    
+    // Calculate quality score based on your 5 criteria and create detailed breakdown
     let score = 0;
+    
+    // Create detailed scoring breakdown
+    const breakdown: ScoreBreakdown = {
+      photos: { points: 0, reason: '', status: 'fail' },
+      signature: { points: 0, reason: '', status: 'fail' },
+      receiverName: { points: 0, reason: '', status: 'fail' },
+      temperature: { points: 0, reason: '', status: 'fail' },
+      clearPhotos: { points: 0, reason: 'Not yet implemented', status: 'pending' },
+      total: 0
+    };
     
     // Photo scoring: 3+ = good, 2 = negative, 1 = more negative, 0 = complete fail
     if (photoCount >= 3) {
-      score += 25; // Good photo count
+      score += 25;
+      breakdown.photos = { points: 25, reason: `Found ${photoCount} photos (3+ required)`, status: 'pass' };
     } else if (photoCount === 2) {
-      score -= 10; // Negative for 2 photos
+      score -= 10;
+      breakdown.photos = { points: -10, reason: `Only 2 photos found (3+ required)`, status: 'partial' };
     } else if (photoCount === 1) {
-      score -= 20; // More negative for 1 photo
+      score -= 20;
+      breakdown.photos = { points: -20, reason: `Only 1 photo found (3+ required)`, status: 'partial' };
     } else {
-      score -= 50; // Complete fail for 0 photos
+      score -= 50;
+      breakdown.photos = { points: -50, reason: `No photos found (3+ required)`, status: 'fail' };
     }
     
-    if (hasSignature) score += 25;
-    if (hasReceiverName) score += 25;
-    if (temperatureCompliant) score += 25;
-    // Clear photos criteria TBD
+    // Signature scoring
+    if (hasSignature) {
+      score += 25;
+      breakdown.signature = { points: 25, reason: 'Delivery signature present', status: 'pass' };
+    } else {
+      breakdown.signature = { points: 0, reason: 'No delivery signature found', status: 'fail' };
+    }
+    
+    // Receiver name scoring
+    if (hasReceiverName) {
+      score += 25;
+      breakdown.receiverName = { points: 25, reason: `Receiver name: "${consignment.deliverySignatureName}"`, status: 'pass' };
+    } else {
+      breakdown.receiverName = { points: 0, reason: 'No receiver name captured', status: 'fail' };
+    }
+    
+    // Temperature compliance scoring
+    if (temperatureCompliant) {
+      score += 25;
+      breakdown.temperature = { points: 25, reason: 'Temperature within expected range', status: 'pass' };
+    } else {
+      breakdown.temperature = { points: 0, reason: 'Temperature outside expected range', status: 'fail' };
+    }
     
     // Ensure score doesn't go below 0
     score = Math.max(0, score);
+    breakdown.total = score;
     
     const metrics: PODMetrics = {
       photoCount,
@@ -507,7 +555,8 @@ export default function PODQuality() {
       hasTrackingLink,
       deliveryTime,
       qualityScore: score,
-      hasReceiverName
+      hasReceiverName,
+      scoreBreakdown: breakdown
     };
 
     return { consignment, metrics };
@@ -694,8 +743,8 @@ export default function PODQuality() {
     );
   };
 
-  // Process and filter consignments
-  const podAnalyses: PODAnalysis[] = deliveredConsignments
+  // Process and filter consignments - ALL filtered data for stats
+  const allFilteredAnalyses: PODAnalysis[] = deliveredConsignments
     .map(analyzePOD)
     .filter((analysis: PODAnalysis) => {
       const consignment = analysis.consignment;
@@ -769,16 +818,30 @@ export default function PODQuality() {
              matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
     });
 
-  // Calculate summary statistics
-  const totalDeliveries = podAnalyses.length;
+  // Pagination calculations
+  const totalItems = allFilteredAnalyses.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  
+  // Current page data (for display)
+  const podAnalyses = allFilteredAnalyses.slice(startIndex, endIndex);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedFilter, selectedWarehouse, selectedShipper, selectedDriver, selectedTempZone, searchTerm, fromDate, toDate, pageSize]);
+
+  // Calculate summary statistics from ALL filtered data (not just current page)
+  const totalDeliveries = allFilteredAnalyses.length;
   const avgPhotoCount = totalDeliveries > 0 ? 
-    podAnalyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries : 0;
+    allFilteredAnalyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries : 0;
   const signatureRate = totalDeliveries > 0 ? 
-    (podAnalyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100 : 0;
+    (allFilteredAnalyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100 : 0;
   const tempComplianceRate = totalDeliveries > 0 ? 
-    (podAnalyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100 : 0;
+    (allFilteredAnalyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100 : 0;
   const avgQualityScore = totalDeliveries > 0 ? 
-    podAnalyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries : 0;
+    allFilteredAnalyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries : 0;
 
   const getQualityBadge = (score: number) => {
     if (score >= 80) return <Badge className="bg-green-100 text-green-800">Excellent</Badge>;
@@ -1158,14 +1221,57 @@ export default function PODQuality() {
         {/* POD Quality List */}
         <div className="gradient-card shadow-card rounded-xl border border-white/20">
           <div className="p-6 border-b border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900">Delivery POD Analysis</h3>
-            <p className="text-gray-600 mt-1">
-              Quality analysis for {podAnalyses.length} delivered consignments
-            </p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Delivery POD Analysis</h3>
+                <p className="text-gray-600 mt-1">
+                  Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} delivered consignments
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    data-testid="select-page-size"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    ← Previous
+                  </Button>
+                  <span className="text-sm text-gray-600 px-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next →
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="p-6">
             <div className="space-y-6">
-              {podAnalyses.map((analysis) => {
+              {podAnalyses.map((analysis, index) => {
                 const { consignment, metrics } = analysis;
                 return (
                   <div
@@ -1186,10 +1292,24 @@ export default function PODQuality() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        {getQualityBadge(metrics.qualityScore)}
-                        <span className="text-2xl font-bold text-gray-900" data-testid={`text-score-${consignment.id}`}>
-                          {metrics.qualityScore}/100
-                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAnalysis(analysis);
+                            setScoreBreakdownOpen(true);
+                          }}
+                          className={`${
+                            metrics.qualityScore >= 80 ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                            metrics.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
+                            'bg-red-100 text-red-800 hover:bg-red-200'
+                          } border-0 font-medium cursor-pointer text-lg px-4 py-2`}
+                          data-testid={`button-score-breakdown-${consignment.id}`}
+                        >
+                          <Info className="h-4 w-4 mr-2" />
+                          {metrics.qualityScore >= 80 ? "Excellent" :
+                           metrics.qualityScore >= 60 ? "Good" : "Poor"} {metrics.qualityScore}/100
+                        </Button>
                       </div>
                     </div>
 
@@ -1218,6 +1338,7 @@ export default function PODQuality() {
                           consignment={consignment}
                           photoCount={metrics.photoCount}
                           onPhotoLoad={handlePhotoLoad}
+                          loadImmediately={index < 10} // Only load first 10 items immediately to prevent overload
                         />
                       </div>
 
@@ -1364,6 +1485,137 @@ export default function PODQuality() {
                 </Button>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Score Breakdown Modal */}
+        <Dialog open={scoreBreakdownOpen} onOpenChange={setScoreBreakdownOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>POD Quality Score Breakdown</DialogTitle>
+              <DialogDescription>
+                {selectedAnalysis && `Detailed scoring for ${selectedAnalysis.consignment.consignmentNo}`}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedAnalysis?.metrics.scoreBreakdown && (
+              <div className="space-y-4">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-3xl font-bold text-gray-900 mb-2">
+                    {selectedAnalysis.metrics.qualityScore}/100
+                  </div>
+                  <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedAnalysis.metrics.qualityScore >= 80 ? 'bg-green-100 text-green-800' :
+                    selectedAnalysis.metrics.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedAnalysis.metrics.qualityScore >= 80 ? "Excellent" :
+                     selectedAnalysis.metrics.qualityScore >= 60 ? "Good" : "Poor"} Quality
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Photos */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    selectedAnalysis.metrics.scoreBreakdown.photos.status === 'pass' ? 'border-green-200 bg-green-50' :
+                    selectedAnalysis.metrics.scoreBreakdown.photos.status === 'partial' ? 'border-yellow-200 bg-yellow-50' :
+                    'border-red-200 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Camera className="h-5 w-5" />
+                        <span className="font-semibold">Photos</span>
+                      </div>
+                      <div className={`font-bold ${
+                        selectedAnalysis.metrics.scoreBreakdown.photos.points > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {selectedAnalysis.metrics.scoreBreakdown.photos.points > 0 ? '+' : ''}{selectedAnalysis.metrics.scoreBreakdown.photos.points} pts
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.photos.reason}</p>
+                  </div>
+
+                  {/* Signature */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    selectedAnalysis.metrics.scoreBreakdown.signature.status === 'pass' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <FileSignature className="h-5 w-5" />
+                        <span className="font-semibold">Signature</span>
+                      </div>
+                      <div className={`font-bold ${
+                        selectedAnalysis.metrics.scoreBreakdown.signature.points > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {selectedAnalysis.metrics.scoreBreakdown.signature.points > 0 ? '+' : ''}{selectedAnalysis.metrics.scoreBreakdown.signature.points} pts
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.signature.reason}</p>
+                  </div>
+
+                  {/* Receiver Name */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    selectedAnalysis.metrics.scoreBreakdown.receiverName.status === 'pass' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        <span className="font-semibold">Receiver Name</span>
+                      </div>
+                      <div className={`font-bold ${
+                        selectedAnalysis.metrics.scoreBreakdown.receiverName.points > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {selectedAnalysis.metrics.scoreBreakdown.receiverName.points > 0 ? '+' : ''}{selectedAnalysis.metrics.scoreBreakdown.receiverName.points} pts
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.receiverName.reason}</p>
+                  </div>
+
+                  {/* Temperature */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    selectedAnalysis.metrics.scoreBreakdown.temperature.status === 'pass' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Thermometer className="h-5 w-5" />
+                        <span className="font-semibold">Temperature Compliance</span>
+                      </div>
+                      <div className={`font-bold ${
+                        selectedAnalysis.metrics.scoreBreakdown.temperature.points > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {selectedAnalysis.metrics.scoreBreakdown.temperature.points > 0 ? '+' : ''}{selectedAnalysis.metrics.scoreBreakdown.temperature.points} pts
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.temperature.reason}</p>
+                  </div>
+
+                  {/* Clear Photos (Future) */}
+                  <div className="p-4 rounded-lg border-2 border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        <span className="font-semibold">Clear Photos</span>
+                      </div>
+                      <div className="font-bold text-gray-500">
+                        +0 pts
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.clearPhotos.reason}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">Scoring System</h4>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>• <strong>Photos:</strong> 3+ photos = +25 pts, 2 photos = -10 pts, 1 photo = -20 pts, 0 photos = -50 pts</p>
+                    <p>• <strong>Signature:</strong> Present = +25 pts, Missing = 0 pts</p>
+                    <p>• <strong>Receiver Name:</strong> Captured = +25 pts, Missing = 0 pts</p>
+                    <p>• <strong>Temperature:</strong> Compliant = +25 pts, Non-compliant = 0 pts</p>
+                    <p>• <strong>Clear Photos:</strong> Not yet implemented = 0 pts</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

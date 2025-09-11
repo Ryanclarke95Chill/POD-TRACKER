@@ -16,6 +16,219 @@ let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Photo scraping queue system with concurrency control
+interface PhotoRequest {
+  token: string;
+  priority: 'high' | 'low'; // high = user clicks, low = background loading
+  resolve: (photos: string[]) => void;
+  reject: (error: Error) => void;
+}
+
+class PhotoScrapingQueue {
+  private queue: PhotoRequest[] = [];
+  private activeRequests = new Set<string>();
+  private readonly maxConcurrency = 3; // Limit concurrent scraping operations
+
+  async addRequest(token: string, priority: 'high' | 'low'): Promise<string[]> {
+    // If already processing this token, wait for existing request
+    if (this.activeRequests.has(token)) {
+      // Return cached result if available
+      const cached = photoCache.get(token);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return cached.photos;
+      }
+      
+      // Wait a short time and try again
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return this.addRequest(token, priority);
+    }
+
+    return new Promise((resolve, reject) => {
+      const request: PhotoRequest = { token, priority, resolve, reject };
+      
+      // Insert based on priority - high priority goes to front
+      if (priority === 'high') {
+        this.queue.unshift(request);
+      } else {
+        this.queue.push(request);
+      }
+      
+      this.processQueue();
+    });
+  }
+
+  private async processQueue() {
+    if (this.activeRequests.size >= this.maxConcurrency || this.queue.length === 0) {
+      return;
+    }
+
+    const request = this.queue.shift();
+    if (!request) return;
+
+    this.activeRequests.add(request.token);
+    
+    try {
+      const photos = await this.scrapePhotos(request.token);
+      request.resolve(photos);
+    } catch (error) {
+      request.reject(error as Error);
+    } finally {
+      this.activeRequests.delete(request.token);
+      // Process next request in queue
+      setTimeout(() => this.processQueue(), 100);
+    }
+  }
+
+  private async scrapePhotos(token: string): Promise<string[]> {
+    console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
+    
+    // Check cache first
+    const cached = photoCache.get(token);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`Using cached photos for token: ${token}`);
+      return cached.photos;
+    }
+
+    let photos: string[] = [];
+
+    // Reuse browser instance for better performance
+    if (!browserInstance) {
+      console.log('Launching new browser instance...');
+      browserInstance = await puppeteer.launch({
+        headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-plugins',
+          '--disable-sync',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
+        ]
+      });
+    }
+
+    const browser = browserInstance;
+    let page;
+
+    try {
+      page = await browser.newPage();
+      
+      // Block unnecessary resources for faster loading
+      await page.setRequestInterception(true);
+      page.on('request', (req: any) => {
+        const resourceType = req.resourceType();
+        if (resourceType === 'font') {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+      
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+      await page.setViewport({ width: 1280, height: 720 });
+      
+      const trackingUrl = `https://live.axylog.com/${token}`;
+      console.log(`Navigating to: ${trackingUrl}`);
+      
+      await page.goto(trackingUrl, { 
+        waitUntil: 'networkidle0',
+        timeout: 20000
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      try {
+        await page.waitForSelector('img', { timeout: 8000 });
+        console.log('Images found, proceeding with extraction...');
+      } catch (e) {
+        console.log('No images found or timeout, but proceeding anyway...');
+      }
+      
+      const imageData = await page.evaluate(() => {
+        const images = Array.from(document.querySelectorAll('img'));
+        
+        return images.map(img => {
+          const rect = img.getBoundingClientRect();
+          return {
+            src: img.src,
+            alt: img.alt || '',
+            width: img.naturalWidth || img.width,
+            height: img.naturalHeight || img.height,
+            className: img.className,
+            isVisible: rect.width > 0 && rect.height > 0,
+            parentText: img.parentElement?.textContent?.substring(0, 100) || ''
+          };
+        }).filter(img => {
+          const isValidPhoto = img.src && 
+                 img.src.startsWith('http') && 
+                 img.width > 100 &&
+                 img.height > 100;
+                 
+          const isNotUIElement = !img.src.includes('logo') &&
+                 !img.src.includes('icon') &&
+                 !img.src.includes('avatar') &&
+                 !img.className.includes('logo') &&
+                 !img.className.includes('icon');
+                 
+          const isNotMap = !img.src.toLowerCase().includes('map') &&
+                 !img.src.toLowerCase().includes('tile') &&
+                 !img.src.toLowerCase().includes('geographic') &&
+                 !img.src.toLowerCase().includes('osm') &&
+                 !img.src.toLowerCase().includes('openstreetmap') &&
+                 !img.src.toLowerCase().includes('cartography') &&
+                 !img.className.toLowerCase().includes('map') &&
+                 !img.parentText.toLowerCase().includes('map') &&
+                 !img.parentText.toLowerCase().includes('route') &&
+                 !img.parentText.toLowerCase().includes('location');
+                 
+          return isValidPhoto && isNotUIElement && isNotMap;
+        });
+      });
+      
+      console.log(`Found ${imageData.length} potential photos on page`);
+      photos = imageData.map((img: any) => img.src);
+      
+      imageData.forEach((img: any, index: number) => {
+        console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
+      });
+      
+    } catch (error: any) {
+      console.error(`Error scraping photos: ${error.message}`);
+      throw error;
+    } finally {
+      if (page) {
+        await page.close();
+      }
+    }
+    
+    const filteredPhotos = photos.filter((url: any) => 
+      !url.toLowerCase().includes('signature') &&
+      !url.toLowerCase().includes('firma') &&
+      !url.toLowerCase().includes('sign')
+    );
+    
+    const uniquePhotos = Array.from(new Set(filteredPhotos));
+    
+    // Cache the results
+    photoCache.set(token, {
+      photos: uniquePhotos,
+      timestamp: Date.now()
+    });
+    
+    console.log(`Found ${uniquePhotos.length} photos for token ${token}`);
+    return uniquePhotos;
+  }
+}
+
+const photoQueue = new PhotoScrapingQueue();
+
 // Image processing cache
 const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();
 const IMAGE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -372,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract POD photos from tracking system
   app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      const { trackingToken } = req.query;
+      const { trackingToken, priority = 'low' } = req.query;
       
       if (!trackingToken || typeof trackingToken !== 'string') {
         return res.status(400).json({ message: "trackingToken parameter is required" });
@@ -386,169 +599,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Extracting photos for tracking token: ${token}`);
       
-      // Check cache first
-      const cached = photoCache.get(token);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`Using cached photos for token: ${token}`);
-        return res.json({
-          success: true,
-          photos: cached.photos,
-          count: cached.photos.length,
-          cached: true
-        });
-      }
-      
-      let photos: string[] = [];
-      
-      console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
-      
-      // Reuse browser instance for better performance
-      if (!browserInstance) {
-        console.log('Launching new browser instance...');
-        browserInstance = await puppeteer.launch({
-          headless: true,
-          executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-extensions',
-            '--disable-default-apps',
-            '--disable-features=VizDisplayCompositor',
-            '--disable-plugins',
-            '--disable-sync',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
-          ]
-        });
-      }
-      
-      const browser = browserInstance;
-      
-      try {
-        const page = await browser.newPage();
-        
-        // Block unnecessary resources for faster loading (but keep images!)
-        await page.setRequestInterception(true);
-        page.on('request', (req: any) => {
-          const resourceType = req.resourceType();
-          // Only block fonts - keep CSS and images for proper rendering
-          if (resourceType === 'font') {
-            req.abort();
-          } else {
-            req.continue();
-          }
-        });
-        
-        // Set user agent and viewport for faster rendering
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-        await page.setViewport({ width: 1280, height: 720 });
-        
-        // Navigate to the tracking URL with faster settings
-        const trackingUrl = `https://live.axylog.com/${token}`;
-        console.log(`Navigating to: ${trackingUrl}`);
-        
-        await page.goto(trackingUrl, { 
-          waitUntil: 'networkidle0', // Wait for network to be completely idle
-          timeout: 20000
-        });
-        
-        // Wait longer for Angular to load and render images
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Wait for images to appear
-        try {
-          await page.waitForSelector('img', { timeout: 8000 });
-          console.log('Images found, proceeding with extraction...');
-        } catch (e) {
-          console.log('No images found or timeout, but proceeding anyway...');
-        }
-        
-        // Extract all image URLs from the page
-        const imageData = await page.evaluate(() => {
-          const images = Array.from(document.querySelectorAll('img'));
-          
-          return images.map(img => {
-            const rect = img.getBoundingClientRect();
-            return {
-              src: img.src,
-              alt: img.alt || '',
-              width: img.naturalWidth || img.width,
-              height: img.naturalHeight || img.height,
-              className: img.className,
-              isVisible: rect.width > 0 && rect.height > 0,
-              parentText: img.parentElement?.textContent?.substring(0, 100) || ''
-            };
-          }).filter(img => {
-            // Filter for actual delivery photos vs UI elements and maps
-            const isValidPhoto = img.src && 
-                   img.src.startsWith('http') && 
-                   img.width > 100 &&  // Must be reasonably large
-                   img.height > 100;
-                   
-            // Exclude UI elements
-            const isNotUIElement = !img.src.includes('logo') &&
-                   !img.src.includes('icon') &&
-                   !img.src.includes('avatar') &&
-                   !img.className.includes('logo') &&
-                   !img.className.includes('icon');
-                   
-            // Exclude map images
-            const isNotMap = !img.src.toLowerCase().includes('map') &&
-                   !img.src.toLowerCase().includes('tile') &&
-                   !img.src.toLowerCase().includes('geographic') &&
-                   !img.src.toLowerCase().includes('osm') &&
-                   !img.src.toLowerCase().includes('openstreetmap') &&
-                   !img.src.toLowerCase().includes('cartography') &&
-                   !img.className.toLowerCase().includes('map') &&
-                   !img.parentText.toLowerCase().includes('map') &&
-                   !img.parentText.toLowerCase().includes('route') &&
-                   !img.parentText.toLowerCase().includes('location');
-                   
-            return isValidPhoto && isNotUIElement && isNotMap;
-          });
-        });
-        
-        console.log(`Found ${imageData.length} potential photos on page`);
-        
-        // Extract just the URLs
-        photos = imageData.map((img: any) => img.src);
-        
-        // Log some details about found images
-        imageData.forEach((img: any, index: number) => {
-          console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
-        });
-        
-      } catch (error: any) {
-        console.error(`Error scraping photos: ${error.message}`);
-      } finally {
-        // Don't close browser - keep it running for reuse
-        // await browser.close();
-      }
-      
-      // Filter out signatures and duplicates
-      const filteredPhotos = photos.filter((url: any) => 
-        !url.toLowerCase().includes('signature') &&
-        !url.toLowerCase().includes('firma') &&
-        !url.toLowerCase().includes('sign')
-      );
-      
-      const uniquePhotos = Array.from(new Set(filteredPhotos));
-      
-      // Cache the results for faster subsequent requests
-      photoCache.set(token, {
-        photos: uniquePhotos,
-        timestamp: Date.now()
-      });
-      
-      console.log(`Found ${uniquePhotos.length} photos for token ${token}`);
+      // Use the photo queue for controlled concurrency and prioritization
+      const photos = await photoQueue.addRequest(token, priority as 'high' | 'low');
       
       res.json({
         success: true,
-        photos: uniquePhotos,
-        count: uniquePhotos.length
+        photos: photos,
+        count: photos.length
       });
       
     } catch (error: any) {

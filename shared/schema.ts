@@ -356,3 +356,24 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertConsignment = z.infer<typeof insertConsignmentSchema>;
 export type Consignment = typeof consignments.$inferSelect;
+
+// POD Quality Analysis Types
+export interface ScoreBreakdown {
+  photos: { points: number; reason: string; status: 'pass' | 'fail' | 'partial' };
+  signature: { points: number; reason: string; status: 'pass' | 'fail' };
+  receiverName: { points: number; reason: string; status: 'pass' | 'fail' };
+  temperature: { points: number; reason: string; status: 'pass' | 'fail' };
+  clearPhotos: { points: number; reason: string; status: 'pending' };
+  total: number;
+}
+
+export interface PODMetrics {
+  photoCount: number;
+  hasSignature: boolean;
+  temperatureCompliant: boolean;
+  hasTrackingLink: boolean;
+  deliveryTime?: string;
+  qualityScore: number;
+  hasReceiverName: boolean;
+  scoreBreakdown?: ScoreBreakdown;
+}
