@@ -57,7 +57,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnai
   const elementRef = useRef<HTMLDivElement>(null);
   const hasStartedLoading = useRef(false);
 
-  const trackingLink = consignment.podLink || '';
+  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
   const cacheKey = trackingLink;
 
   const loadPhotos = useCallback(async () => {
