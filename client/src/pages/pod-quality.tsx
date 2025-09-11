@@ -24,6 +24,8 @@ import {
   Info,
   FileText,
   Eye,
+  EyeOff,
+  TrendingUp,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -548,6 +550,9 @@ export default function PODQuality() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   
+  // Summary state
+  const [showSummary, setShowSummary] = useState(false);
+  
   // Track loaded photos for instant modal opening
   const [loadedPhotos, setLoadedPhotos] = useState<Map<number, string[]>>(new Map());
   
@@ -594,10 +599,52 @@ export default function PODQuality() {
     return tempZone;
   };
 
-  // Filter for delivered consignments
+  // Helper function to check if consignment is an internal transfer
+  const isInternalTransfer = (consignment: Consignment): boolean => {
+    const shipFrom = (consignment as any).shipFromMasterDataCode;
+    const shipTo = (consignment as any).shipToMasterDataCode;
+    
+    if (!shipFrom || !shipTo) return false;
+    
+    // Depot transfer patterns (same as in axylog.ts)
+    const depotTransferPatterns = [
+      { from: 'WA_8', to: 'WA_8D' },
+      { from: 'WA_8D', to: 'WA_8' },
+      { from: 'NSW_5', to: 'NSW_5D' },
+      { from: 'NSW_5D', to: 'NSW_5' },
+      { from: 'VIC_29963', to: 'VIC_29963D' },
+      { from: 'VIC_29963D', to: 'VIC_29963' },
+      { from: 'QLD_829', to: 'QLD_829D' },
+      { from: 'QLD_829D', to: 'QLD_829' }
+    ];
+    
+    return depotTransferPatterns.some(pattern => 
+      pattern.from === shipFrom && pattern.to === shipTo
+    );
+  };
+
+  // Helper function to check if consignment is a return
+  const isReturn = (consignment: Consignment): boolean => {
+    const orderType = consignment.type?.toLowerCase();
+    
+    // Check for return indicators in the type field
+    return !!(orderType && (
+      orderType.includes('return') ||
+      orderType.includes('rts') ||  // Return to sender
+      orderType.includes('reverse') ||
+      orderType.includes('pickup') // Some returns might be labeled as pickups
+    ));
+  };
+
+  // Filter for delivered consignments, excluding returns and internal transfers
   const deliveredConsignments = (allConsignments as Consignment[]).filter((consignment: Consignment) => {
     const status = getStatusDisplay(consignment);
-    return status === 'Delivered';
+    const isDelivered = status === 'Delivered';
+    const isInternalTx = isInternalTransfer(consignment);
+    const isReturnOrder = isReturn(consignment);
+    
+    // Only include delivered consignments that are NOT returns or internal transfers
+    return isDelivered && !isInternalTx && !isReturnOrder;
   });
 
   // Get unique values for filter dropdowns
@@ -680,6 +727,32 @@ export default function PODQuality() {
     };
   };
 
+  // Helper function to evaluate individual component compliance
+  const evaluateComponentCompliance = (consignment: Consignment, photoCount: number, hasSignature: boolean, hasReceiverName: boolean) => {
+    const temperatureCompliant = checkTemperatureCompliance(consignment);
+    
+    return {
+      photos: {
+        compliant: photoCount >= 3,
+        reason: photoCount >= 3 ? 
+          `${photoCount} photos provided (≥3 required)` : 
+          `Only ${photoCount} photos (need ≥3 for mandatory set)`
+      },
+      signature: {
+        compliant: hasSignature,
+        reason: hasSignature ? 'Signature provided' : 'No signature provided'
+      },
+      receiverName: {
+        compliant: hasReceiverName,
+        reason: hasReceiverName ? 'Receiver name provided' : 'No receiver name provided'
+      },
+      temperature: {
+        compliant: temperatureCompliant,
+        reason: temperatureCompliant ? 'Temperature compliant' : 'Temperature non-compliant'
+      }
+    };
+  };
+
   // Analyze POD quality for each consignment using new gated + bucketed system
   const analyzePOD = (consignment: Consignment): PODAnalysis => {
     const photoCount = countPhotos(consignment);
@@ -687,25 +760,45 @@ export default function PODQuality() {
     const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
     const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
     const deliveryTime = consignment.delivery_OutcomeDateTime;
+    const temperatureCompliant = checkTemperatureCompliance(consignment);
+    
+    // Evaluate individual component compliance
+    const componentStatus = evaluateComponentCompliance(consignment, photoCount, hasSignature, hasReceiverName);
     
     // Check gates first
     const gateCheck = passesGates(consignment);
     
-    // If gates fail, return non-compliant
+    // If gates fail, show individual component status but mark overall as non-compliant
     if (!gateCheck.ok) {
       const breakdown: ScoreBreakdown = {
-        photos: { points: 0, reason: `Gates failed: ${gateCheck.missing.join(', ')}`, status: 'fail' },
-        signature: { points: 0, reason: 'Gates failed', status: 'fail' },
-        receiverName: { points: 0, reason: 'Gates failed', status: 'fail' },
-        temperature: { points: 0, reason: 'Gates failed', status: 'fail' },
-        clearPhotos: { points: 0, reason: 'Gates failed', status: 'pending' },
+        photos: { 
+          points: 0, 
+          reason: `${componentStatus.photos.reason} (Gate: ${componentStatus.photos.compliant ? 'PASS' : 'FAIL'})`, 
+          status: componentStatus.photos.compliant ? 'pass' : 'fail' 
+        },
+        signature: { 
+          points: 0, 
+          reason: `${componentStatus.signature.reason} (Gate: ${componentStatus.signature.compliant ? 'PASS' : 'FAIL'})`, 
+          status: componentStatus.signature.compliant ? 'pass' : 'fail' 
+        },
+        receiverName: { 
+          points: 0, 
+          reason: `${componentStatus.receiverName.reason} (Gate: ${componentStatus.receiverName.compliant ? 'PASS' : 'FAIL'})`, 
+          status: componentStatus.receiverName.compliant ? 'pass' : 'fail' 
+        },
+        temperature: { 
+          points: 0, 
+          reason: `${componentStatus.temperature.reason} (Gate: ${componentStatus.temperature.compliant ? 'PASS' : 'FAIL'})`, 
+          status: componentStatus.temperature.compliant ? 'pass' : 'fail' 
+        },
+        clearPhotos: { points: 0, reason: 'Photo clarity/OCR analysis pending', status: 'pending' },
         total: 0
       };
       
       const metrics: PODMetrics = {
         photoCount,
         hasSignature,
-        temperatureCompliant: false,
+        temperatureCompliant,
         hasTrackingLink,
         deliveryTime,
         qualityScore: 0,
@@ -727,16 +820,16 @@ export default function PODQuality() {
       total: 0
     };
     
-    // 1. Photos (30 points total)
+    // 1. Photos (40 points total)
     let photoPoints = 0;
     if (photoCount >= 3) {
-      photoPoints += 25; // Mandatory set present
-      // Extra useful photos bonus: +1 each up to +5 (cap 30 total)
+      photoPoints += 35; // Mandatory set present
+      // Extra useful photos bonus: +1 each up to +5 (cap 40 total)
       const extraPhotos = Math.min(5, photoCount - 3);
       photoPoints += extraPhotos;
       breakdown.photos = { 
         points: photoPoints, 
-        reason: `Mandatory photos (${photoCount} ≥ 3) +25pts, ${extraPhotos} extra photos +${extraPhotos}pts`, 
+        reason: `Mandatory photos (${photoCount} ≥ 3) +35pts, ${extraPhotos} extra photos +${extraPhotos}pts`, 
         status: 'pass' 
       };
     } else {
@@ -748,22 +841,43 @@ export default function PODQuality() {
     }
     score += photoPoints;
     
-    // 2. Recipient confirmation (15 points total)
-    let recipientPoints = 0;
+    // 2. Signature (20 points total)
+    let signaturePoints = 0;
     if (hasSignature) {
-      recipientPoints += 8; // Signature → +8
+      signaturePoints = 20; // Signature present → +20
+      breakdown.signature = { 
+        points: signaturePoints, 
+        reason: 'Signature provided', 
+        status: 'pass' 
+      };
+    } else {
+      breakdown.signature = { 
+        points: 0, 
+        reason: 'No signature provided', 
+        status: 'fail' 
+      };
     }
-    if (hasReceiverName) {
-      recipientPoints += 7; // Receiver name → +7
-    }
-    breakdown.signature = { 
-      points: recipientPoints, 
-      reason: `Signature ${hasSignature ? '+8pts' : '+0pts'}, Receiver name ${hasReceiverName ? '+7pts' : '+0pts'}`, 
-      status: recipientPoints > 0 ? 'pass' : 'fail' 
-    };
-    score += recipientPoints;
+    score += signaturePoints;
     
-    // 3. Temperature compliance (25 points total) - using existing temperature logic
+    // 3. Receiver Name (15 points total) - check if receiver name is provided in signature
+    let receiverNamePoints = 0;
+    if (hasReceiverName) {
+      receiverNamePoints = 15; // Full points for having receiver name
+      breakdown.receiverName = { 
+        points: receiverNamePoints, 
+        reason: 'Receiver name provided', 
+        status: 'pass' 
+      };
+    } else {
+      breakdown.receiverName = { 
+        points: 0, 
+        reason: 'No receiver name provided', 
+        status: 'fail' 
+      };
+    }
+    score += receiverNamePoints;
+    
+    // 4. Temperature compliance (25 points total) - using existing temperature logic
     let tempPoints = 0;
     const isTemperatureCompliant = checkTemperatureCompliance(consignment);
     const { expected, actual } = formatTemperatureDisplay(consignment);
@@ -785,31 +899,16 @@ export default function PODQuality() {
     }
     score += tempPoints;
     
-    // 4. Quantity accuracy (15 points total) - using receiverName field for now
-    // QTY present → +5 (If available)
-    // Matches evidence → +10 (not implemented yet)
-    const qtyPoints = 5; // Assume QTY present for now, since it's optional in gates
-    breakdown.receiverName = { 
-      points: qtyPoints, 
-      reason: 'QTY present +5pts (evidence matching not yet implemented)', 
-      status: 'pass' 
-    };
-    score += qtyPoints;
-    
-    // 5. Photo clarity/OCR (15 points) - placeholder for now to prevent infinite loops
-    // Will be filled in with actual analysis when photos are checked
+    // 5. Photo clarity/OCR - not counted in scoring for now
     breakdown.clearPhotos = { 
       points: 0, 
-      reason: 'Photo analysis pending - click "Check Photos" to analyze', 
+      reason: 'Photo analysis not counted in scoring', 
       status: 'pending' 
     };
     
     // Cap total at 100
     score = Math.min(100, score);
     breakdown.total = score;
-    
-    // Determine temperature compliance for legacy field using existing logic
-    const temperatureCompliant = checkTemperatureCompliance(consignment);
     
     const metrics: PODMetrics = {
       photoCount,
@@ -1108,6 +1207,97 @@ export default function PODQuality() {
   const avgQualityScore = totalDeliveries > 0 ? 
     allFilteredAnalyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries : 0;
 
+  // Additional summary analytics
+  const goldCount = allFilteredAnalyses.filter(a => a.metrics.qualityScore >= 90).length;
+  const silverCount = allFilteredAnalyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+  const bronzeCount = allFilteredAnalyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+  const nonCompliantCount = allFilteredAnalyses.filter(a => a.metrics.qualityScore === 0).length;
+  
+  const missingPhotosCount = allFilteredAnalyses.filter(a => a.metrics.photoCount === 0).length;
+  const missingSignatureCount = allFilteredAnalyses.filter(a => !a.metrics.hasSignature).length;
+  const tempIssuesCount = allFilteredAnalyses.filter(a => !a.metrics.temperatureCompliant).length;
+  const hasReceiverNameCount = allFilteredAnalyses.filter(a => a.metrics.hasReceiverName).length;
+  
+  // Quality distribution
+  const qualityDistribution = {
+    gold: totalDeliveries > 0 ? ((goldCount / totalDeliveries) * 100) : 0,
+    silver: totalDeliveries > 0 ? ((silverCount / totalDeliveries) * 100) : 0,
+    bronze: totalDeliveries > 0 ? ((bronzeCount / totalDeliveries) * 100) : 0,
+    nonCompliant: totalDeliveries > 0 ? ((nonCompliantCount / totalDeliveries) * 100) : 0
+  };
+
+  // Generate summary analysis text
+  const generateSummaryAnalysis = () => {
+    if (totalDeliveries === 0) {
+      return "No deliveries found matching the selected filters.";
+    }
+
+    const analysisPoints = [];
+
+    // Overall performance
+    if (avgQualityScore >= 85) {
+      analysisPoints.push("🎯 **Excellent overall performance** - High quality POD standards being maintained.");
+    } else if (avgQualityScore >= 70) {
+      analysisPoints.push("✅ **Good performance** - POD quality is above average with room for improvement.");
+    } else if (avgQualityScore >= 50) {
+      analysisPoints.push("⚠️ **Moderate performance** - Several areas need attention to improve POD quality.");
+    } else {
+      analysisPoints.push("🚨 **Performance issues** - Significant improvements needed in POD quality standards.");
+    }
+
+    // Quality distribution insights
+    if (qualityDistribution.gold >= 40) {
+      analysisPoints.push(`🏆 **Strong Gold tier performance** - ${goldCount} deliveries (${qualityDistribution.gold.toFixed(1)}%) achieving Gold standard.`);
+    } else if (qualityDistribution.nonCompliant >= 30) {
+      analysisPoints.push(`📋 **High non-compliance rate** - ${nonCompliantCount} deliveries (${qualityDistribution.nonCompliant.toFixed(1)}%) failing to meet basic requirements.`);
+    }
+
+    // Specific issue identification
+    const issues = [];
+    if (missingPhotosCount > 0) {
+      issues.push(`${missingPhotosCount} deliveries missing photos`);
+    }
+    if (missingSignatureCount > 0) {
+      issues.push(`${missingSignatureCount} deliveries missing signatures`);
+    }
+    if (tempIssuesCount > 0) {
+      issues.push(`${tempIssuesCount} deliveries with temperature compliance issues`);
+    }
+
+    if (issues.length > 0) {
+      analysisPoints.push(`🔍 **Key issues identified**: ${issues.join(", ")}.`);
+    }
+
+    // Photo performance
+    if (avgPhotoCount >= 4) {
+      analysisPoints.push(`📸 **Strong photo documentation** - Average of ${avgPhotoCount.toFixed(1)} photos per delivery.`);
+    } else if (avgPhotoCount < 3) {
+      analysisPoints.push(`📸 **Photo documentation needs improvement** - Average of only ${avgPhotoCount.toFixed(1)} photos per delivery.`);
+    }
+
+    // Signature performance
+    if (signatureRate >= 90) {
+      analysisPoints.push(`✍️ **Excellent signature capture** - ${signatureRate.toFixed(1)}% of deliveries have signatures.`);
+    } else if (signatureRate < 80) {
+      analysisPoints.push(`✍️ **Signature capture needs attention** - Only ${signatureRate.toFixed(1)}% of deliveries have signatures.`);
+    }
+
+    // Temperature compliance
+    if (tempComplianceRate >= 95) {
+      analysisPoints.push(`🌡️ **Excellent temperature compliance** - ${tempComplianceRate.toFixed(1)}% compliance rate.`);
+    } else if (tempComplianceRate < 90) {
+      analysisPoints.push(`🌡️ **Temperature compliance issues** - Only ${tempComplianceRate.toFixed(1)}% compliance rate.`);
+    }
+
+    // Receiver name performance
+    const receiverNameRate = totalDeliveries > 0 ? ((hasReceiverNameCount / totalDeliveries) * 100) : 0;
+    if (receiverNameRate < 85) {
+      analysisPoints.push(`👤 **Receiver name capture needs improvement** - Only ${receiverNameRate.toFixed(1)}% have receiver names recorded.`);
+    }
+
+    return analysisPoints.join("\n\n");
+  };
+
   const getQualityBadge = (score: number) => {
     if (score === 0) return <Badge className="bg-gray-100 text-gray-800">Non-compliant</Badge>;
     if (score >= 90) return <Badge className="bg-green-100 text-green-800">Gold</Badge>;
@@ -1353,6 +1543,124 @@ export default function PODQuality() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Summary Section */}
+        <div className="flex justify-center mb-6">
+          <Button
+            onClick={() => setShowSummary(!showSummary)}
+            className="gradient-accent hover:opacity-90 text-white border-0 px-6 py-3 text-lg font-semibold shadow-lg"
+            data-testid="button-get-summary"
+          >
+            <div className="flex items-center gap-2">
+              {showSummary ? (
+                <>
+                  <EyeOff className="h-5 w-5" />
+                  Hide Summary
+                </>
+              ) : (
+                <>
+                  <Eye className="h-5 w-5" />
+                  Get Summary
+                </>
+              )}
+            </div>
+          </Button>
+        </div>
+
+        {/* Summary Display */}
+        {showSummary && (
+          <div className="gradient-card shadow-card rounded-xl p-8 mb-8 border border-white/20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">POD Quality Analysis Summary</h3>
+                <p className="text-gray-600">Based on {totalDeliveries} filtered deliveries</p>
+              </div>
+            </div>
+
+            {/* Quality Distribution */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-800">{goldCount}</div>
+                  <div className="text-sm text-green-600">Gold ({qualityDistribution.gold.toFixed(1)}%)</div>
+                  <div className="text-xs text-gray-500 mt-1">≥90 points</div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-800">{silverCount}</div>
+                  <div className="text-sm text-blue-600">Silver ({qualityDistribution.silver.toFixed(1)}%)</div>
+                  <div className="text-xs text-gray-500 mt-1">75-89 points</div>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-800">{bronzeCount}</div>
+                  <div className="text-sm text-yellow-600">Bronze ({qualityDistribution.bronze.toFixed(1)}%)</div>
+                  <div className="text-xs text-gray-500 mt-1">60-74 points</div>
+                </div>
+              </div>
+              
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-800">{nonCompliantCount}</div>
+                  <div className="text-sm text-red-600">Non-compliant ({qualityDistribution.nonCompliant.toFixed(1)}%)</div>
+                  <div className="text-xs text-gray-500 mt-1">0 points</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Analysis Text */}
+            <div className="bg-white rounded-lg p-6 border border-gray-100">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                Key Insights
+              </h4>
+              <div 
+                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                style={{ whiteSpace: 'pre-line' }}
+                data-testid="text-summary-analysis"
+              >
+                {generateSummaryAnalysis()}
+              </div>
+            </div>
+
+            {/* Issue Breakdown */}
+            {(missingPhotosCount > 0 || missingSignatureCount > 0 || tempIssuesCount > 0) && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mt-6">
+                <h4 className="text-lg font-semibold text-orange-900 mb-4 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  Action Items
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {missingPhotosCount > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-800">{missingPhotosCount}</div>
+                      <div className="text-sm text-orange-600">Missing Photos</div>
+                    </div>
+                  )}
+                  {missingSignatureCount > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-800">{missingSignatureCount}</div>
+                      <div className="text-sm text-orange-600">Missing Signatures</div>
+                    </div>
+                  )}
+                  {tempIssuesCount > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-800">{tempIssuesCount}</div>
+                      <div className="text-sm text-orange-600">Temperature Issues</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filters and Search */}
         <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
