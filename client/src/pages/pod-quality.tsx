@@ -168,9 +168,26 @@ export default function PODQuality() {
 
   // Format temperature display for expected vs actual
   const formatTemperatureDisplay = (consignment: Consignment) => {
-    const expected = consignment.expectedTemperature || 'N/A';
-    const actualTemp = (consignment as any).paymentMethod;
+    // Extract expected temperature from document_note (e.g., "Frozen -18C to -20C")
+    let expected = 'N/A';
+    if (consignment.documentNote) {
+      const tempMatch = consignment.documentNote.match(/^([^\\n]+)/);
+      if (tempMatch) {
+        expected = tempMatch[1].trim();
+        // Clean up the temperature format
+        if (expected.includes('\\n') || expected.includes('\\')) {
+          expected = expected.split('\\')[0].trim();
+        }
+      }
+    }
     
+    // Fallback to expectedTemperature field if available
+    if (expected === 'N/A' && consignment.expectedTemperature) {
+      expected = consignment.expectedTemperature;
+    }
+    
+    // Get actual recorded temperature from paymentMethod field (after re-sync)
+    const actualTemp = (consignment as any).paymentMethod;
     let actual = 'N/A';
     if (actualTemp && !isNaN(parseFloat(actualTemp))) {
       actual = `${parseFloat(actualTemp)}°C`;
@@ -181,8 +198,17 @@ export default function PODQuality() {
 
   // Check if temperature requirements were met using actual recorded temperatures
   const checkTemperatureCompliance = (consignment: Consignment): boolean => {
+    // Get expected temperature from document_note or expectedTemperature field
+    let expectedTemp = consignment.expectedTemperature;
+    if (!expectedTemp && consignment.documentNote) {
+      const tempMatch = consignment.documentNote.match(/^([^\\n]+)/);
+      if (tempMatch) {
+        expectedTemp = tempMatch[1].trim();
+      }
+    }
+    
     // If no expected temperature is specified, we can't determine compliance
-    if (!consignment.expectedTemperature) return true;
+    if (!expectedTemp) return true;
     
     // Get actual recorded temperature from paymentMethod field (e.g., "-18.5" for -18.5°C)
     const actualTemp = (consignment as any).paymentMethod;
@@ -192,10 +218,10 @@ export default function PODQuality() {
       if (!documentNote) return true;
       
       const actualTempZone = documentNote.split('\\')[0];
-      const expectedTemp = consignment.expectedTemperature;
+      const fallbackExpectedTemp = consignment.expectedTemperature;
       
       const normalizeTemp = (temp: string) => temp.toLowerCase().trim();
-      const expectedLower = normalizeTemp(expectedTemp);
+      const expectedLower = normalizeTemp(fallbackExpectedTemp || '');
       const actualLower = normalizeTemp(actualTempZone);
       
       if (expectedLower.includes('frozen') || expectedLower.includes('freezer') || expectedLower.includes('-18') || expectedLower.includes('-20')) {
@@ -214,34 +240,34 @@ export default function PODQuality() {
     if (isNaN(actualTempValue)) return true; // Invalid temperature data
     
     // Get expected temperature ranges for each zone
-    const expectedTemp = consignment.expectedTemperature.toLowerCase();
+    const expectedTempLower = (expectedTemp || '').toLowerCase();
     
-    if (expectedTemp.includes('freezer') || expectedTemp.includes('-20')) {
+    if (expectedTempLower.includes('freezer') || expectedTempLower.includes('-20')) {
       // Freezer: typically -20°C ± 5°C tolerance
       return actualTempValue >= -25 && actualTempValue <= -15;
     }
     
-    if (expectedTemp.includes('chiller') || expectedTemp.includes('0–4') || expectedTemp.includes('0-4')) {
+    if (expectedTempLower.includes('chiller') || expectedTempLower.includes('0–4') || expectedTempLower.includes('0-4')) {
       // Chiller: 0-4°C ± 2°C tolerance  
       return actualTempValue >= -2 && actualTempValue <= 6;
     }
     
-    if (expectedTemp.includes('wine') || expectedTemp.includes('14')) {
+    if (expectedTempLower.includes('wine') || expectedTempLower.includes('14')) {
       // Wine: 14°C ± 3°C tolerance
       return actualTempValue >= 11 && actualTempValue <= 17;
     }
     
-    if (expectedTemp.includes('confectionery') || expectedTemp.includes('15–20') || expectedTemp.includes('15-20')) {
+    if (expectedTempLower.includes('confectionery') || expectedTempLower.includes('15–20') || expectedTempLower.includes('15-20')) {
       // Confectionery: 15-20°C ± 2°C tolerance
       return actualTempValue >= 13 && actualTempValue <= 22;
     }
     
-    if (expectedTemp.includes('pharma') || expectedTemp.includes('2–8') || expectedTemp.includes('2-8')) {
+    if (expectedTempLower.includes('pharma') || expectedTempLower.includes('2–8') || expectedTempLower.includes('2-8')) {
       // Pharma: 2-8°C ± 1°C tolerance
       return actualTempValue >= 1 && actualTempValue <= 9;
     }
     
-    if (expectedTemp.includes('dry') || expectedTemp.includes('ambient')) {
+    if (expectedTempLower.includes('dry') || expectedTempLower.includes('ambient')) {
       // Dry: ambient temperature (typically 15-25°C range)
       return actualTempValue >= 10 && actualTempValue <= 30;
     }
@@ -533,8 +559,8 @@ export default function PODQuality() {
               >
                 <option value="all">All Drivers</option>
                 {driverNames.map((driver) => (
-                  <option key={driver} value={driver}>
-                    {driver}
+                  <option key={driver} value={driver || ''}>
+                    {driver || 'Unknown Driver'}
                   </option>
                 ))}
               </select>
