@@ -1145,7 +1145,7 @@ export default function PODQuality() {
     if (score >= 90) return <Badge className="bg-green-100 text-green-800">Gold</Badge>;
     if (score >= 75) return <Badge className="bg-blue-100 text-blue-800">Silver</Badge>;
     if (score >= 60) return <Badge className="bg-yellow-100 text-yellow-800">Bronze</Badge>;
-    return <Badge className="bg-red-100 text-red-800">Poor</Badge>;
+    return <Badge className="bg-red-100 text-red-800">Non-compliant</Badge>;
   };
 
   const formatDate = (dateString: string | null) => {
@@ -1619,7 +1619,7 @@ export default function PODQuality() {
                           {metrics.qualityScore === 0 ? "Non-compliant" :
                            metrics.qualityScore >= 90 ? "Gold" :
                            metrics.qualityScore >= 75 ? "Silver" :
-                           metrics.qualityScore >= 60 ? "Bronze" : "Poor"} {metrics.qualityScore}/100
+                           metrics.qualityScore >= 60 ? "Bronze" : "Non-compliant"} {metrics.qualityScore}/100
                         </Button>
                       </div>
                     </div>
@@ -1825,7 +1825,7 @@ export default function PODQuality() {
                     {selectedAnalysis.metrics.qualityScore === 0 ? "Non-compliant" :
                      selectedAnalysis.metrics.qualityScore >= 90 ? "Gold" :
                      selectedAnalysis.metrics.qualityScore >= 75 ? "Silver" :
-                     selectedAnalysis.metrics.qualityScore >= 60 ? "Bronze" : "Poor"} Quality
+                     selectedAnalysis.metrics.qualityScore >= 60 ? "Bronze" : "Non-compliant"} Quality
                   </div>
                 </div>
 
