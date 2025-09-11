@@ -151,6 +151,16 @@ export default function PODQuality() {
     // Use the file count data from Axylog API if available
     if (deliveryFileCount > 0 || pickupFileCount > 0) {
       count = Number(deliveryFileCount) + Number(pickupFileCount);
+      
+      // Subtract signatures from file count since they're included in the total
+      // but we want to count actual photos only
+      if (consignment.deliverySignatureName && deliveryFileCount > 0) {
+        count = Math.max(0, count - 1); // Subtract delivery signature
+      }
+      if (consignment.pickupSignatureName && pickupFileCount > 0) {
+        count = Math.max(0, count - 1); // Subtract pickup signature  
+      }
+      
       return count;
     }
     
