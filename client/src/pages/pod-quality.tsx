@@ -31,6 +31,7 @@ interface PODMetrics {
   hasTrackingLink: boolean;
   deliveryTime: string | null;
   qualityScore: number;
+  hasReceiverName: boolean;
 }
 
 interface PODAnalysis {
@@ -116,17 +117,38 @@ export default function PODQuality() {
   const analyzePOD = (consignment: Consignment): PODAnalysis => {
     const photoCount = countPhotos(consignment);
     const hasSignature = Boolean(consignment.deliverySignatureName);
+    const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
     const temperatureCompliant = checkTemperatureCompliance(consignment);
     const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
     const deliveryTime = consignment.delivery_OutcomeDateTime;
     
-    // Calculate quality score (0-100)
+    // Calculate quality score based on your 5 criteria:
+    // 1. 3+ photos (required - negative scoring if less)
+    // 2. Signed 
+    // 3. Name of receiver
+    // 4. Temperature compliance
+    // 5. Clear photos (TBD - not implemented yet)
+    
     let score = 0;
-    if (photoCount > 0) score += 30;
-    if (photoCount > 2) score += 10; // Bonus for multiple photos
+    
+    // Photo scoring: 3+ = good, 2 = negative, 1 = more negative, 0 = complete fail
+    if (photoCount >= 3) {
+      score += 25; // Good photo count
+    } else if (photoCount === 2) {
+      score -= 10; // Negative for 2 photos
+    } else if (photoCount === 1) {
+      score -= 20; // More negative for 1 photo
+    } else {
+      score -= 50; // Complete fail for 0 photos
+    }
+    
     if (hasSignature) score += 25;
+    if (hasReceiverName) score += 25;
     if (temperatureCompliant) score += 25;
-    if (hasTrackingLink) score += 10;
+    // Clear photos criteria TBD
+    
+    // Ensure score doesn't go below 0
+    score = Math.max(0, score);
     
     const metrics: PODMetrics = {
       photoCount,
@@ -134,7 +156,8 @@ export default function PODQuality() {
       temperatureCompliant,
       hasTrackingLink,
       deliveryTime,
-      qualityScore: score
+      qualityScore: score,
+      hasReceiverName
     };
 
     return { consignment, metrics };
