@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar, Activity, AlertTriangle } from "lucide-react";
+import { BarChart3, LogOut, Search, Package, TrendingUp, Clock, MapPin, Calendar, Activity, AlertTriangle, ClipboardCheck } from "lucide-react";
 import DashboardTable from "@/components/dashboard-table";
 import ConsignmentDetailModal from "@/components/consignment-detail-modal";
 import SyncDataButton from "@/components/sync-data-button";
@@ -198,6 +198,13 @@ export default function Dashboard() {
           </div>
           
           <div className="flex items-center space-x-3">
+            <Link href="/pod-quality">
+              <Button variant="ghost" className="text-white hover:bg-white/10">
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                POD Quality
+              </Button>
+            </Link>
+            
             <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
               <span>{user?.email}</span>
             </div>
