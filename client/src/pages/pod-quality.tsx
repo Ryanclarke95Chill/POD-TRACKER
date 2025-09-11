@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,12 @@ import {
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
 import { Consignment } from "@shared/schema";
+
+interface PhotoGalleryProps {
+  trackingLink: string;
+  consignmentNo: string;
+}
+
 
 interface PODMetrics {
   photoCount: number;
@@ -985,7 +991,7 @@ export default function PODQuality() {
             <div className="flex-1 overflow-hidden">
               {selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink ? (
                 <iframe
-                  src={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink}
+                  src={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
                   className="w-full h-[70vh] border rounded-lg"
                   title="Live Tracking Photos"
                   data-testid="iframe-photo-viewer"

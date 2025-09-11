@@ -185,7 +185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user;
       const userWithRole = {
         id: user.id,
+        username: user.email, // Use email as username fallback
+        password: '', // Not needed for permissions check
         email: user.email,
+        name: user.name,
         role: user.role,
         department: user.department || null,
         isActive: true
@@ -346,6 +349,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Proxy tracking endpoint for photo extraction
+  app.get("/api/proxy-tracking", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const { url } = req.query;
+      
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ message: "URL parameter is required" });
+      }
+      
+      // Validate that it's an Axylog URL for security
+      if (!url.includes('live.axylog.com')) {
+        return res.status(403).json({ message: "Only Axylog tracking URLs are allowed" });
+      }
+      
+      // Fetch the tracking page
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tracking page: ${response.status}`);
+      }
+      
+      const html = await response.text();
+      
+      // Return the HTML content for photo extraction
+      res.header('Content-Type', 'text/html');
+      res.send(html);
+      
+    } catch (error: any) {
+      console.error("Error proxying tracking request:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch tracking data",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Register both route variations for compatibility
   app.post("/api/axylog-sync", authenticate, axylogSyncHandler);
   app.post("/api/axylog/sync", authenticate, axylogSyncHandler);
@@ -367,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Successfully authenticated with axylog API",
         credentials: "Connected"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Axylog test error:", error);
       res.status(500).json({ 
         success: false, 
