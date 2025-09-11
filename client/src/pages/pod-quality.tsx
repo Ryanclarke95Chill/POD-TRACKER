@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Camera, 
   ExternalLink, 
@@ -18,7 +19,8 @@ import {
   LogOut,
   BarChart3,
   RefreshCw,
-  Home
+  Home,
+  X
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -50,6 +52,8 @@ export default function PODQuality() {
   const [toDate, setToDate] = useState("");
   
   const [isSyncing, setIsSyncing] = useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const user = getUser();
 
   // Fetch all consignments and filter for delivered ones
@@ -281,7 +285,6 @@ export default function PODQuality() {
       if (rangeMatch) {
         const temp1 = parseFloat(rangeMatch[1]);
         const temp2 = parseFloat(rangeMatch[2]);
-        console.log(`Parsed temperature range: ${temp1} to ${temp2} from "${tempZone}"`);
         return {
           min: Math.min(temp1, temp2),
           max: Math.max(temp1, temp2)
@@ -292,11 +295,8 @@ export default function PODQuality() {
       const singleMatch = tempZone.match(/([+-]?\d+)\s*(?:C|°C)/i);
       if (singleMatch) {
         const temp = parseFloat(singleMatch[1]);
-        console.log(`Parsed single temperature: ${temp} from "${tempZone}"`);
         return { min: temp, max: temp };
       }
-      
-      console.log(`Could not parse temperature range from: "${tempZone}"`);
       return null;
     };
     
@@ -343,14 +343,6 @@ export default function PODQuality() {
     if (actualTemps.length === 0) return true;
     
     // Check if ANY actual temperature falls within the expected range
-    console.log(`Temperature compliance check:`, {
-      expectedRange,
-      actualTemps,
-      compliant: actualTemps.some(actualTemp => 
-        actualTemp >= expectedRange.min && actualTemp <= expectedRange.max
-      )
-    });
-    
     return actualTemps.some(actualTemp => 
       actualTemp >= expectedRange.min && actualTemp <= expectedRange.max
     );
@@ -857,14 +849,24 @@ export default function PODQuality() {
 
                     {/* POD Metrics */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div 
+                        className="bg-gray-50 rounded-lg p-4 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+                        onClick={() => {
+                          setSelectedConsignment(consignment);
+                          setPhotoModalOpen(true);
+                        }}
+                        data-testid={`button-photos-${consignment.id}`}
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Camera className="h-5 w-5 text-blue-600" />
                             <span className="text-sm font-semibold text-gray-700">Photos</span>
                           </div>
-                          {metrics.photoCount === 0 && <XCircle className="h-5 w-5 text-red-500" />}
-                          {metrics.photoCount > 0 && <CheckCircle className="h-5 w-5 text-green-500" />}
+                          <div className="flex items-center gap-1">
+                            {metrics.photoCount === 0 && <XCircle className="h-5 w-5 text-red-500" />}
+                            {metrics.photoCount > 0 && <CheckCircle className="h-5 w-5 text-green-500" />}
+                            <ExternalLink className="h-4 w-4 text-gray-400" />
+                          </div>
                         </div>
                         <p className="text-lg font-bold text-gray-900" data-testid={`text-photos-${consignment.id}`}>
                           {metrics.photoCount} photos
@@ -970,6 +972,54 @@ export default function PODQuality() {
           </div>
         </div>
         </main>
+
+        {/* Photo Viewer Modal */}
+        <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>POD Photos - {selectedConsignment?.consignmentNo}</DialogTitle>
+              <DialogDescription>
+                {selectedConsignment?.shipToCompanyName} • {selectedConsignment && countPhotos(selectedConsignment)} photos
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              {selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink ? (
+                <iframe
+                  src={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink}
+                  className="w-full h-[70vh] border rounded-lg"
+                  title="Live Tracking Photos"
+                  data-testid="iframe-photo-viewer"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[70vh] text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <Camera className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">No tracking link available</p>
+                    <p className="text-sm">Photos cannot be displayed without a live tracking link</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t">
+              <p className="text-sm text-gray-600">
+                This opens the live tracking system where POD photos are stored
+              </p>
+              {(selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink) && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const link = selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink;
+                    if (link) window.open(link, '_blank');
+                  }}
+                  data-testid="button-open-external"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open in New Tab
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
