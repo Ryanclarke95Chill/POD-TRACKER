@@ -46,13 +46,39 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       const response = await apiRequest('GET', `/api/proxy-tracking?url=${encodeURIComponent(trackingLink)}`);
       const html = await response.text();
       
+      // Debug: Log a snippet of the HTML to see what we're working with
+      console.log('HTML snippet:', html.substring(0, 1000));
+      
       // Extract Azure blob storage URLs for images
       // Looking for URLs like: https://axylogdata.blob.core.windows.net/...jpg
-      const imageUrlRegex = /https:\/\/axylogdata\.blob\.core\.windows\.net\/[^"'\s]+\.(jpg|jpeg|png|gif)/gi;
-      const matches = html.match(imageUrlRegex) || [];
+      let imageUrlRegex = /https:\/\/axylogdata\.blob\.core\.windows\.net\/[^"'\s]+\.(jpg|jpeg|png|gif)/gi;
+      let matches = html.match(imageUrlRegex) || [];
+      
+      // If no matches, try broader patterns
+      if (matches.length === 0) {
+        console.log('No Azure blob URLs found, trying broader patterns...');
+        
+        // Try any image URLs
+        imageUrlRegex = /https:\/\/[^"'\s]+\.(jpg|jpeg|png|gif)/gi;
+        matches = html.match(imageUrlRegex) || [];
+        console.log('Found image URLs:', matches);
+        
+        // Try looking for specific patterns in the HTML
+        const srcPattern = /src\s*=\s*["']([^"']*\.(jpg|jpeg|png|gif)[^"']*)["']/gi;
+        const srcMatches = [];
+        let match;
+        while ((match = srcPattern.exec(html)) !== null) {
+          srcMatches.push(match[1]);
+        }
+        console.log('Found src attributes:', srcMatches);
+        
+        // Combine all found images
+        matches = [...matches, ...srcMatches];
+      }
       
       // Remove duplicates and filter valid image URLs
       const uniquePhotos = Array.from(new Set(matches));
+      console.log('Final photo URLs:', uniquePhotos);
       
       setPhotos(uniquePhotos);
     } catch (err) {
