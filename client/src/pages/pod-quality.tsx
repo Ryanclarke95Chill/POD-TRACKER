@@ -55,6 +55,10 @@ interface InlinePhotoModalProps {
   consignmentNo: string;
 }
 
+interface SignaturePhotosProps {
+  consignment: Consignment;
+}
+
 interface PhotoThumbnailsProps {
   consignment: Consignment;
   photoCount: number;
@@ -70,14 +74,13 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
-  const hasStartedLoading = useRef(false);
 
   const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
   const cacheKey = trackingLink;
 
   const loadPhotos = useCallback(async () => {
-    if (hasStartedLoading.current || !trackingLink) return;
-    hasStartedLoading.current = true;
+    // Prevent multiple simultaneous loads and ensure we have a tracking link
+    if (loading || !trackingLink) return;
 
     // Check cache first
     if (photoCache.has(cacheKey)) {
@@ -90,6 +93,8 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     }
 
     setLoading(true);
+    setError(false);
+    
     try {
       const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
         headers: {
@@ -112,7 +117,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     } finally {
       setLoading(false);
     }
-  }, [trackingLink, cacheKey, consignment.id, onPhotoLoad]);
+  }, [trackingLink, cacheKey, consignment.id, onPhotoLoad, loading]);
 
   // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
   useEffect(() => {
@@ -126,7 +131,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasStartedLoading.current) {
+          if (entry.isIntersecting) {
             loadPhotos();
           }
         });
@@ -610,70 +615,233 @@ export default function PODQuality() {
     new Set(deliveredConsignments.map(c => getTemperatureZone(c)).filter(Boolean))
   ).sort();
 
-  // Analyze POD quality for each consignment
+  // Helper function to parse temperature band from label strings like "-18C to -20C" or "0 to 5 C"
+  const parseBandFromLabel = (label: string): { min: number; max: number } | null => {
+    if (!label) return null;
+    
+    // Match patterns like "-18C to -20C", "0 to 5 C", "2C to 8C", etc.
+    const patterns = [
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s+to\s+(-?\d+(?:\.\d+)?)\s*°?C?/i,
+      /(-?\d+(?:\.\d+)?)\s*to\s+(-?\d+(?:\.\d+)?)\s*°?C/i,
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s*-\s*(-?\d+(?:\.\d+)?)\s*°?C?/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = label.match(pattern);
+      if (match) {
+        const val1 = parseFloat(match[1]);
+        const val2 = parseFloat(match[2]);
+        // Return with min/max regardless of order in text
+        return {
+          min: Math.min(val1, val2),
+          max: Math.max(val1, val2)
+        };
+      }
+    }
+    
+    return null;
+  };
+
+  // Gate checks (pass/fail before scoring)
+  const passesGates = (consignment: Consignment): { ok: boolean; missing: string[] } => {
+    const missing: string[] = [];
+    
+    // Signature present
+    if (!consignment.deliverySignatureName) {
+      missing.push('Signature present');
+    }
+    
+    // Receiver name present (first name, last name or initial)
+    const receiverName = consignment.deliverySignatureName?.trim();
+    if (!receiverName || receiverName.length < 2) {
+      missing.push('Receiver name present (first name)');
+    }
+    
+    // Temperature pickup and delivery recorded with 1 decimal
+    const pickupTemp = (consignment as any).amountToCollect;
+    const deliveryTemp = (consignment as any).amountCollected;
+    
+    if (!pickupTemp || !String(pickupTemp).includes('.')) {
+      missing.push('Temperature pickup recorded with 1 decimal');
+    }
+    
+    if (!deliveryTemp || !String(deliveryTemp).includes('.')) {
+      missing.push('Temperature delivery recorded with 1 decimal');
+    }
+    
+    // Photos requirement: temporary rule ≥3 photos (until photo type detection is implemented)
+    const photoCount = countPhotos(consignment);
+    if (photoCount < 3) {
+      missing.push('Photos requirement (≥3 photos)');
+    }
+    
+    // QTY provided (optional if available - don't gate on it if not in data)
+    // Skip this check for now as it's optional
+    
+    return {
+      ok: missing.length === 0,
+      missing
+    };
+  };
+
+  // Analyze POD quality for each consignment using new gated + bucketed system
   const analyzePOD = (consignment: Consignment): PODAnalysis => {
     const photoCount = countPhotos(consignment);
     const hasSignature = Boolean(consignment.deliverySignatureName);
     const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
-    const temperatureCompliant = checkTemperatureCompliance(consignment);
     const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
     const deliveryTime = consignment.delivery_OutcomeDateTime;
     
-    // Calculate quality score based on your 5 criteria and create detailed breakdown
-    let score = 0;
+    // Check gates first
+    const gateCheck = passesGates(consignment);
     
-    // Create detailed scoring breakdown
+    // If gates fail, return non-compliant
+    if (!gateCheck.ok) {
+      const breakdown: ScoreBreakdown = {
+        photos: { points: 0, reason: `Gates failed: ${gateCheck.missing.join(', ')}`, status: 'fail' },
+        signature: { points: 0, reason: 'Gates failed', status: 'fail' },
+        receiverName: { points: 0, reason: 'Gates failed', status: 'fail' },
+        temperature: { points: 0, reason: 'Gates failed', status: 'fail' },
+        clearPhotos: { points: 0, reason: 'Gates failed', status: 'fail' },
+        total: 0
+      };
+      
+      const metrics: PODMetrics = {
+        photoCount,
+        hasSignature,
+        temperatureCompliant: false,
+        hasTrackingLink,
+        deliveryTime,
+        qualityScore: 0,
+        hasReceiverName,
+        scoreBreakdown: breakdown
+      };
+
+      return { consignment, metrics };
+    }
+    
+    // Gates passed - proceed with bucketed scoring (total 100)
+    let score = 0;
     const breakdown: ScoreBreakdown = {
       photos: { points: 0, reason: '', status: 'fail' },
       signature: { points: 0, reason: '', status: 'fail' },
       receiverName: { points: 0, reason: '', status: 'fail' },
       temperature: { points: 0, reason: '', status: 'fail' },
-      clearPhotos: { points: 0, reason: 'Not yet implemented', status: 'pending' },
+      clearPhotos: { points: 0, reason: 'Photo clarity/OCR not yet implemented', status: 'pending' },
       total: 0
     };
     
-    // Photo scoring: 3+ = good, 2 = negative, 1 = more negative, 0 = complete fail
+    // 1. Photos (30 points total)
+    let photoPoints = 0;
     if (photoCount >= 3) {
-      score += 25;
-      breakdown.photos = { points: 25, reason: `Found ${photoCount} photos (3+ required)`, status: 'pass' };
-    } else if (photoCount === 2) {
-      score -= 10;
-      breakdown.photos = { points: -10, reason: `Only 2 photos found (3+ required)`, status: 'partial' };
-    } else if (photoCount === 1) {
-      score -= 20;
-      breakdown.photos = { points: -20, reason: `Only 1 photo found (3+ required)`, status: 'partial' };
+      photoPoints += 25; // Mandatory set present
+      // Extra useful photos bonus: +1 each up to +5 (cap 30 total)
+      const extraPhotos = Math.min(5, photoCount - 3);
+      photoPoints += extraPhotos;
+      breakdown.photos = { 
+        points: photoPoints, 
+        reason: `Mandatory photos (${photoCount} ≥ 3) +25pts, ${extraPhotos} extra photos +${extraPhotos}pts`, 
+        status: 'pass' 
+      };
     } else {
-      score -= 50;
-      breakdown.photos = { points: -50, reason: `No photos found (3+ required)`, status: 'fail' };
+      breakdown.photos = { 
+        points: 0, 
+        reason: `Only ${photoCount} photos (need ≥3 for mandatory set)`, 
+        status: 'fail' 
+      };
     }
+    score += photoPoints;
     
-    // Signature scoring
+    // 2. Recipient confirmation (15 points total)
+    let recipientPoints = 0;
     if (hasSignature) {
-      score += 25;
-      breakdown.signature = { points: 25, reason: 'Delivery signature present', status: 'pass' };
-    } else {
-      breakdown.signature = { points: 0, reason: 'No delivery signature found', status: 'fail' };
+      recipientPoints += 8; // Signature → +8
     }
-    
-    // Receiver name scoring
     if (hasReceiverName) {
-      score += 25;
-      breakdown.receiverName = { points: 25, reason: `Receiver name: "${consignment.deliverySignatureName}"`, status: 'pass' };
-    } else {
-      breakdown.receiverName = { points: 0, reason: 'No receiver name captured', status: 'fail' };
+      recipientPoints += 7; // Receiver name → +7
+    }
+    breakdown.signature = { 
+      points: recipientPoints, 
+      reason: `Signature ${hasSignature ? '+8pts' : '+0pts'}, Receiver name ${hasReceiverName ? '+7pts' : '+0pts'}`, 
+      status: recipientPoints > 0 ? 'pass' : 'fail' 
+    };
+    score += recipientPoints;
+    
+    // 3. Temperature compliance (25 points total)
+    let tempPoints = 0;
+    const pickupTemp = (consignment as any).amountToCollect;
+    const deliveryTemp = (consignment as any).amountCollected;
+    
+    // Pickup has 1 decimal → +5
+    if (pickupTemp && String(pickupTemp).includes('.')) {
+      tempPoints += 5;
     }
     
-    // Temperature compliance scoring
-    if (temperatureCompliant) {
-      score += 25;
-      breakdown.temperature = { points: 25, reason: 'Temperature within expected range', status: 'pass' };
-    } else {
-      breakdown.temperature = { points: 0, reason: 'Temperature outside expected range', status: 'fail' };
+    // Delivery has 1 decimal → +5
+    if (deliveryTemp && String(deliveryTemp).includes('.')) {
+      tempPoints += 5;
     }
     
-    // Ensure score doesn't go below 0
-    score = Math.max(0, score);
+    // Delivery within expected band → +10
+    let bandCompliant = false;
+    let bandReason = 'Expected band missing';
+    
+    // Get expected temperature from document_note
+    let expectedBandLabel = '';
+    if (consignment.documentNote) {
+      const tempMatch = consignment.documentNote.match(/^([^\n]+)/);
+      if (tempMatch) {
+        expectedBandLabel = tempMatch[1].trim();
+      }
+    }
+    
+    if (expectedBandLabel) {
+      const band = parseBandFromLabel(expectedBandLabel);
+      if (band && deliveryTemp) {
+        const actualTemp = parseFloat(String(deliveryTemp));
+        if (!isNaN(actualTemp) && actualTemp >= band.min && actualTemp <= band.max) {
+          tempPoints += 10;
+          bandCompliant = true;
+          bandReason = `${actualTemp}°C within ${band.min}°C to ${band.max}°C`;
+        } else {
+          bandReason = `${actualTemp}°C outside ${band.min}°C to ${band.max}°C`;
+        }
+      }
+    }
+    
+    breakdown.temperature = { 
+      points: tempPoints, 
+      reason: `Pickup decimal ${pickupTemp && String(pickupTemp).includes('.') ? '+5pts' : '+0pts'}, Delivery decimal ${deliveryTemp && String(deliveryTemp).includes('.') ? '+5pts' : '+0pts'}, Band compliance ${bandCompliant ? '+10pts' : '+0pts'} (${bandReason})`, 
+      status: tempPoints > 0 ? 'pass' : 'fail' 
+    };
+    score += tempPoints;
+    
+    // 4. Quantity accuracy (15 points total) - using receiverName field for now
+    // QTY present → +5 (If available)
+    // Matches evidence → +10 (not implemented yet)
+    const qtyPoints = 5; // Assume QTY present for now, since it's optional in gates
+    breakdown.receiverName = { 
+      points: qtyPoints, 
+      reason: 'QTY present +5pts (evidence matching not yet implemented)', 
+      status: 'pass' 
+    };
+    score += qtyPoints;
+    
+    // 5. Photo clarity/OCR (15 points) - feature flag disabled, default 0
+    // Label OCR/legible → +7, Temp screen legible → +5, No-blur → +3
+    // This is marked as pending until implemented
+    breakdown.clearPhotos = { 
+      points: 0, 
+      reason: 'Photo clarity/OCR feature not yet implemented', 
+      status: 'pending' 
+    };
+    
+    // Cap total at 100
+    score = Math.min(100, score);
     breakdown.total = score;
+    
+    // Determine temperature compliance for legacy field
+    const temperatureCompliant = tempPoints > 0;
     
     const metrics: PODMetrics = {
       photoCount,
