@@ -498,6 +498,11 @@ export class AxylogAPI {
           pickupPodFiles: delivery.pickupPodFiles || null,
           receivedDeliveryPodFiles: delivery.receivedDeliveryPodFiles || null,
           receivedPickupPodFiles: delivery.receivedPickupPodFiles || null,
+          // File count fields from Axylog API
+          deliveryExpectedFileCount: delivery.deliveryExpectedFileCount || null,
+          deliveryReceivedFileCount: delivery.deliveryReceivedFileCount || null,
+          pickupExpectedFileCount: delivery.pickupExpectedFileCount || null,
+          pickupReceivedFileCount: delivery.pickupReceivedFileCount || null,
           deliverySignatureName: delivery.deliverySignatureName || null,
           pickupSignatureName: delivery.pickupSignatureName || null,
           deliveryState: delivery.deliveryState || null,

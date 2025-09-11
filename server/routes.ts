@@ -286,8 +286,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.user!.id
           }));
           
-          // Debug temperature data in first consignment
-          console.log("=== DEBUG: First consignment temperature data ===");
+          // Debug temperature data and file counts in first consignment
+          console.log("=== DEBUG: First consignment temperature and file data ===");
           if (consignmentsToInsert[0]) {
             const first = consignmentsToInsert[0];
             console.log("PaymentMethod (temp reading):", first.paymentMethod);
@@ -295,6 +295,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log("AmountCollected (temp 2):", first.amountCollected);
             console.log("DocumentCashNotes:", first.documentCashNotes);
             console.log("ExpectedTemperature:", first.expectedTemperature);
+            console.log("DeliveryExpectedFileCount:", first.deliveryExpectedFileCount);
+            console.log("DeliveryReceivedFileCount:", first.deliveryReceivedFileCount);
+            console.log("PickupExpectedFileCount:", first.pickupExpectedFileCount);
+            console.log("PickupReceivedFileCount:", first.pickupReceivedFileCount);
+            console.log("DeliveryLiveTrackLink:", first.deliveryLiveTrackLink);
+            console.log("PickupLiveTrackLink:", first.pickupLiveTrackLink);
           }
           
           await storage.createConsignmentsBatch(consignmentsToInsert);

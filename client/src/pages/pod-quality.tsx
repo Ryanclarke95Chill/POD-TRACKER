@@ -114,7 +114,7 @@ export default function PODQuality() {
     const photoCount = countPhotos(consignment);
     const hasSignature = Boolean(consignment.deliverySignatureName);
     const temperatureCompliant = checkTemperatureCompliance(consignment);
-    const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink);
+    const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
     const deliveryTime = consignment.delivery_OutcomeDateTime;
     
     // Calculate quality score (0-100)
@@ -137,11 +137,21 @@ export default function PODQuality() {
     return { consignment, metrics };
   };
 
-  // Count photos from POD files
+  // Count photos from POD files using Axylog file count data
   const countPhotos = (consignment: Consignment): number => {
     let count = 0;
     
-    // Check if actual file paths are provided
+    // First check if we have actual file count data from Axylog API
+    const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+    const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+    
+    // Use the file count data from Axylog API if available
+    if (deliveryFileCount > 0 || pickupFileCount > 0) {
+      count = Number(deliveryFileCount) + Number(pickupFileCount);
+      return count;
+    }
+    
+    // Fallback: Check if actual file paths are provided
     if (consignment.deliveryPodFiles) {
       count += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
     }

@@ -242,8 +242,8 @@ export const consignments = pgTable("consignments", {
   expectedTemperature: text("expected_temperature"),
   // Actual payment and temperature data from Axylog
   paymentMethod: text("payment_method"), // Contains actual recorded temperature
-  amountToCollect: integer("amount_to_collect"),
-  amountCollected: integer("amount_collected"),
+  amountToCollect: text("amount_to_collect"), // Temperature 1 (can be decimal)
+  amountCollected: text("amount_collected"), // Temperature 2 (can be decimal)
   documentCashNotes: text("document_cash_notes"),
   requiredTags: text("required_tags"),
   forbiddenTags: text("forbidden_tags"),
@@ -253,6 +253,11 @@ export const consignments = pgTable("consignments", {
   pickupPodFiles: text("pickup_pod_files"),
   receivedDeliveryPodFiles: text("received_delivery_pod_files"),
   receivedPickupPodFiles: text("received_pickup_pod_files"),
+  // File count fields from Axylog API  
+  deliveryExpectedFileCount: integer("delivery_expected_file_count"),
+  deliveryReceivedFileCount: integer("delivery_received_file_count"),
+  pickupExpectedFileCount: integer("pickup_expected_file_count"),
+  pickupReceivedFileCount: integer("pickup_received_file_count"),
   deliverySignatureName: text("delivery_signature_name"),
   pickupSignatureName: text("pickup_signature_name"),
   deliveryState: text("delivery_state"),
