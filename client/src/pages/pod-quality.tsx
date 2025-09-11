@@ -166,37 +166,87 @@ export default function PODQuality() {
     return count;
   };
 
-  // Check if temperature requirements were met
+  // Format temperature display for expected vs actual
+  const formatTemperatureDisplay = (consignment: Consignment) => {
+    const expected = consignment.expectedTemperature || 'N/A';
+    const actualTemp = (consignment as any).paymentMethod;
+    
+    let actual = 'N/A';
+    if (actualTemp && !isNaN(parseFloat(actualTemp))) {
+      actual = `${parseFloat(actualTemp)}°C`;
+    }
+    
+    return { expected, actual };
+  };
+
+  // Check if temperature requirements were met using actual recorded temperatures
   const checkTemperatureCompliance = (consignment: Consignment): boolean => {
     // If no expected temperature is specified, we can't determine compliance
     if (!consignment.expectedTemperature) return true;
     
-    // Extract temperature zone from document note (first line before \\)
-    const documentNote = consignment.documentNote;
-    if (!documentNote) return true; // No actual temperature data to compare
-    
-    const actualTempZone = documentNote.split('\\')[0];
-    const expectedTemp = consignment.expectedTemperature;
-    
-    // Basic compliance check - if the expected temperature contains keywords that match the actual zone
-    const normalizeTemp = (temp: string) => temp.toLowerCase().trim();
-    const expectedLower = normalizeTemp(expectedTemp);
-    const actualLower = normalizeTemp(actualTempZone);
-    
-    // Check for temperature zone compliance
-    if (expectedLower.includes('frozen') || expectedLower.includes('freezer') || expectedLower.includes('-18') || expectedLower.includes('-20')) {
-      return actualLower.includes('frozen') || actualLower.includes('freezer') || actualLower.includes('-18') || actualLower.includes('-20');
+    // Get actual recorded temperature from paymentMethod field (e.g., "-18.5" for -18.5°C)
+    const actualTemp = (consignment as any).paymentMethod;
+    if (!actualTemp) {
+      // Fallback to old logic if no recorded temperature available
+      const documentNote = consignment.documentNote;
+      if (!documentNote) return true;
+      
+      const actualTempZone = documentNote.split('\\')[0];
+      const expectedTemp = consignment.expectedTemperature;
+      
+      const normalizeTemp = (temp: string) => temp.toLowerCase().trim();
+      const expectedLower = normalizeTemp(expectedTemp);
+      const actualLower = normalizeTemp(actualTempZone);
+      
+      if (expectedLower.includes('frozen') || expectedLower.includes('freezer') || expectedLower.includes('-18') || expectedLower.includes('-20')) {
+        return actualLower.includes('frozen') || actualLower.includes('freezer') || actualLower.includes('-18') || actualLower.includes('-20');
+      }
+      
+      if (expectedLower.includes('chiller') || expectedLower.includes('0-4') || expectedLower.includes('0–4')) {
+        return actualLower.includes('chiller') || actualLower.includes('0-4') || actualLower.includes('0–4');
+      }
+      
+      return true; // If we can't determine, assume compliant
     }
     
-    if (expectedLower.includes('chiller') || expectedLower.includes('0-4') || expectedLower.includes('0–4')) {
-      return actualLower.includes('chiller') || actualLower.includes('0-4') || actualLower.includes('0–4');
+    // Parse actual recorded temperature (e.g., "-18.5" -> -18.5)
+    const actualTempValue = parseFloat(actualTemp);
+    if (isNaN(actualTempValue)) return true; // Invalid temperature data
+    
+    // Get expected temperature ranges for each zone
+    const expectedTemp = consignment.expectedTemperature.toLowerCase();
+    
+    if (expectedTemp.includes('freezer') || expectedTemp.includes('-20')) {
+      // Freezer: typically -20°C ± 5°C tolerance
+      return actualTempValue >= -25 && actualTempValue <= -15;
     }
     
-    if (expectedLower.includes('dry') || expectedLower.includes('ambient')) {
-      return actualLower.includes('dry') || actualLower.includes('ambient') || !actualLower.includes('frozen') && !actualLower.includes('chiller');
+    if (expectedTemp.includes('chiller') || expectedTemp.includes('0–4') || expectedTemp.includes('0-4')) {
+      // Chiller: 0-4°C ± 2°C tolerance  
+      return actualTempValue >= -2 && actualTempValue <= 6;
     }
     
-    // If we can't determine compliance, assume compliant (benefit of doubt)
+    if (expectedTemp.includes('wine') || expectedTemp.includes('14')) {
+      // Wine: 14°C ± 3°C tolerance
+      return actualTempValue >= 11 && actualTempValue <= 17;
+    }
+    
+    if (expectedTemp.includes('confectionery') || expectedTemp.includes('15–20') || expectedTemp.includes('15-20')) {
+      // Confectionery: 15-20°C ± 2°C tolerance
+      return actualTempValue >= 13 && actualTempValue <= 22;
+    }
+    
+    if (expectedTemp.includes('pharma') || expectedTemp.includes('2–8') || expectedTemp.includes('2-8')) {
+      // Pharma: 2-8°C ± 1°C tolerance
+      return actualTempValue >= 1 && actualTempValue <= 9;
+    }
+    
+    if (expectedTemp.includes('dry') || expectedTemp.includes('ambient')) {
+      // Dry: ambient temperature (typically 15-25°C range)
+      return actualTempValue >= 10 && actualTempValue <= 30;
+    }
+    
+    // If we can't determine compliance, assume compliant
     return true;
   };
 
@@ -711,9 +761,17 @@ export default function PODQuality() {
                             <AlertTriangle className="h-5 w-5 text-yellow-500" />
                           }
                         </div>
-                        <p className="text-lg font-bold text-gray-900" data-testid={`text-temperature-${consignment.id}`}>
-                          {metrics.temperatureCompliant ? 'Compliant' : 'Issue'}
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-600">
+                            Expected: <span className="font-medium">{formatTemperatureDisplay(consignment).expected}</span>
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Actual: <span className="font-medium text-gray-900">{formatTemperatureDisplay(consignment).actual}</span>
+                          </p>
+                          <p className={`text-lg font-bold ${metrics.temperatureCompliant ? 'text-green-600' : 'text-yellow-600'}`} data-testid={`text-temperature-${consignment.id}`}>
+                            {metrics.temperatureCompliant ? 'Compliant' : 'Non-Compliant'}
+                          </p>
+                        </div>
                       </div>
 
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">

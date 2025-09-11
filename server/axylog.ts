@@ -485,6 +485,11 @@ export class AxylogAPI {
           expectedPaymentMethodCode: delivery.expectedPaymentMethodCode || null,
           expectedPaymentNotes: delivery.expectedPaymentNotes || null,
           expectedTemperature: delivery.expectedTemperature || null,
+          // Actual payment and temperature data
+          paymentMethod: delivery.paymentMethod || null, // Contains actual recorded temperature
+          amountToCollect: delivery.amountToCollect || null,
+          amountCollected: delivery.amountCollected || null,
+          documentCashNotes: delivery.documentCashNotes || null,
           requiredTags: delivery.requiredTags || null,
           forbiddenTags: delivery.forbiddenTags || null,
           requiredTagsDescription: delivery.requiredTagsDescription || null,

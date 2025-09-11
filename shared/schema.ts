@@ -240,6 +240,11 @@ export const consignments = pgTable("consignments", {
   expectedPaymentMethodCode: text("expected_payment_method_code"),
   expectedPaymentNotes: text("expected_payment_notes"),
   expectedTemperature: text("expected_temperature"),
+  // Actual payment and temperature data from Axylog
+  paymentMethod: text("payment_method"), // Contains actual recorded temperature
+  amountToCollect: integer("amount_to_collect"),
+  amountCollected: integer("amount_collected"),
+  documentCashNotes: text("document_cash_notes"),
   requiredTags: text("required_tags"),
   forbiddenTags: text("forbidden_tags"),
   requiredTagsDescription: text("required_tags_description"),
