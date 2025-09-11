@@ -679,7 +679,7 @@ export default function PODQuality() {
   };
 
   // Analyze POD quality for each consignment using new gated + bucketed system
-  const analyzePOD = (consignment: Consignment): PODAnalysis => {
+  const analyzePOD = async (consignment: Consignment): Promise<PODAnalysis> => {
     const photoCount = countPhotos(consignment);
     const hasSignature = Boolean(consignment.deliverySignatureName);
     const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
@@ -696,7 +696,7 @@ export default function PODQuality() {
         signature: { points: 0, reason: 'Gates failed', status: 'fail' },
         receiverName: { points: 0, reason: 'Gates failed', status: 'fail' },
         temperature: { points: 0, reason: 'Gates failed', status: 'fail' },
-        clearPhotos: { points: 0, reason: 'Gates failed', status: 'fail' },
+        clearPhotos: { points: 0, reason: 'Gates failed', status: 'pending' },
         total: 0
       };
       
@@ -794,14 +794,64 @@ export default function PODQuality() {
     };
     score += qtyPoints;
     
-    // 5. Photo clarity/OCR (15 points) - feature flag disabled, default 0
-    // Label OCR/legible → +7, Temp screen legible → +5, No-blur → +3
-    // This is marked as pending until implemented
-    breakdown.clearPhotos = { 
-      points: 0, 
-      reason: 'Photo clarity/OCR feature not yet implemented', 
-      status: 'pending' 
-    };
+    // 5. Photo clarity/OCR (15 points) - now implemented
+    let ocrPoints = 0;
+    const podPhotos = await fetchPODPhotos(consignment.deliveryLiveTrackLink?.split('/').pop() || '');
+    
+    if (podPhotos.success && podPhotos.photos.length > 0) {
+      try {
+        // Analyze up to 3 photos for performance
+        const photosToAnalyze = podPhotos.photos.slice(0, 3);
+        const response = await fetch('/api/analyze-photos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ imageUrls: photosToAnalyze })
+        });
+        
+        if (response.ok) {
+          const analysisData = await response.json();
+          const analyses = analysisData.results;
+          
+          // Calculate OCR points based on analysis
+          const avgQualityScore = analyses.reduce((sum: number, a: any) => sum + a.overall.qualityScore, 0) / analyses.length;
+          ocrPoints = Math.round(avgQualityScore); // Convert 0-15 score directly
+          
+          const issues = analyses.flatMap((a: any) => a.overall.issues).slice(0, 3);
+          const hasTemperature = analyses.some((a: any) => a.ocr.hasTemperatureDisplay);
+          const hasLabel = analyses.some((a: any) => a.ocr.hasShippingLabel);
+          
+          breakdown.clearPhotos = {
+            points: ocrPoints,
+            reason: `Photo analysis: Avg quality ${avgQualityScore.toFixed(1)}/15, ${hasTemperature ? 'temp display found' : 'no temp display'}, ${hasLabel ? 'label found' : 'no label'}, ${issues.length} issues`,
+            status: ocrPoints >= 10 ? 'pass' : ocrPoints >= 5 ? 'partial' : 'fail'
+          };
+        } else {
+          breakdown.clearPhotos = { 
+            points: 0, 
+            reason: 'Photo analysis failed - API error', 
+            status: 'fail' 
+          };
+        }
+      } catch (error) {
+        console.error('Photo analysis error:', error);
+        breakdown.clearPhotos = { 
+          points: 0, 
+          reason: 'Photo analysis failed - network error', 
+          status: 'fail' 
+        };
+      }
+    } else {
+      breakdown.clearPhotos = { 
+        points: 0, 
+        reason: 'No photos available for analysis', 
+        status: 'fail' 
+      };
+    }
+    
+    score += ocrPoints;
     
     // Cap total at 100
     score = Math.min(100, score);
@@ -1005,10 +1055,20 @@ export default function PODQuality() {
     );
   };
 
-  // Process and filter consignments - ALL filtered data for stats
-  const allFilteredAnalyses: PODAnalysis[] = deliveredConsignments
-    .map(analyzePOD)
-    .filter((analysis: PODAnalysis) => {
+  // State for async analysis results
+  const [allFilteredAnalyses, setAllFilteredAnalyses] = useState<PODAnalysis[]>([]);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+
+  // Process consignments asynchronously
+  useEffect(() => {
+    const processConsignments = async () => {
+      setAnalysisLoading(true);
+      try {
+        // Analyze all consignments
+        const analyses = await Promise.all(deliveredConsignments.map(analyzePOD));
+        
+        // Apply filters to analyses
+        const filtered = analyses.filter((analysis: PODAnalysis) => {
       const consignment = analysis.consignment;
       const metrics = analysis.metrics;
       
@@ -1078,9 +1138,23 @@ export default function PODQuality() {
         }
       })();
       
-      return matchesSearch && matchesWarehouse && matchesShipper && 
-             matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
-    });
+          return matchesSearch && matchesWarehouse && matchesShipper && 
+                 matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
+        });
+        
+        setAllFilteredAnalyses(filtered);
+      } catch (error) {
+        console.error('Error processing consignments:', error);
+        setAllFilteredAnalyses([]);
+      } finally {
+        setAnalysisLoading(false);
+      }
+    };
+
+    if (deliveredConsignments.length > 0) {
+      processConsignments();
+    }
+  }, [deliveredConsignments, selectedFilter, selectedWarehouse, selectedShipper, selectedDriver, selectedTempZone, searchTerm, fromDate, toDate]);
 
   // Pagination calculations
   const totalItems = allFilteredAnalyses.length;
@@ -1768,7 +1842,7 @@ export default function PODQuality() {
 
         {/* Score Breakdown Modal */}
         <Dialog open={scoreBreakdownOpen} onOpenChange={setScoreBreakdownOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>POD Quality Score Breakdown</DialogTitle>
               <DialogDescription>
@@ -1777,9 +1851,10 @@ export default function PODQuality() {
             </DialogHeader>
             
             {selectedAnalysis?.metrics.scoreBreakdown && (
-              <div className="space-y-4">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-900 mb-2">
+              <div className="space-y-3">
+                {/* Overall Score */}
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">
                     {selectedAnalysis.metrics.qualityScore}/100
                   </div>
                   <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
@@ -1796,7 +1871,8 @@ export default function PODQuality() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                {/* Score Breakdown Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Photos */}
                   <div className={`p-4 rounded-lg border-2 ${
                     selectedAnalysis.metrics.scoreBreakdown.photos.status === 'pass' ? 'border-green-200 bg-green-50' :
@@ -1886,14 +1962,24 @@ export default function PODQuality() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">Scoring System</h4>
-                  <div className="text-sm text-blue-800 space-y-1">
-                    <p>• <strong>Photos:</strong> 3+ photos = +25 pts, 2 photos = -10 pts, 1 photo = -20 pts, 0 photos = -50 pts</p>
-                    <p>• <strong>Signature:</strong> Present = +25 pts, Missing = 0 pts</p>
-                    <p>• <strong>Receiver Name:</strong> Captured = +25 pts, Missing = 0 pts</p>
-                    <p>• <strong>Temperature:</strong> Compliant = +25 pts, Non-compliant = 0 pts</p>
-                    <p>• <strong>Clear Photos:</strong> Not yet implemented = 0 pts</p>
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">Gated + Bucketed Scoring System</h4>
+                  <div className="text-xs text-blue-800 space-y-1">
+                    <p className="font-medium mb-1">Gate Requirements (must pass all for scoring):</p>
+                    <div className="ml-2 space-y-0.5">
+                      <p>• Signature present</p>
+                      <p>• Receiver name provided</p>
+                      <p>• Temperature compliance met</p>
+                      <p>• Minimum 3 photos</p>
+                    </div>
+                    <p className="font-medium mt-2 mb-1">Point Buckets (100 points total):</p>
+                    <div className="ml-2 space-y-0.5">
+                      <p>• <strong>Photos (30pts):</strong> 25pts base + 5pts bonus for extras</p>
+                      <p>• <strong>Temperature (25pts):</strong> All-or-nothing compliance</p>
+                      <p>• <strong>Recipient (15pts):</strong> Signature 8pts + Name 7pts</p>
+                      <p>• <strong>Photo OCR (15pts):</strong> Clarity analysis (pending)</p>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">Grades: Gold (90-100), Silver (75-89), Bronze (60-74), Non-compliant (gate failure)</p>
                   </div>
                 </div>
               </div>

@@ -10,6 +10,7 @@ import { consignments } from "@shared/schema";
 import puppeteer from "puppeteer";
 import sharp from "sharp";
 import { createHash } from "crypto";
+import { photoAnalysisService } from "./photoAnalysis";
 
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
@@ -834,6 +835,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Reverse geocoding failed:', error);
       res.status(500).json({ location: 'Location unavailable' });
+    }
+  });
+
+  // Photo analysis endpoint
+  app.post("/api/analyze-photos", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const { imageUrls } = req.body;
+      
+      if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Please provide an array of image URLs" 
+        });
+      }
+
+      if (imageUrls.length > 10) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Maximum 10 images allowed per request" 
+        });
+      }
+
+      console.log(`Analyzing ${imageUrls.length} photos for user ${req.user?.email}`);
+      
+      const results = await photoAnalysisService.analyzeMultiplePhotos(imageUrls);
+      
+      res.json({
+        success: true,
+        results
+      });
+      
+    } catch (error: any) {
+      console.error("Photo analysis error:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to analyze photos",
+        message: error.message 
+      });
     }
   });
 
