@@ -41,6 +41,63 @@ interface PhotoGalleryProps {
   consignmentNo: string;
 }
 
+interface ProgressiveImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+  index: number;
+}
+
+function ProgressiveImage({ src, alt, className, index }: ProgressiveImageProps) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [thumbLoaded, setThumbLoaded] = useState(false);
+  
+  // Generate optimized image URLs using our proxy
+  const thumbUrl = `/api/image?src=${encodeURIComponent(src)}&w=32&q=20&fmt=webp`;
+  const smallUrl = `/api/image?src=${encodeURIComponent(src)}&w=320&q=75&fmt=webp`;
+  const mediumUrl = `/api/image?src=${encodeURIComponent(src)}&w=640&q=80&fmt=webp`;
+  const largeUrl = `/api/image?src=${encodeURIComponent(src)}&w=960&q=85&fmt=webp`;
+  
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      {/* Tiny blur placeholder */}
+      <img
+        src={thumbUrl}
+        alt={alt}
+        className={`absolute inset-0 w-full h-full object-cover blur-sm scale-110 transition-opacity duration-300 ${
+          thumbLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        onLoad={() => setThumbLoaded(true)}
+        data-testid={`photo-thumb-${index}`}
+      />
+      
+      {/* High-res image */}
+      <img
+        src={smallUrl}
+        srcSet={`
+          ${smallUrl} 320w,
+          ${mediumUrl} 640w,
+          ${largeUrl} 960w
+        `}
+        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+        alt={alt}
+        className={`relative w-full h-full object-cover transition-opacity duration-500 ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        onLoad={() => setIsLoaded(true)}
+        loading={index < 6 ? "eager" : "lazy"} // Load first 6 eagerly
+        decoding="async"
+        data-testid={`photo-full-${index}`}
+      />
+      
+      {/* Loading skeleton */}
+      {!thumbLoaded && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse" data-testid={`photo-skeleton-${index}`} />
+      )}
+    </div>
+  );
+}
+
 function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,14 +210,11 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
             onClick={() => window.open(photoUrl, '_blank')}
             data-testid={`photo-${index}`}
           >
-            <img
+            <ProgressiveImage
               src={photoUrl}
               alt={`POD Photo ${index + 1} for ${consignmentNo}`}
-              className="w-full h-48 object-cover"
-              onError={(e) => {
-                console.log(`Failed to load image: ${photoUrl}`);
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
+              className="w-full h-48"
+              index={index}
             />
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
               <ExternalLink className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />

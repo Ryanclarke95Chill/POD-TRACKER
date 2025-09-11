@@ -8,11 +8,25 @@ import { axylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
 import { consignments } from "@shared/schema";
 import puppeteer from "puppeteer";
+import sharp from "sharp";
+import { createHash } from "crypto";
 
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Image processing cache
+const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();
+const IMAGE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Allowed hosts for image proxy (security)
+const ALLOWED_HOSTS = ['axylogdata.blob.core.windows.net'];
+
+// Helper function to create cache key
+function createImageCacheKey(url: string, width?: number, quality?: number, format?: string): string {
+  return createHash('md5').update(`${url}_${width}_${quality}_${format}`).digest('hex');
+}
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -418,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Block unnecessary resources for faster loading (but keep images!)
         await page.setRequestInterception(true);
-        page.on('request', (req) => {
+        page.on('request', (req: any) => {
           const resourceType = req.resourceType();
           // Only block fonts - keep CSS and images for proper rendering
           if (resourceType === 'font') {
@@ -500,10 +514,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Found ${imageData.length} potential photos on page`);
         
         // Extract just the URLs
-        photos = imageData.map(img => img.src);
+        photos = imageData.map((img: any) => img.src);
         
         // Log some details about found images
-        imageData.forEach((img, index) => {
+        imageData.forEach((img: any, index: number) => {
           console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
         });
         
@@ -545,6 +559,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : 'Unknown error',
         photos: []
       });
+    }
+  });
+
+  // Image proxy endpoint for progressive loading
+  app.get("/api/image", async (req: Request, res: Response) => {
+    try {
+      const { src, w, q = 80, fmt = 'webp' } = req.query;
+      
+      if (!src || typeof src !== 'string') {
+        return res.status(400).json({ error: 'src parameter is required' });
+      }
+      
+      // Security: validate URL and host
+      let url: URL;
+      try {
+        url = new URL(src);
+      } catch {
+        return res.status(400).json({ error: 'Invalid URL' });
+      }
+      
+      if (!ALLOWED_HOSTS.includes(url.hostname)) {
+        return res.status(403).json({ error: 'Host not allowed' });
+      }
+      
+      const width = w ? parseInt(w as string, 10) : undefined;
+      const quality = parseInt(q as string, 10);
+      const format = fmt as string;
+      
+      // Validate parameters
+      if (width && (width < 10 || width > 2000)) {
+        return res.status(400).json({ error: 'Width must be between 10 and 2000' });
+      }
+      
+      if (quality < 10 || quality > 100) {
+        return res.status(400).json({ error: 'Quality must be between 10 and 100' });
+      }
+      
+      if (!['webp', 'jpeg', 'avif', 'png'].includes(format)) {
+        return res.status(400).json({ error: 'Format must be webp, jpeg, avif, or png' });
+      }
+      
+      // Check cache first
+      const cacheKey = createImageCacheKey(src, width, quality, format);
+      const cached = imageCache.get(cacheKey);
+      
+      if (cached && Date.now() - cached.timestamp < IMAGE_CACHE_DURATION) {
+        res.set({
+          'Content-Type': cached.contentType,
+          'Cache-Control': 'public, max-age=86400, immutable',
+          'X-Cache': 'HIT'
+        });
+        return res.send(cached.buffer);
+      }
+      
+      // Fetch original image
+      const response = await fetch(src);
+      if (!response.ok) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+      
+      const originalBuffer = Buffer.from(await response.arrayBuffer());
+      
+      // Process image with Sharp
+      let sharpInstance = sharp(originalBuffer);
+      
+      if (width) {
+        sharpInstance = sharpInstance.resize(width, null, { 
+          withoutEnlargement: true,
+          fit: 'inside'
+        });
+      }
+      
+      // Apply format and quality
+      switch (format) {
+        case 'webp':
+          sharpInstance = sharpInstance.webp({ quality });
+          break;
+        case 'avif':
+          sharpInstance = sharpInstance.avif({ quality });
+          break;
+        case 'jpeg':
+          sharpInstance = sharpInstance.jpeg({ quality });
+          break;
+        case 'png':
+          sharpInstance = sharpInstance.png({ quality });
+          break;
+      }
+      
+      const processedBuffer = await sharpInstance.toBuffer();
+      const contentType = `image/${format}`;
+      
+      // Cache the result
+      imageCache.set(cacheKey, {
+        buffer: processedBuffer,
+        contentType,
+        timestamp: Date.now()
+      });
+      
+      // Clean up old cache entries occasionally
+      if (Math.random() < 0.01) { // 1% chance
+        const now = Date.now();
+        for (const [key, value] of imageCache.entries()) {
+          if (now - value.timestamp > IMAGE_CACHE_DURATION) {
+            imageCache.delete(key);
+          }
+        }
+      }
+      
+      res.set({
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400, immutable',
+        'X-Cache': 'MISS'
+      });
+      
+      res.send(processedBuffer);
+      
+    } catch (error: any) {
+      console.error('Image proxy error:', error);
+      res.status(500).json({ error: 'Image processing failed' });
     }
   });
 
