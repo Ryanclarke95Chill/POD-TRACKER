@@ -427,16 +427,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
               parentText: img.parentElement?.textContent?.substring(0, 100) || ''
             };
           }).filter(img => {
-            // Filter for actual photos vs UI elements
-            return img.src && 
+            // Filter for actual delivery photos vs UI elements and maps
+            const isValidPhoto = img.src && 
                    img.src.startsWith('http') && 
                    img.width > 100 &&  // Must be reasonably large
-                   img.height > 100 && 
-                   !img.src.includes('logo') &&
+                   img.height > 100;
+                   
+            // Exclude UI elements
+            const isNotUIElement = !img.src.includes('logo') &&
                    !img.src.includes('icon') &&
                    !img.src.includes('avatar') &&
                    !img.className.includes('logo') &&
                    !img.className.includes('icon');
+                   
+            // Exclude map images
+            const isNotMap = !img.src.toLowerCase().includes('map') &&
+                   !img.src.toLowerCase().includes('tile') &&
+                   !img.src.toLowerCase().includes('geographic') &&
+                   !img.src.toLowerCase().includes('osm') &&
+                   !img.src.toLowerCase().includes('openstreetmap') &&
+                   !img.src.toLowerCase().includes('cartography') &&
+                   !img.className.toLowerCase().includes('map') &&
+                   !img.parentText.toLowerCase().includes('map') &&
+                   !img.parentText.toLowerCase().includes('route') &&
+                   !img.parentText.toLowerCase().includes('location');
+                   
+            return isValidPhoto && isNotUIElement && isNotMap;
           });
         });
         
