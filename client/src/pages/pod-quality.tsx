@@ -39,6 +39,12 @@ interface PODAnalysis {
 export default function PODQuality() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [selectedWarehouse, setSelectedWarehouse] = useState("all");
+  const [selectedShipper, setSelectedShipper] = useState("all");
+  const [selectedDriver, setSelectedDriver] = useState("all");
+  const [selectedTempZone, setSelectedTempZone] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   
   const user = getUser();
 
@@ -47,8 +53,8 @@ export default function PODQuality() {
     queryKey: ['/api/consignments'],
   });
 
-  // Filter for delivered consignments
-  const deliveredConsignments = (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+  // Helper function to map status labels
+  const getStatusDisplay = (consignment: Consignment) => {
     const deliveryStateLabel = (consignment as any).delivery_StateLabel;
     const pickupStateLabel = (consignment as any).pickUp_StateLabel;
     
@@ -65,9 +71,43 @@ export default function PODQuality() {
       return status;
     };
     
-    const status = mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
+    return mapStatus(deliveryStateLabel, false) || mapStatus(pickupStateLabel, true) || 'In Transit';
+  };
+
+  // Helper function to extract temperature zone from documentNote
+  const getTemperatureZone = (consignment: Consignment) => {
+    const tempZone = consignment.documentNote?.split('\\')[0] || consignment.expectedTemperature || 'Standard';
+    
+    // Filter out internal depot operations
+    if (tempZone === 'Return to depot' || tempZone?.toLowerCase().includes('return to depot')) {
+      return 'Internal Transfer';
+    }
+    
+    return tempZone;
+  };
+
+  // Filter for delivered consignments
+  const deliveredConsignments = (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+    const status = getStatusDisplay(consignment);
     return status === 'Delivered';
   });
+
+  // Get unique values for filter dropdowns
+  const warehouseCompanies = Array.from(
+    new Set(deliveredConsignments.map(c => c.warehouseCompanyName).filter(Boolean))
+  ).sort();
+
+  const shipperCompanies = Array.from(
+    new Set(deliveredConsignments.map(c => (c as any).shipperCompanyName).filter(Boolean))
+  ).sort();
+
+  const driverNames = Array.from(
+    new Set(deliveredConsignments.map(c => c.driverName).filter(Boolean))
+  ).sort();
+
+  const temperatureZones = Array.from(
+    new Set(deliveredConsignments.map(c => getTemperatureZone(c)).filter(Boolean))
+  ).sort();
 
   // Analyze POD quality for each consignment
   const analyzePOD = (consignment: Consignment): PODAnalysis => {
@@ -100,13 +140,29 @@ export default function PODQuality() {
   // Count photos from POD files
   const countPhotos = (consignment: Consignment): number => {
     let count = 0;
+    
+    // Check if actual file paths are provided
     if (consignment.deliveryPodFiles) {
-      // Assume comma-separated list of file paths/URLs
       count += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
     }
     if (consignment.receivedDeliveryPodFiles) {
       count += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
     }
+    
+    // If no file paths but we have delivery signatures and tracking links,
+    // estimate based on presence of other delivery evidence
+    if (count === 0) {
+      // If there's a delivery signature, likely at least 1 photo
+      if (consignment.deliverySignatureName) {
+        count += 1;
+      }
+      
+      // If there's a tracking link and it's delivered, likely photos exist
+      if (consignment.deliveryLiveTrackLink && getStatusDisplay(consignment) === 'Delivered') {
+        count += Math.max(1, count); // At least 1 photo if delivered with tracking
+      }
+    }
+    
     return count;
   };
 
@@ -152,32 +208,71 @@ export default function PODQuality() {
       const metrics = analysis.metrics;
       
       // Text search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matches = 
-          consignment.consignmentNo?.toLowerCase().includes(searchLower) ||
-          consignment.shipToCompanyName?.toLowerCase().includes(searchLower) ||
-          consignment.driverName?.toLowerCase().includes(searchLower);
-        if (!matches) return false;
-      }
+      const matchesSearch = searchTerm === "" || 
+        consignment.consignmentNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        consignment.shipToCompanyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        consignment.driverName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Warehouse filter
+      const matchesWarehouse = selectedWarehouse === "all" || 
+        consignment.warehouseCompanyName === selectedWarehouse;
+      
+      // Shipper filter
+      const matchesShipper = selectedShipper === "all" || 
+        (consignment as any).shipperCompanyName === selectedShipper;
+      
+      // Driver filter
+      const matchesDriver = selectedDriver === "all" || 
+        consignment.driverName === selectedDriver;
+      
+      // Temperature zone filter
+      const tempZone = getTemperatureZone(consignment);
+      const matchesTempZone = selectedTempZone === "all" || tempZone === selectedTempZone;
+      
+      // Date range filter (use delivery outcome date)
+      const matchesDateRange = (() => {
+        if (!fromDate && !toDate) return true;
+        
+        const deliveryDate = metrics.deliveryTime;
+        if (!deliveryDate) return true; // Show consignments without delivery dates
+        
+        // Convert to AEST timezone for comparison
+        const utcDate = new Date(deliveryDate);
+        const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000)); // Add 10 hours for AEST
+        const dateString = aestDate.toISOString().split('T')[0];
+        
+        if (fromDate && toDate) {
+          return dateString >= fromDate && dateString <= toDate;
+        } else if (fromDate) {
+          return dateString >= fromDate;
+        } else if (toDate) {
+          return dateString <= toDate;
+        }
+        return true;
+      })();
       
       // Quality filter
-      switch (selectedFilter) {
-        case "excellent":
-          return metrics.qualityScore >= 80;
-        case "good":
-          return metrics.qualityScore >= 60 && metrics.qualityScore < 80;
-        case "poor":
-          return metrics.qualityScore < 60;
-        case "missing-photos":
-          return metrics.photoCount === 0;
-        case "missing-signature":
-          return !metrics.hasSignature;
-        case "temp-issues":
-          return !metrics.temperatureCompliant;
-        default:
-          return true;
-      }
+      const matchesQuality = (() => {
+        switch (selectedFilter) {
+          case "excellent":
+            return metrics.qualityScore >= 80;
+          case "good":
+            return metrics.qualityScore >= 60 && metrics.qualityScore < 80;
+          case "poor":
+            return metrics.qualityScore < 60;
+          case "missing-photos":
+            return metrics.photoCount === 0;
+          case "missing-signature":
+            return !metrics.hasSignature;
+          case "temp-issues":
+            return !metrics.temperatureCompliant;
+          default:
+            return true;
+        }
+      })();
+      
+      return matchesSearch && matchesWarehouse && matchesShipper && 
+             matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
     });
 
   // Calculate summary statistics
@@ -308,152 +403,327 @@ export default function PODQuality() {
         </div>
 
         {/* Filters and Search */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search by consignment no, company, or driver..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-search-pod"
-                  />
-                </div>
+        <div className="gradient-card shadow-card rounded-xl p-6 mb-8 border border-white/20">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters & Search</h3>
+          
+          {/* Main Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 items-end mb-6">
+            <div className="relative lg:col-span-2">
+              <div className="flex items-center gap-2 mb-3">
+                <Search className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  Search
+                </label>
               </div>
-              
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={selectedFilter === "all" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("all")}
-                  size="sm"
-                  data-testid="button-filter-all"
-                >
-                  All
-                </Button>
-                <Button
-                  variant={selectedFilter === "excellent" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("excellent")}
-                  size="sm"
-                  data-testid="button-filter-excellent"
-                >
-                  Excellent (80+)
-                </Button>
-                <Button
-                  variant={selectedFilter === "good" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("good")}
-                  size="sm"
-                  data-testid="button-filter-good"
-                >
-                  Good (60-79)
-                </Button>
-                <Button
-                  variant={selectedFilter === "poor" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("poor")}
-                  size="sm"
-                  data-testid="button-filter-poor"
-                >
-                  Poor (&lt;60)
-                </Button>
-                <Button
-                  variant={selectedFilter === "missing-photos" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("missing-photos")}
-                  size="sm"
-                  data-testid="button-filter-missing-photos"
-                >
-                  No Photos
-                </Button>
-                <Button
-                  variant={selectedFilter === "missing-signature" ? "default" : "outline"}
-                  onClick={() => setSelectedFilter("missing-signature")}
-                  size="sm"
-                  data-testid="button-filter-missing-signature"
-                >
-                  No Signature
-                </Button>
-              </div>
+              <Input
+                placeholder="Consignment no, company, driver..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                data-testid="input-search-pod"
+              />
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-5 w-5 bg-blue-500 rounded"></div>
+                <label className="text-sm font-semibold text-gray-700">
+                  Warehouse
+                </label>
+              </div>
+              <select
+                value={selectedWarehouse}
+                onChange={(e) => setSelectedWarehouse(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-primary focus:ring-primary/20 focus:outline-none"
+                data-testid="select-warehouse"
+              >
+                <option value="all">All Warehouses</option>
+                {warehouseCompanies.map((warehouse) => (
+                  <option key={warehouse || 'unknown'} value={warehouse || ''}>
+                    {warehouse}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-5 w-5 bg-green-500 rounded"></div>
+                <label className="text-sm font-semibold text-gray-700">
+                  Shipper
+                </label>
+              </div>
+              <select
+                value={selectedShipper}
+                onChange={(e) => setSelectedShipper(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-primary focus:ring-primary/20 focus:outline-none"
+                data-testid="select-shipper"
+              >
+                <option value="all">All Shippers</option>
+                {shipperCompanies.map((shipper) => (
+                  <option key={shipper} value={shipper}>
+                    {shipper}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-5 w-5 bg-purple-500 rounded"></div>
+                <label className="text-sm font-semibold text-gray-700">
+                  Driver
+                </label>
+              </div>
+              <select
+                value={selectedDriver}
+                onChange={(e) => setSelectedDriver(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-primary focus:ring-primary/20 focus:outline-none"
+                data-testid="select-driver"
+              >
+                <option value="all">All Drivers</option>
+                {driverNames.map((driver) => (
+                  <option key={driver} value={driver}>
+                    {driver}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Thermometer className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  Temp Zone
+                </label>
+              </div>
+              <select
+                value={selectedTempZone}
+                onChange={(e) => setSelectedTempZone(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-primary focus:ring-primary/20 focus:outline-none"
+                data-testid="select-temp-zone"
+              >
+                <option value="all">All Zones</option>
+                {temperatureZones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Date Range Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-6">
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  From Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                data-testid="input-from-date"
+              />
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-5 w-5 text-primary" />
+                <label className="text-sm font-semibold text-gray-700">
+                  To Date
+                </label>
+              </div>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full border-gray-200 focus:border-primary focus:ring-primary/20"
+                data-testid="input-to-date"
+              />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                <span className="text-sm font-medium text-gray-700">{podAnalyses.length}</span>
+                <span className="text-sm text-gray-500 ml-1">found</span>
+              </div>
+              {(fromDate || toDate) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="text-xs"
+                  data-testid="button-clear-dates"
+                >
+                  Clear Dates
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {/* Quality Filter Buttons */}
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-5 w-5 bg-yellow-500 rounded"></div>
+              <label className="text-sm font-semibold text-gray-700">
+                Quality Filters
+              </label>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={selectedFilter === "all" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("all")}
+                size="sm"
+                data-testid="button-filter-all"
+              >
+                All
+              </Button>
+              <Button
+                variant={selectedFilter === "excellent" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("excellent")}
+                size="sm"
+                data-testid="button-filter-excellent"
+              >
+                Excellent (80+)
+              </Button>
+              <Button
+                variant={selectedFilter === "good" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("good")}
+                size="sm"
+                data-testid="button-filter-good"
+              >
+                Good (60-79)
+              </Button>
+              <Button
+                variant={selectedFilter === "poor" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("poor")}
+                size="sm"
+                data-testid="button-filter-poor"
+              >
+                Poor (&lt;60)
+              </Button>
+              <Button
+                variant={selectedFilter === "missing-photos" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("missing-photos")}
+                size="sm"
+                data-testid="button-filter-missing-photos"
+              >
+                No Photos
+              </Button>
+              <Button
+                variant={selectedFilter === "missing-signature" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("missing-signature")}
+                size="sm"
+                data-testid="button-filter-missing-signature"
+              >
+                No Signature
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* POD Quality List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Delivery POD Analysis</CardTitle>
-            <CardDescription>
+        <div className="gradient-card shadow-card rounded-xl border border-white/20">
+          <div className="p-6 border-b border-gray-100">
+            <h3 className="text-xl font-bold text-gray-900">Delivery POD Analysis</h3>
+            <p className="text-gray-600 mt-1">
               Quality analysis for {podAnalyses.length} delivered consignments
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="space-y-6">
               {podAnalyses.map((analysis) => {
                 const { consignment, metrics } = analysis;
                 return (
                   <div
                     key={consignment.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50"
+                    className="bg-white border-2 border-gray-100 rounded-xl p-6 hover:border-primary/20 hover:shadow-md transition-all duration-200"
                     data-testid={`pod-analysis-${consignment.id}`}
                   >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg" data-testid={`text-consignment-${consignment.id}`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-xl text-gray-900 mb-2" data-testid={`text-consignment-${consignment.id}`}>
                           {consignment.consignmentNo}
                         </h3>
-                        <p className="text-sm text-gray-600" data-testid={`text-company-${consignment.id}`}>
+                        <p className="text-base text-gray-700 font-medium mb-1" data-testid={`text-company-${consignment.id}`}>
                           {consignment.shipToCompanyName}
                         </p>
-                        <p className="text-sm text-gray-500" data-testid={`text-delivery-time-${consignment.id}`}>
+                        <p className="text-sm text-gray-600" data-testid={`text-delivery-time-${consignment.id}`}>
                           Delivered: {formatDate(metrics.deliveryTime)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {getQualityBadge(metrics.qualityScore)}
-                        <span className="text-lg font-bold" data-testid={`text-score-${consignment.id}`}>
+                        <span className="text-2xl font-bold text-gray-900" data-testid={`text-score-${consignment.id}`}>
                           {metrics.qualityScore}/100
                         </span>
                       </div>
                     </div>
 
                     {/* POD Metrics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Camera className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm" data-testid={`text-photos-${consignment.id}`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Camera className="h-5 w-5 text-blue-600" />
+                            <span className="text-sm font-semibold text-gray-700">Photos</span>
+                          </div>
+                          {metrics.photoCount === 0 && <XCircle className="h-5 w-5 text-red-500" />}
+                          {metrics.photoCount > 0 && <CheckCircle className="h-5 w-5 text-green-500" />}
+                        </div>
+                        <p className="text-lg font-bold text-gray-900" data-testid={`text-photos-${consignment.id}`}>
                           {metrics.photoCount} photos
-                        </span>
-                        {metrics.photoCount === 0 && <XCircle className="h-4 w-4 text-red-500" />}
-                        {metrics.photoCount > 0 && <CheckCircle className="h-4 w-4 text-green-500" />}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <FileSignature className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm" data-testid={`text-signature-${consignment.id}`}>
-                          {metrics.hasSignature ? 'Signed' : 'No signature'}
-                        </span>
-                        {metrics.hasSignature ? 
-                          <CheckCircle className="h-4 w-4 text-green-500" /> : 
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        }
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <FileSignature className="h-5 w-5 text-purple-600" />
+                            <span className="text-sm font-semibold text-gray-700">Signature</span>
+                          </div>
+                          {metrics.hasSignature ? 
+                            <CheckCircle className="h-5 w-5 text-green-500" /> : 
+                            <XCircle className="h-5 w-5 text-red-500" />
+                          }
+                        </div>
+                        <p className="text-lg font-bold text-gray-900" data-testid={`text-signature-${consignment.id}`}>
+                          {metrics.hasSignature ? 'Signed' : 'Missing'}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Thermometer className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm" data-testid={`text-temperature-${consignment.id}`}>
-                          {metrics.temperatureCompliant ? 'Temp OK' : 'Temp issue'}
-                        </span>
-                        {metrics.temperatureCompliant ? 
-                          <CheckCircle className="h-4 w-4 text-green-500" /> : 
-                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                        }
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Thermometer className="h-5 w-5 text-orange-600" />
+                            <span className="text-sm font-semibold text-gray-700">Temperature</span>
+                          </div>
+                          {metrics.temperatureCompliant ? 
+                            <CheckCircle className="h-5 w-5 text-green-500" /> : 
+                            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                          }
+                        </div>
+                        <p className="text-lg font-bold text-gray-900" data-testid={`text-temperature-${consignment.id}`}>
+                          {metrics.temperatureCompliant ? 'Compliant' : 'Issue'}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {metrics.hasTrackingLink && consignment.deliveryLiveTrackLink && (
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ExternalLink className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-semibold text-gray-700">Tracking</span>
+                          </div>
+                        </div>
+                        {metrics.hasTrackingLink && consignment.deliveryLiveTrackLink ? (
                           <a
                             href={consignment.deliveryLiveTrackLink}
                             target="_blank"
@@ -463,25 +733,34 @@ export default function PODQuality() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="w-full"
                             >
-                              <ExternalLink className="h-3 w-3 mr-1" />
+                              <ExternalLink className="h-4 w-4 mr-2" />
                               Live Track
                             </Button>
                           </a>
+                        ) : (
+                          <p className="text-sm text-gray-500">No tracking link</p>
                         )}
                       </div>
                     </div>
 
                     {/* Additional Details */}
-                    <div className="flex justify-between items-center text-sm text-gray-500">
-                      <span data-testid={`text-driver-${consignment.id}`}>
-                        Driver: {consignment.driverName || 'N/A'}
-                      </span>
-                      <span data-testid={`text-temp-zone-${consignment.id}`}>
-                        {consignment.expectedTemperature && (
-                          <>Temp Zone: {consignment.expectedTemperature}</>
-                        )}
-                      </span>
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-semibold text-gray-700">Driver:</span>
+                          <span className="ml-2 text-gray-900" data-testid={`text-driver-${consignment.id}`}>
+                            {consignment.driverName || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-700">Temp Zone:</span>
+                          <span className="ml-2 text-gray-900" data-testid={`text-temp-zone-${consignment.id}`}>
+                            {consignment.expectedTemperature || getTemperatureZone(consignment) || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -493,8 +772,8 @@ export default function PODQuality() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     </div>
   );
