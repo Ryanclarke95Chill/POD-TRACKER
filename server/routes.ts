@@ -4,9 +4,10 @@ import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, db } from "./db";
-import { axylogAPI, getAxylogAPI } from "./axylog";
+import { axylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
 import { consignments } from "@shared/schema";
+import puppeteer from "puppeteer";
 
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
@@ -368,14 +369,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let photos: string[] = [];
       
-      console.log(`Looking for photos for token: ${token}`);
+      console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
       
-      // For now, simulate that we could not extract photos from the API endpoints
-      // but provide a working fallback to the iframe approach until we can reverse engineer 
-      // the correct API endpoints
-      console.log(`Photo extraction not yet implemented - API endpoints need to be reverse engineered`);
+      // Use Puppeteer to scrape photos from the Angular SPA
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ]
+      });
       
-      // Future: implement actual photo extraction when API endpoints are discovered
+      try {
+        const page = await browser.newPage();
+        
+        // Set user agent to avoid bot detection
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        
+        // Navigate to the tracking URL
+        const trackingUrl = `https://live.axylog.com/${token}`;
+        console.log(`Navigating to: ${trackingUrl}`);
+        
+        await page.goto(trackingUrl, { 
+          waitUntil: 'networkidle2',
+          timeout: 30000 
+        });
+        
+        // Wait for Angular to load and render content
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Try to wait for images to appear
+        try {
+          await page.waitForSelector('img', { timeout: 10000 });
+        } catch (e) {
+          console.log('No images found on page or timeout waiting for images');
+        }
+        
+        // Extract all image URLs from the page
+        const imageData = await page.evaluate(() => {
+          const images = Array.from(document.querySelectorAll('img'));
+          
+          return images.map(img => {
+            const rect = img.getBoundingClientRect();
+            return {
+              src: img.src,
+              alt: img.alt || '',
+              width: img.naturalWidth || img.width,
+              height: img.naturalHeight || img.height,
+              className: img.className,
+              isVisible: rect.width > 0 && rect.height > 0,
+              parentText: img.parentElement?.textContent?.substring(0, 100) || ''
+            };
+          }).filter(img => {
+            // Filter for actual photos vs UI elements
+            return img.src && 
+                   img.src.startsWith('http') && 
+                   img.width > 100 &&  // Must be reasonably large
+                   img.height > 100 && 
+                   !img.src.includes('logo') &&
+                   !img.src.includes('icon') &&
+                   !img.src.includes('avatar') &&
+                   !img.className.includes('logo') &&
+                   !img.className.includes('icon');
+          });
+        });
+        
+        console.log(`Found ${imageData.length} potential photos on page`);
+        
+        // Extract just the URLs
+        photos = imageData.map(img => img.src);
+        
+        // Log some details about found images
+        imageData.forEach((img, index) => {
+          console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
+        });
+        
+      } catch (error: any) {
+        console.error(`Error scraping photos: ${error.message}`);
+      } finally {
+        await browser.close();
+      }
       
       // Filter out signatures and duplicates
       const filteredPhotos = photos.filter((url: any) => 
