@@ -232,8 +232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Axylog sync endpoint (admin only)
-  app.post("/api/axylog-sync", authenticate, async (req: AuthRequest, res: Response) => {
+  // Axylog sync endpoint (admin only) - multiple routes for compatibility
+  const axylogSyncHandler = async (req: AuthRequest, res: Response) => {
     console.log("=== AXYLOG SYNC ENDPOINT ===");
     res.setHeader('Content-Type', 'application/json');
     
@@ -327,7 +327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error.message 
       });
     }
-  });
+  };
+
+  // Register both route variations for compatibility
+  app.post("/api/axylog-sync", authenticate, axylogSyncHandler);
+  app.post("/api/axylog/sync", authenticate, axylogSyncHandler);
 
   // Test axylog connection
   app.post("/api/test-axylog", authenticate, async (req: AuthRequest, res: Response) => {

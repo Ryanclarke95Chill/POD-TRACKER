@@ -186,9 +186,29 @@ export default function PODQuality() {
       expected = consignment.expectedTemperature;
     }
     
-    // Actual temperature readings not available in current Axylog API
-    // The API only provides expected temperature zones, not recorded temperatures
-    let actual = 'Not recorded by API';
+    // Get actual temperature readings from Axylog fields
+    const temp1 = (consignment as any).amountToCollect;
+    const temp2 = (consignment as any).amountCollected;
+    const tempPayment = (consignment as any).paymentMethod;
+    
+    let actualTemps = [];
+    
+    // amountToCollect = Temp 1 (999 = default/blank)
+    if (temp1 && temp1 !== 999 && !isNaN(parseFloat(temp1.toString()))) {
+      actualTemps.push(`${temp1}°C`);
+    }
+    
+    // amountCollected = Temp 2
+    if (temp2 && !isNaN(parseFloat(temp2.toString()))) {
+      actualTemps.push(`${temp2}°C`);
+    }
+    
+    // paymentMethod = Additional temp reading
+    if (tempPayment && !isNaN(parseFloat(tempPayment))) {
+      actualTemps.push(`${parseFloat(tempPayment)}°C`);
+    }
+    
+    let actual = actualTemps.length > 0 ? actualTemps.join(', ') : 'No readings available';
     
     return { expected, actual };
   };
