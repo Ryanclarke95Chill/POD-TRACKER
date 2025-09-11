@@ -363,7 +363,7 @@ export interface ScoreBreakdown {
   signature: { points: number; reason: string; status: 'pass' | 'fail' };
   receiverName: { points: number; reason: string; status: 'pass' | 'fail' };
   temperature: { points: number; reason: string; status: 'pass' | 'fail' };
-  clearPhotos: { points: number; reason: string; status: 'pending' };
+  clearPhotos: { points: number; reason: string; status: 'pass' | 'fail' | 'partial' | 'pending' };
   total: number;
 }
 

@@ -541,6 +541,8 @@ export default function PODQuality() {
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [scoreBreakdownOpen, setScoreBreakdownOpen] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<PODAnalysis | null>(null);
+  const [photoAnalysisLoading, setPhotoAnalysisLoading] = useState<number | null>(null);
+  const [photoAnalysisResults, setPhotoAnalysisResults] = useState<Map<number, any>>(new Map());
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -679,7 +681,7 @@ export default function PODQuality() {
   };
 
   // Analyze POD quality for each consignment using new gated + bucketed system
-  const analyzePOD = async (consignment: Consignment): Promise<PODAnalysis> => {
+  const analyzePOD = (consignment: Consignment): PODAnalysis => {
     const photoCount = countPhotos(consignment);
     const hasSignature = Boolean(consignment.deliverySignatureName);
     const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
@@ -794,64 +796,13 @@ export default function PODQuality() {
     };
     score += qtyPoints;
     
-    // 5. Photo clarity/OCR (15 points) - now implemented
-    let ocrPoints = 0;
-    const podPhotos = await fetchPODPhotos(consignment.deliveryLiveTrackLink?.split('/').pop() || '');
-    
-    if (podPhotos.success && podPhotos.photos.length > 0) {
-      try {
-        // Analyze up to 3 photos for performance
-        const photosToAnalyze = podPhotos.photos.slice(0, 3);
-        const response = await fetch('/api/analyze-photos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ imageUrls: photosToAnalyze })
-        });
-        
-        if (response.ok) {
-          const analysisData = await response.json();
-          const analyses = analysisData.results;
-          
-          // Calculate OCR points based on analysis
-          const avgQualityScore = analyses.reduce((sum: number, a: any) => sum + a.overall.qualityScore, 0) / analyses.length;
-          ocrPoints = Math.round(avgQualityScore); // Convert 0-15 score directly
-          
-          const issues = analyses.flatMap((a: any) => a.overall.issues).slice(0, 3);
-          const hasTemperature = analyses.some((a: any) => a.ocr.hasTemperatureDisplay);
-          const hasLabel = analyses.some((a: any) => a.ocr.hasShippingLabel);
-          
-          breakdown.clearPhotos = {
-            points: ocrPoints,
-            reason: `Photo analysis: Avg quality ${avgQualityScore.toFixed(1)}/15, ${hasTemperature ? 'temp display found' : 'no temp display'}, ${hasLabel ? 'label found' : 'no label'}, ${issues.length} issues`,
-            status: ocrPoints >= 10 ? 'pass' : ocrPoints >= 5 ? 'partial' : 'fail'
-          };
-        } else {
-          breakdown.clearPhotos = { 
-            points: 0, 
-            reason: 'Photo analysis failed - API error', 
-            status: 'fail' 
-          };
-        }
-      } catch (error) {
-        console.error('Photo analysis error:', error);
-        breakdown.clearPhotos = { 
-          points: 0, 
-          reason: 'Photo analysis failed - network error', 
-          status: 'fail' 
-        };
-      }
-    } else {
-      breakdown.clearPhotos = { 
-        points: 0, 
-        reason: 'No photos available for analysis', 
-        status: 'fail' 
-      };
-    }
-    
-    score += ocrPoints;
+    // 5. Photo clarity/OCR (15 points) - placeholder for now to prevent infinite loops
+    // Will be filled in with actual analysis when photos are checked
+    breakdown.clearPhotos = { 
+      points: 0, 
+      reason: 'Photo analysis pending - click "Check Photos" to analyze', 
+      status: 'pending' 
+    };
     
     // Cap total at 100
     score = Math.min(100, score);
@@ -1055,20 +1006,10 @@ export default function PODQuality() {
     );
   };
 
-  // State for async analysis results
-  const [allFilteredAnalyses, setAllFilteredAnalyses] = useState<PODAnalysis[]>([]);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-
-  // Process consignments asynchronously
-  useEffect(() => {
-    const processConsignments = async () => {
-      setAnalysisLoading(true);
-      try {
-        // Analyze all consignments
-        const analyses = await Promise.all(deliveredConsignments.map(analyzePOD));
-        
-        // Apply filters to analyses
-        const filtered = analyses.filter((analysis: PODAnalysis) => {
+  // Process and filter consignments - ALL filtered data for stats
+  const allFilteredAnalyses: PODAnalysis[] = deliveredConsignments
+    .map(analyzePOD)
+    .filter((analysis: PODAnalysis) => {
       const consignment = analysis.consignment;
       const metrics = analysis.metrics;
       
@@ -1138,23 +1079,9 @@ export default function PODQuality() {
         }
       })();
       
-          return matchesSearch && matchesWarehouse && matchesShipper && 
-                 matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
-        });
-        
-        setAllFilteredAnalyses(filtered);
-      } catch (error) {
-        console.error('Error processing consignments:', error);
-        setAllFilteredAnalyses([]);
-      } finally {
-        setAnalysisLoading(false);
-      }
-    };
-
-    if (deliveredConsignments.length > 0) {
-      processConsignments();
-    }
-  }, [deliveredConsignments, selectedFilter, selectedWarehouse, selectedShipper, selectedDriver, selectedTempZone, searchTerm, fromDate, toDate]);
+      return matchesSearch && matchesWarehouse && matchesShipper && 
+             matchesDriver && matchesTempZone && matchesDateRange && matchesQuality;
+    });
 
   // Pagination calculations
   const totalItems = allFilteredAnalyses.length;
@@ -1215,6 +1142,76 @@ export default function PODQuality() {
       </div>
     );
   }
+
+  // Analyze photos for a specific consignment
+  const analyzePhotosForConsignment = async (consignment: Consignment) => {
+    setPhotoAnalysisLoading(consignment.id);
+    
+    try {
+      // Fetch photos for this consignment
+      const trackingToken = consignment.deliveryLiveTrackLink?.split('/').pop() || '';
+      const podPhotos = await fetchPODPhotos(trackingToken);
+      
+      if (!podPhotos.success || podPhotos.photos.length === 0) {
+        const result = {
+          points: 0,
+          reason: 'No photos available for analysis',
+          status: 'fail'
+        };
+        setPhotoAnalysisResults(prev => new Map(prev.set(consignment.id, result)));
+        return;
+      }
+
+      // Analyze up to 3 photos for performance
+      const photosToAnalyze = podPhotos.photos.slice(0, 3);
+      const response = await fetch('/api/analyze-photos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ imageUrls: photosToAnalyze })
+      });
+
+      if (response.ok) {
+        const analysisData = await response.json();
+        const analyses = analysisData.results;
+
+        // Calculate OCR points based on analysis
+        const avgQualityScore = analyses.reduce((sum: number, a: any) => sum + a.overall.qualityScore, 0) / analyses.length;
+        const ocrPoints = Math.round(avgQualityScore); // Convert 0-15 score directly
+
+        const issues = analyses.flatMap((a: any) => a.overall.issues).slice(0, 3);
+        const hasTemperature = analyses.some((a: any) => a.ocr.hasTemperatureDisplay);
+        const hasLabel = analyses.some((a: any) => a.ocr.hasShippingLabel);
+
+        const result = {
+          points: ocrPoints,
+          reason: `Photo analysis: Avg quality ${avgQualityScore.toFixed(1)}/15, ${hasTemperature ? 'temp display found' : 'no temp display'}, ${hasLabel ? 'label found' : 'no label'}, ${issues.length} issues`,
+          status: ocrPoints >= 10 ? 'pass' : ocrPoints >= 5 ? 'partial' : 'fail'
+        };
+        
+        setPhotoAnalysisResults(prev => new Map(prev.set(consignment.id, result)));
+      } else {
+        const result = {
+          points: 0,
+          reason: 'Photo analysis failed - API error',
+          status: 'fail'
+        };
+        setPhotoAnalysisResults(prev => new Map(prev.set(consignment.id, result)));
+      }
+    } catch (error) {
+      console.error('Photo analysis error:', error);
+      const result = {
+        points: 0,
+        reason: 'Photo analysis failed - network error',
+        status: 'fail'
+      };
+      setPhotoAnalysisResults(prev => new Map(prev.set(consignment.id, result)));
+    } finally {
+      setPhotoAnalysisLoading(null);
+    }
+  };
 
   // Handle sync from Axylog
   const handleSyncFromAxylog = async () => {
@@ -1947,18 +1944,72 @@ export default function PODQuality() {
                     <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.temperature.reason}</p>
                   </div>
 
-                  {/* Clear Photos (Future) */}
-                  <div className="p-4 rounded-lg border-2 border-gray-200 bg-gray-50">
+                  {/* Clear Photos with AI Analysis */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    (() => {
+                      const analysisResult = photoAnalysisResults.get(selectedAnalysis.consignment.id);
+                      if (analysisResult) {
+                        return analysisResult.points >= 10 ? 'border-green-200 bg-green-50' :
+                               analysisResult.points >= 5 ? 'border-yellow-200 bg-yellow-50' :
+                               'border-red-200 bg-red-50';
+                      }
+                      return selectedAnalysis.metrics.scoreBreakdown.clearPhotos.status === 'pending' ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-gray-50';
+                    })()
+                  }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Eye className="h-5 w-5" />
                         <span className="font-semibold">Clear Photos</span>
                       </div>
-                      <div className="font-bold text-gray-500">
-                        +0 pts
+                      <div className={`font-bold ${
+                        (() => {
+                          const analysisResult = photoAnalysisResults.get(selectedAnalysis.consignment.id);
+                          if (analysisResult) {
+                            return analysisResult.points > 0 ? 'text-green-600' : 'text-red-600';
+                          }
+                          return 'text-gray-500';
+                        })()
+                      }`}>
+                        {(() => {
+                          const analysisResult = photoAnalysisResults.get(selectedAnalysis.consignment.id);
+                          if (analysisResult) {
+                            return `${analysisResult.points > 0 ? '+' : ''}${analysisResult.points} pts`;
+                          }
+                          return '+0 pts';
+                        })()}
                       </div>
                     </div>
-                    <p className="text-sm text-gray-700">{selectedAnalysis.metrics.scoreBreakdown.clearPhotos.reason}</p>
+                    <p className="text-sm text-gray-700 mb-3">
+                      {(() => {
+                        const analysisResult = photoAnalysisResults.get(selectedAnalysis.consignment.id);
+                        if (analysisResult) {
+                          return analysisResult.reason;
+                        }
+                        return selectedAnalysis.metrics.scoreBreakdown.clearPhotos.reason;
+                      })()}
+                    </p>
+                    {!photoAnalysisResults.get(selectedAnalysis.consignment.id) && (
+                      <Button
+                        onClick={() => analyzePhotosForConsignment(selectedAnalysis.consignment)}
+                        disabled={photoAnalysisLoading === selectedAnalysis.consignment.id}
+                        className="w-full"
+                        variant="outline"
+                        size="sm"
+                        data-testid={`button-analyze-photos-${selectedAnalysis.consignment.id}`}
+                      >
+                        {photoAnalysisLoading === selectedAnalysis.consignment.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                            Analyzing Photos...
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Check Photos with AI
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
