@@ -86,13 +86,9 @@ export default function SyncDataButton() {
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <Button 
-          className="bg-primary hover:bg-primary/90 text-white flex items-center"
-          aria-label="Sync from Axylog"
-          data-testid="button-sync-axylog"
-        >
-          <Download className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Sync from Axylog</span>
+        <Button className="bg-primary hover:bg-primary/90 text-white">
+          <Download className="h-4 w-4 mr-2" />
+          Sync from Axylog
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
