@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,140 @@ interface PODMetrics {
 interface PhotoGalleryProps {
   trackingLink: string;
   consignmentNo: string;
+}
+
+interface PhotoThumbnailsProps {
+  consignment: Consignment;
+  photoCount: number;
+  onPhotoLoad: (consignmentId: number, photos: string[]) => void;
+}
+
+// Global cache for photos to avoid re-extraction
+const photoCache = new Map<string, string[]>();
+
+function PhotoThumbnails({ consignment, photoCount, onPhotoLoad }: PhotoThumbnailsProps) {
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const elementRef = useRef<HTMLDivElement>(null);
+  const hasStartedLoading = useRef(false);
+
+  const trackingLink = consignment.podLink || '';
+  const cacheKey = trackingLink;
+
+  const loadPhotos = useCallback(async () => {
+    if (hasStartedLoading.current || !trackingLink) return;
+    hasStartedLoading.current = true;
+
+    // Check cache first
+    if (photoCache.has(cacheKey)) {
+      const cachedPhotos = photoCache.get(cacheKey) || [];
+      setPhotos(cachedPhotos);
+      onPhotoLoad(consignment.id, cachedPhotos);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to load photos');
+      
+      const data = await response.json();
+      const loadedPhotos = data.photos || [];
+      
+      setPhotos(loadedPhotos);
+      photoCache.set(cacheKey, loadedPhotos);
+      onPhotoLoad(consignment.id, loadedPhotos);
+    } catch (error) {
+      console.error('Error loading photos:', error);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [trackingLink, cacheKey, consignment.id, onPhotoLoad]);
+
+  // Intersection Observer for lazy loading
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasStartedLoading.current) {
+            loadPhotos();
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (elementRef.current) {
+      observer.observe(elementRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadPhotos]);
+
+  if (loading) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2">
+        <div className="grid grid-cols-3 gap-1">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="w-8 h-8 bg-gray-200 rounded animate-pulse"
+            />
+          ))}
+        </div>
+        <span className="text-sm text-gray-500">Loading...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2 text-red-500">
+        <AlertTriangle className="h-4 w-4" />
+        <span className="text-sm">Failed to load</span>
+      </div>
+    );
+  }
+
+  if (photos.length === 0) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2 text-gray-500">
+        <Camera className="h-4 w-4" />
+        <span className="text-sm">{photoCount} photos</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={elementRef} className="flex items-center gap-2">
+      <div className="grid grid-cols-3 gap-1">
+        {photos.slice(0, 3).map((photo, index) => (
+          <img
+            key={index}
+            src={`/api/image?src=${encodeURIComponent(photo)}&w=32&q=60&fmt=webp`}
+            alt={`Preview ${index + 1}`}
+            className="w-8 h-8 object-cover rounded border"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ))}
+        {photos.length > 3 && (
+          <div className="w-8 h-8 bg-gray-100 rounded border flex items-center justify-center">
+            <span className="text-xs text-gray-600">+{photos.length - 3}</span>
+          </div>
+        )}
+      </div>
+      <span className="text-sm text-gray-700">{photos.length} photos</span>
+    </div>
+  );
 }
 
 interface ProgressiveImageProps {
@@ -102,6 +236,18 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Check cache first for instant loading
+  useEffect(() => {
+    const cachedPhotos = photoCache.get(trackingLink);
+    if (cachedPhotos) {
+      setPhotos(cachedPhotos);
+      setLoading(false);
+      return;
+    }
+    // If not cached, proceed with normal loading
+    extractPhotos();
+  }, [trackingLink]);
 
   const extractPhotos = async () => {
     try {
@@ -247,6 +393,13 @@ export default function PODQuality() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
+  
+  // Track loaded photos for instant modal opening
+  const [loadedPhotos, setLoadedPhotos] = useState<Map<number, string[]>>(new Map());
+  
+  const handlePhotoLoad = useCallback((consignmentId: number, photos: string[]) => {
+    setLoadedPhotos(prev => new Map(prev).set(consignmentId, photos));
+  }, []);
   const user = getUser();
 
   // Fetch all consignments and filter for delivered ones
@@ -1061,9 +1214,11 @@ export default function PODQuality() {
                             <ExternalLink className="h-4 w-4 text-gray-400" />
                           </div>
                         </div>
-                        <p className="text-lg font-bold text-gray-900" data-testid={`text-photos-${consignment.id}`}>
-                          {metrics.photoCount} photos
-                        </p>
+                        <PhotoThumbnails 
+                          consignment={consignment}
+                          photoCount={metrics.photoCount}
+                          onPhotoLoad={handlePhotoLoad}
+                        />
                       </div>
 
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
