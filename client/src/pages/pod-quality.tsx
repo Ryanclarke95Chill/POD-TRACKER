@@ -657,16 +657,10 @@ export default function PODQuality() {
       missing.push('Receiver name present (first name)');
     }
     
-    // Temperature pickup and delivery recorded with 1 decimal
-    const pickupTemp = (consignment as any).amountToCollect;
-    const deliveryTemp = (consignment as any).amountCollected;
-    
-    if (!pickupTemp || !String(pickupTemp).includes('.')) {
-      missing.push('Temperature pickup recorded with 1 decimal');
-    }
-    
-    if (!deliveryTemp || !String(deliveryTemp).includes('.')) {
-      missing.push('Temperature delivery recorded with 1 decimal');
+    // Temperature compliance using existing logic
+    const isTemperatureCompliant = checkTemperatureCompliance(consignment);
+    if (!isTemperatureCompliant) {
+      missing.push('Temperature compliance requirement');
     }
     
     // Photos requirement: temporary rule ≥3 photos (until photo type detection is implemented)
@@ -767,53 +761,26 @@ export default function PODQuality() {
     };
     score += recipientPoints;
     
-    // 3. Temperature compliance (25 points total)
+    // 3. Temperature compliance (25 points total) - using existing temperature logic
     let tempPoints = 0;
-    const pickupTemp = (consignment as any).amountToCollect;
-    const deliveryTemp = (consignment as any).amountCollected;
+    const isTemperatureCompliant = checkTemperatureCompliance(consignment);
+    const { expected, actual } = formatTemperatureDisplay(consignment);
     
-    // Pickup has 1 decimal → +5
-    if (pickupTemp && String(pickupTemp).includes('.')) {
-      tempPoints += 5;
+    // Award full 25 points if temperature is compliant using existing logic
+    if (isTemperatureCompliant) {
+      tempPoints = 25;
+      breakdown.temperature = { 
+        points: tempPoints, 
+        reason: `Temperature compliant: Expected ${expected}, Actual ${actual}`, 
+        status: 'pass' 
+      };
+    } else {
+      breakdown.temperature = { 
+        points: 0, 
+        reason: `Temperature non-compliant: Expected ${expected}, Actual ${actual}`, 
+        status: 'fail' 
+      };
     }
-    
-    // Delivery has 1 decimal → +5
-    if (deliveryTemp && String(deliveryTemp).includes('.')) {
-      tempPoints += 5;
-    }
-    
-    // Delivery within expected band → +10
-    let bandCompliant = false;
-    let bandReason = 'Expected band missing';
-    
-    // Get expected temperature from document_note
-    let expectedBandLabel = '';
-    if (consignment.documentNote) {
-      const tempMatch = consignment.documentNote.match(/^([^\n]+)/);
-      if (tempMatch) {
-        expectedBandLabel = tempMatch[1].trim();
-      }
-    }
-    
-    if (expectedBandLabel) {
-      const band = parseBandFromLabel(expectedBandLabel);
-      if (band && deliveryTemp) {
-        const actualTemp = parseFloat(String(deliveryTemp));
-        if (!isNaN(actualTemp) && actualTemp >= band.min && actualTemp <= band.max) {
-          tempPoints += 10;
-          bandCompliant = true;
-          bandReason = `${actualTemp}°C within ${band.min}°C to ${band.max}°C`;
-        } else {
-          bandReason = `${actualTemp}°C outside ${band.min}°C to ${band.max}°C`;
-        }
-      }
-    }
-    
-    breakdown.temperature = { 
-      points: tempPoints, 
-      reason: `Pickup decimal ${pickupTemp && String(pickupTemp).includes('.') ? '+5pts' : '+0pts'}, Delivery decimal ${deliveryTemp && String(deliveryTemp).includes('.') ? '+5pts' : '+0pts'}, Band compliance ${bandCompliant ? '+10pts' : '+0pts'} (${bandReason})`, 
-      status: tempPoints > 0 ? 'pass' : 'fail' 
-    };
     score += tempPoints;
     
     // 4. Quantity accuracy (15 points total) - using receiverName field for now
@@ -840,8 +807,8 @@ export default function PODQuality() {
     score = Math.min(100, score);
     breakdown.total = score;
     
-    // Determine temperature compliance for legacy field
-    const temperatureCompliant = tempPoints > 0;
+    // Determine temperature compliance for legacy field using existing logic
+    const temperatureCompliant = checkTemperatureCompliance(consignment);
     
     const metrics: PODMetrics = {
       photoCount,
