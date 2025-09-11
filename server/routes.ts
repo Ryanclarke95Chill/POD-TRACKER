@@ -9,6 +9,11 @@ import { getUserPermissions, hasPermission, requirePermission, getAccessibleCons
 import { consignments } from "@shared/schema";
 import puppeteer from "puppeteer";
 
+// Browser instance cache for faster subsequent requests
+let browserInstance: any = null;
+const photoCache = new Map<string, { photos: string[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const SECRET_KEY = process.env.JWT_SECRET || "chilltrack-secret-key";
 
 interface AuthRequest extends Request {
@@ -367,48 +372,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Extracting photos for tracking token: ${token}`);
       
+      // Check cache first
+      const cached = photoCache.get(token);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`Using cached photos for token: ${token}`);
+        return res.json({
+          success: true,
+          photos: cached.photos,
+          count: cached.photos.length,
+          cached: true
+        });
+      }
+      
       let photos: string[] = [];
       
       console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
       
-      // Use Puppeteer to scrape photos from the Angular SPA
-      const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-features=VizDisplayCompositor'
-        ]
-      });
+      // Reuse browser instance for better performance
+      if (!browserInstance) {
+        console.log('Launching new browser instance...');
+        browserInstance = await puppeteer.launch({
+          headless: true,
+          executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-plugins',
+            '--disable-sync',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
+          ]
+        });
+      }
+      
+      const browser = browserInstance;
       
       try {
         const page = await browser.newPage();
         
-        // Set user agent to avoid bot detection
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        // Block unnecessary resources for faster loading
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+          const resourceType = req.resourceType();
+          // Block CSS, fonts, media that aren't essential for image extraction
+          if (resourceType === 'stylesheet' || resourceType === 'font' || resourceType === 'media') {
+            req.abort();
+          } else {
+            req.continue();
+          }
+        });
         
-        // Navigate to the tracking URL
+        // Set user agent and viewport for faster rendering
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        await page.setViewport({ width: 1280, height: 720 });
+        
+        // Navigate to the tracking URL with faster settings
         const trackingUrl = `https://live.axylog.com/${token}`;
         console.log(`Navigating to: ${trackingUrl}`);
         
         await page.goto(trackingUrl, { 
-          waitUntil: 'networkidle2',
-          timeout: 30000 
+          waitUntil: 'domcontentloaded', // Faster than networkidle2
+          timeout: 15000 // Reduced timeout
         });
         
-        // Wait for Angular to load and render content
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Reduced wait time for Angular to load
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Try to wait for images to appear
+        // Try to wait for images to appear with shorter timeout
         try {
-          await page.waitForSelector('img', { timeout: 10000 });
+          await page.waitForSelector('img', { timeout: 3000 });
         } catch (e) {
-          console.log('No images found on page or timeout waiting for images');
+          console.log('Images may still be loading, proceeding anyway...');
         }
         
         // Extract all image URLs from the page
@@ -469,7 +509,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
         console.error(`Error scraping photos: ${error.message}`);
       } finally {
-        await browser.close();
+        // Don't close browser - keep it running for reuse
+        // await browser.close();
       }
       
       // Filter out signatures and duplicates
@@ -480,6 +521,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       const uniquePhotos = Array.from(new Set(filteredPhotos));
+      
+      // Cache the results for faster subsequent requests
+      photoCache.set(token, {
+        photos: uniquePhotos,
+        timestamp: Date.now()
+      });
       
       console.log(`Found ${uniquePhotos.length} photos for token ${token}`);
       
