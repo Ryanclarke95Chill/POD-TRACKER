@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, db } from "./db";
-import { axylogAPI } from "./axylog";
+import { axylogAPI, getAxylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
 import { consignments } from "@shared/schema";
 
@@ -366,56 +366,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Extracting photos for tracking token: ${token}`);
       
-      // Try different potential API endpoints that the Angular SPA might use
-      const possibleEndpoints = [
-        `https://api.axylog.com/live/${token}/attachments`,
-        `https://api.axylog.com/live/${token}/documents`,
-        `https://api.axylog.com/live/${token}/files`,
-        `https://live.axylog.com/api/${token}/attachments`,
-        `https://live.axylog.com/api/attachments/${token}`,
-      ];
+      let photos: string[] = [];
       
-      let photos = [];
+      console.log(`Looking for photos for token: ${token}`);
       
-      for (const endpoint of possibleEndpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`);
-          const response = await fetch(endpoint);
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Success from ${endpoint}:`, JSON.stringify(data, null, 2));
-            
-            // Try to extract photo URLs from various response formats
-            if (Array.isArray(data)) {
-              photos = data.filter((item: any) => 
-                item.url && 
-                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
-                 item.url.includes('.png') || item.url.includes('.gif'))
-              ).map((item: any) => item.url);
-            } else if (data.attachments && Array.isArray(data.attachments)) {
-              photos = data.attachments.filter((item: any) => 
-                item.url && 
-                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
-                 item.url.includes('.png') || item.url.includes('.gif'))
-              ).map((item: any) => item.url);
-            } else if (data.files && Array.isArray(data.files)) {
-              photos = data.files.filter((item: any) => 
-                item.url && 
-                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
-                 item.url.includes('.png') || item.url.includes('.gif'))
-              ).map((item: any) => item.url);
-            }
-            
-            if (photos.length > 0) {
-              break; // Found photos, stop trying other endpoints
-            }
-          }
-        } catch (endpointError: any) {
-          console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
-          continue;
-        }
-      }
+      // For now, simulate that we could not extract photos from the API endpoints
+      // but provide a working fallback to the iframe approach until we can reverse engineer 
+      // the correct API endpoints
+      console.log(`Photo extraction not yet implemented - API endpoints need to be reverse engineered`);
+      
+      // Future: implement actual photo extraction when API endpoints are discovered
       
       // Filter out signatures and duplicates
       const filteredPhotos = photos.filter((url: any) => 

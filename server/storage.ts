@@ -226,25 +226,6 @@ export class DatabaseStorage implements IStorage {
     return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
   }
 
-  async getConsignmentsByUserId(userId: number): Promise<Consignment[]> {
-    // Get the user to check their role
-    const user = await this.getUserById(userId);
-    if (!user) return [];
-
-    // If user is admin, show their own consignments
-    if (user.role === 'admin') {
-      return await db.select().from(consignments).where(eq(consignments.userId, userId)).limit(20000);
-    }
-
-    // For non-admin users, show admin's consignments (latest synced data)
-    const adminUser = await this.getUserByUsername('admin');
-    if (adminUser) {
-      return await db.select().from(consignments).where(eq(consignments.userId, adminUser.id)).limit(20000);
-    }
-
-    // Fallback to user's own consignments if no admin found
-    return await db.select().from(consignments).where(eq(consignments.userId, userId)).limit(20000);
-  }
 
   async getConsignmentsByDepartment(department: string): Promise<Consignment[]> {
     // Get admin's consignments and filter by department

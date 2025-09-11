@@ -118,19 +118,26 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   if (photos.length === 0) {
     return (
       <div className="flex items-center justify-center h-[60vh] py-8 text-gray-500">
-        <div className="text-center">
-          <Camera className="h-8 w-8 mx-auto mb-4 text-gray-400" />
-          <p className="text-lg font-medium">No photos found</p>
-          <p className="text-sm">Photos may not be available for this consignment</p>
-          <Button 
-            onClick={() => window.open(trackingLink, '_blank')} 
-            variant="outline" 
-            className="mt-4"
-            size="sm"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View Full Tracking Page
-          </Button>
+        <div className="text-center max-w-md">
+          <Camera className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+          <p className="text-lg font-medium text-gray-800 mb-2">Photo Extraction In Development</p>
+          <p className="text-sm text-gray-600 mb-4">
+            Individual photo extraction from the tracking system requires reverse engineering the API endpoints. 
+            For now, you can view all photos through the tracking system.
+          </p>
+          <div className="space-y-2">
+            <Button 
+              onClick={() => window.open(trackingLink, '_blank')} 
+              className="w-full"
+              data-testid="button-view-tracking"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View Photos in Tracking System
+            </Button>
+            <p className="text-xs text-gray-500">
+              Opens the full tracking interface where you can navigate to view and assess photo quality
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1137,7 +1144,7 @@ export default function PODQuality() {
             </div>
             <div className="flex justify-between items-center pt-4 border-t">
               <p className="text-sm text-gray-600">
-                Click any photo to view in full size. Photos are extracted directly from the tracking system.
+                Use the tracking system to view and assess photo quality for POD scoring.
               </p>
               {(selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink) && (
                 <Button
