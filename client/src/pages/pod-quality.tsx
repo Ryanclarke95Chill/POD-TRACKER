@@ -217,18 +217,18 @@ export default function PODQuality() {
     let actualTemps = [];
     
     // amountToCollect = Temp 1 (999 = default/blank)
-    if (temp1 && temp1 !== 999 && !isNaN(parseFloat(temp1.toString()))) {
+    if (temp1 && temp1 !== 999 && temp1 !== '999' && !isNaN(parseFloat(temp1.toString()))) {
       actualTemps.push(`${temp1}°C`);
     }
     
-    // amountCollected = Temp 2
-    if (temp2 && !isNaN(parseFloat(temp2.toString()))) {
+    // amountCollected = Temp 2  
+    if (temp2 && temp2 !== 999 && temp2 !== '999' && !isNaN(parseFloat(temp2.toString()))) {
       actualTemps.push(`${temp2}°C`);
     }
     
-    // paymentMethod = Additional temp reading
-    if (tempPayment && !isNaN(parseFloat(tempPayment))) {
-      actualTemps.push(`${parseFloat(tempPayment)}°C`);
+    // paymentMethod = Additional temp reading  
+    if (tempPayment && tempPayment !== 999 && tempPayment !== '999' && !isNaN(parseFloat(tempPayment))) {
+      actualTemps.push(`${tempPayment}°C`);
     }
     
     let actual = actualTemps.length > 0 ? actualTemps.join(', ') : 'No readings available';
