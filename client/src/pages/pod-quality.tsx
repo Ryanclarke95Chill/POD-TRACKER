@@ -23,7 +23,9 @@ import {
   X,
   Info,
   FileText,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -45,6 +47,14 @@ interface PhotoGalleryProps {
   consignmentNo: string;
 }
 
+interface InlinePhotoModalProps {
+  photos: string[];
+  isOpen: boolean;
+  onClose: () => void;
+  initialPhotoIndex?: number;
+  consignmentNo: string;
+}
+
 interface PhotoThumbnailsProps {
   consignment: Consignment;
   photoCount: number;
@@ -53,7 +63,7 @@ interface PhotoThumbnailsProps {
 }
 
 // Global cache for photos to avoid re-extraction
-const photoCache = new Map<string, string[]>();
+const photoCache = new Map<string, {photos: string[], signaturePhotos: string[]}>;
 
 function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately = false }: PhotoThumbnailsProps) {
   const [photos, setPhotos] = useState<string[]>([]);
@@ -71,9 +81,11 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
 
     // Check cache first
     if (photoCache.has(cacheKey)) {
-      const cachedPhotos = photoCache.get(cacheKey) || [];
-      setPhotos(cachedPhotos);
-      onPhotoLoad(consignment.id, cachedPhotos);
+      const cachedData = photoCache.get(cacheKey);
+      if (cachedData) {
+        setPhotos(cachedData.photos);
+        onPhotoLoad(consignment.id, cachedData.photos);
+      }
       return;
     }
 
@@ -89,9 +101,10 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       
       const data = await response.json();
       const loadedPhotos = data.photos || [];
+      const signaturePhotos = data.signaturePhotos || [];
       
       setPhotos(loadedPhotos);
-      photoCache.set(cacheKey, loadedPhotos);
+      photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos});
       onPhotoLoad(consignment.id, loadedPhotos);
     } catch (error) {
       console.error('Error loading photos:', error);
@@ -187,6 +200,102 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
   );
 }
 
+// Inline Photo Modal Component
+function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, consignmentNo }: InlinePhotoModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialPhotoIndex);
+
+  const nextPhoto = () => {
+    setCurrentIndex((prev) => (prev + 1) % photos.length);
+  };
+
+  const prevPhoto = () => {
+    setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+    if (e.key === 'ArrowRight') nextPhoto();
+    if (e.key === 'ArrowLeft') prevPhoto();
+    if (e.key === 'Escape') onClose();
+  }, [isOpen]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  useEffect(() => {
+    setCurrentIndex(initialPhotoIndex);
+  }, [initialPhotoIndex]);
+
+  if (!isOpen || photos.length === 0) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-full h-[90vh] p-0">
+        <DialogHeader className="p-4 pb-2">
+          <DialogTitle className="flex items-center justify-between">
+            <span>Photo {currentIndex + 1} of {photos.length} - {consignmentNo}</span>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="flex-1 relative flex items-center justify-center bg-black">
+          {/* Navigation buttons */}
+          {photos.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute left-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+                onClick={prevPhoto}
+                data-testid="button-prev-photo"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+                onClick={nextPhoto}
+                data-testid="button-next-photo"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </Button>
+            </>
+          )}
+          
+          {/* Main photo */}
+          <img
+            src={`/api/image?src=${encodeURIComponent(photos[currentIndex])}&w=1200&q=90&fmt=webp`}
+            alt={`Photo ${currentIndex + 1} for ${consignmentNo}`}
+            className="max-w-full max-h-full object-contain"
+            data-testid={`photo-modal-${currentIndex}`}
+          />
+        </div>
+        
+        {/* Photo navigation dots */}
+        {photos.length > 1 && (
+          <div className="flex justify-center p-4 bg-gray-50 gap-2">
+            {photos.map((_, index) => (
+              <button
+                key={index}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentIndex ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+                onClick={() => setCurrentIndex(index)}
+                data-testid={`photo-dot-${index}`}
+              />
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface ProgressiveImageProps {
   src: string;
   alt: string;
@@ -248,12 +357,14 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   // Check cache first for instant loading
   useEffect(() => {
-    const cachedPhotos = photoCache.get(trackingLink);
-    if (cachedPhotos) {
-      setPhotos(cachedPhotos);
+    const cachedData = photoCache.get(trackingLink);
+    if (cachedData) {
+      setPhotos(cachedData.photos);
       setLoading(false);
       return;
     }
@@ -279,7 +390,11 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       const data = await response.json();
       
       if (data.success) {
-        setPhotos(data.photos || []);
+        const regularPhotos = data.photos || [];
+        const signaturePhotos = data.signaturePhotos || [];
+        setPhotos(regularPhotos);
+        // Update cache with both types
+        photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos});
       } else {
         throw new Error(data.message || 'Failed to extract photos');
       }
@@ -365,7 +480,10 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
           <div 
             key={index}
             className="relative group cursor-pointer border rounded-lg overflow-hidden hover:shadow-lg transition-shadow bg-white"
-            onClick={() => window.open(photoUrl, '_blank')}
+            onClick={() => {
+              setSelectedPhotoIndex(index);
+              setPhotoModalOpen(true);
+            }}
             data-testid={`photo-${index}`}
           >
             <ProgressiveImage
@@ -375,7 +493,7 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
               index={index}
             />
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-              <ExternalLink className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
             </div>
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
               <p className="text-white text-sm font-medium">Photo {index + 1}</p>
@@ -383,6 +501,15 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
           </div>
         ))}
       </div>
+
+      {/* Inline Photo Modal */}
+      <InlinePhotoModal
+        photos={photos}
+        isOpen={photoModalOpen}
+        onClose={() => setPhotoModalOpen(false)}
+        initialPhotoIndex={selectedPhotoIndex}
+        consignmentNo={consignmentNo}
+      />
     </div>
   );
 }
