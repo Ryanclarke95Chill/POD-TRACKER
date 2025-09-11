@@ -79,14 +79,17 @@ class PhotoScrapingQueue {
     }
   }
 
-  private async scrapePhotos(token: string): Promise<string[]> {
+  private async scrapePhotos(token: string): Promise<{photos: string[], signaturePhotos: string[]}> {
     console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
     
     // Check cache first
     const cached = photoCache.get(token);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       console.log(`Using cached photos for token: ${token}`);
-      return cached.photos;
+      return {
+        photos: cached.photos,
+        signaturePhotos: cached.signaturePhotos || []
+      };
     }
 
     let photos: string[] = [];
@@ -208,22 +211,35 @@ class PhotoScrapingQueue {
       }
     }
     
-    const filteredPhotos = photos.filter((url: any) => 
+    // Separate signature photos from regular photos
+    const signaturePhotos = photos.filter((url: any) => 
+      url.toLowerCase().includes('signature') ||
+      url.toLowerCase().includes('firma') ||
+      url.toLowerCase().includes('sign')
+    );
+    
+    const regularPhotos = photos.filter((url: any) => 
       !url.toLowerCase().includes('signature') &&
       !url.toLowerCase().includes('firma') &&
       !url.toLowerCase().includes('sign')
     );
     
-    const uniquePhotos = Array.from(new Set(filteredPhotos));
+    const uniqueRegularPhotos = Array.from(new Set(regularPhotos));
+    const uniqueSignaturePhotos = Array.from(new Set(signaturePhotos));
     
     // Cache the results
     photoCache.set(token, {
-      photos: uniquePhotos,
+      photos: uniqueRegularPhotos,
+      signaturePhotos: uniqueSignaturePhotos,
       timestamp: Date.now()
     });
     
-    console.log(`Found ${uniquePhotos.length} photos for token ${token}`);
-    return uniquePhotos;
+    console.log(`Found ${uniqueRegularPhotos.length} regular photos and ${uniqueSignaturePhotos.length} signature photos for token ${token}`);
+    
+    return {
+      photos: uniqueRegularPhotos,
+      signaturePhotos: uniqueSignaturePhotos
+    };
   }
 }
 
@@ -600,12 +616,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Extracting photos for tracking token: ${token}`);
       
       // Use the photo queue for controlled concurrency and prioritization
-      const photos = await photoQueue.addRequest(token, priority as 'high' | 'low');
+      const photoResult = await photoQueue.addRequest(token, priority as 'high' | 'low');
       
       res.json({
         success: true,
-        photos: photos,
-        count: photos.length
+        photos: photoResult.photos,
+        signaturePhotos: photoResult.signaturePhotos,
+        count: photoResult.photos.length,
+        signatureCount: photoResult.signaturePhotos.length
       });
       
     } catch (error: any) {
