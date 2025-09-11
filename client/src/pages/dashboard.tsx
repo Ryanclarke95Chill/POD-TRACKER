@@ -373,7 +373,7 @@ export default function Dashboard() {
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
                   {warehouseCompanies.map((warehouse) => (
-                    <SelectItem key={warehouse} value={warehouse}>
+                    <SelectItem key={warehouse} value={warehouse || ''}>
                       {warehouse}
                     </SelectItem>
                   ))}
@@ -503,7 +503,6 @@ export default function Dashboard() {
             <DashboardTable
               consignments={filteredConsignments}
               onViewDetails={handleViewDetails}
-              getStatusDisplay={getStatusDisplay}
             />
           ) : (
             /* No consignments found */
