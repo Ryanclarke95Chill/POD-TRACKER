@@ -252,24 +252,28 @@ export default function PODQuality() {
     
     // Parse temperature range from expected temp zone (e.g., "Frozen -18C to -20C")
     const parseTemperatureRange = (tempZone: string) => {
-      // Look for patterns like "-18C to -20C", "-18 to -20", "0–4°C", "2–8°C", etc.
-      const rangeMatch = tempZone.match(/(-?\d+)\s*(?:C|°C)?\s*(?:to|–|-)\s*(-?\d+)\s*(?:C|°C)?/i);
+      // Look for patterns like "-18C to -20C", "0C to +4C", "-18 to -20", "0–4°C", "2–8°C", etc.
+      // Updated regex to handle optional + signs and various separators
+      const rangeMatch = tempZone.match(/([+-]?\d+)\s*(?:C|°C)?\s*(?:to|–|-)\s*([+-]?\d+)\s*(?:C|°C)?/i);
       if (rangeMatch) {
         const temp1 = parseFloat(rangeMatch[1]);
         const temp2 = parseFloat(rangeMatch[2]);
+        console.log(`Parsed temperature range: ${temp1} to ${temp2} from "${tempZone}"`);
         return {
           min: Math.min(temp1, temp2),
           max: Math.max(temp1, temp2)
         };
       }
       
-      // Look for single temperature values (e.g., "14°C")
-      const singleMatch = tempZone.match(/(-?\d+)\s*(?:C|°C)/i);
+      // Look for single temperature values (e.g., "14°C", "+14°C")
+      const singleMatch = tempZone.match(/([+-]?\d+)\s*(?:C|°C)/i);
       if (singleMatch) {
         const temp = parseFloat(singleMatch[1]);
+        console.log(`Parsed single temperature: ${temp} from "${tempZone}"`);
         return { min: temp, max: temp };
       }
       
+      console.log(`Could not parse temperature range from: "${tempZone}"`);
       return null;
     };
     
@@ -316,6 +320,14 @@ export default function PODQuality() {
     if (actualTemps.length === 0) return true;
     
     // Check if ANY actual temperature falls within the expected range
+    console.log(`Temperature compliance check:`, {
+      expectedRange,
+      actualTemps,
+      compliant: actualTemps.some(actualTemp => 
+        actualTemp >= expectedRange.min && actualTemp <= expectedRange.max
+      )
+    });
+    
     return actualTemps.some(actualTemp => 
       actualTemp >= expectedRange.min && actualTemp <= expectedRange.max
     );
