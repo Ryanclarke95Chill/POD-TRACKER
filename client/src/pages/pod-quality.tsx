@@ -186,12 +186,9 @@ export default function PODQuality() {
       expected = consignment.expectedTemperature;
     }
     
-    // Get actual recorded temperature from paymentMethod field (after re-sync)
-    const actualTemp = (consignment as any).paymentMethod;
-    let actual = 'N/A';
-    if (actualTemp && !isNaN(parseFloat(actualTemp))) {
-      actual = `${parseFloat(actualTemp)}°C`;
-    }
+    // Actual temperature readings not available in current Axylog API
+    // The API only provides expected temperature zones, not recorded temperatures
+    let actual = 'Not recorded by API';
     
     return { expected, actual };
   };
@@ -220,8 +217,8 @@ export default function PODQuality() {
       const actualTempZone = documentNote.split('\\')[0];
       const fallbackExpectedTemp = consignment.expectedTemperature;
       
-      const normalizeTemp = (temp: string) => temp.toLowerCase().trim();
-      const expectedLower = normalizeTemp(fallbackExpectedTemp || '');
+      const normalizeTemp = (temp: string | null) => (temp || '').toLowerCase().trim();
+      const expectedLower = normalizeTemp(fallbackExpectedTemp);
       const actualLower = normalizeTemp(actualTempZone);
       
       if (expectedLower.includes('frozen') || expectedLower.includes('freezer') || expectedLower.includes('-18') || expectedLower.includes('-20')) {
