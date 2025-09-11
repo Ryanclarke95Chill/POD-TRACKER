@@ -286,6 +286,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.user!.id
           }));
           
+          // Debug temperature data in first consignment
+          console.log("=== DEBUG: First consignment temperature data ===");
+          if (consignmentsToInsert[0]) {
+            const first = consignmentsToInsert[0];
+            console.log("PaymentMethod (temp reading):", first.paymentMethod);
+            console.log("AmountToCollect (temp 1):", first.amountToCollect);
+            console.log("AmountCollected (temp 2):", first.amountCollected);
+            console.log("DocumentCashNotes:", first.documentCashNotes);
+            console.log("ExpectedTemperature:", first.expectedTemperature);
+          }
+          
           await storage.createConsignmentsBatch(consignmentsToInsert);
           console.log(`Successfully inserted ${axylogConsignments.length} consignments`);
         }
