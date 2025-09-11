@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Camera, 
   ExternalLink, 
@@ -41,13 +42,8 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       setLoading(true);
       setError(null);
       
-      // Fetch the tracking page HTML through our proxy
-      const response = await fetch(`/api/proxy-tracking?url=${encodeURIComponent(trackingLink)}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch tracking data');
-      }
-      
+      // Fetch the tracking page HTML through our authenticated proxy
+      const response = await apiRequest('GET', `/api/proxy-tracking?url=${encodeURIComponent(trackingLink)}`);
       const html = await response.text();
       
       // Extract Azure blob storage URLs for images
