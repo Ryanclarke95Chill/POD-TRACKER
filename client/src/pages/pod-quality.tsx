@@ -1143,6 +1143,33 @@ export default function PODQuality() {
     );
   }
 
+  // Fetch POD photos for a tracking token
+  const fetchPODPhotos = async (trackingToken: string) => {
+    try {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=high`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to load photos');
+      
+      const data = await response.json();
+      return {
+        success: true,
+        photos: data.photos || [],
+        signaturePhotos: data.signaturePhotos || []
+      };
+    } catch (error) {
+      console.error('Error fetching POD photos:', error);
+      return {
+        success: false,
+        photos: [],
+        signaturePhotos: []
+      };
+    }
+  };
+
   // Analyze photos for a specific consignment
   const analyzePhotosForConsignment = async (consignment: Consignment) => {
     setPhotoAnalysisLoading(consignment.id);

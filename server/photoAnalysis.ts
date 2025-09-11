@@ -28,6 +28,14 @@ export interface PhotoAnalysisResult {
 export class PhotoAnalysisService {
   private async downloadImageAsBase64(imageUrl: string): Promise<string> {
     try {
+      // Security: Only allow images from trusted axylogdata.blob.core.windows.net domain
+      const allowedDomain = 'axylogdata.blob.core.windows.net';
+      const url = new URL(imageUrl);
+      
+      if (url.hostname !== allowedDomain) {
+        throw new Error(`Image URL not from allowed domain: ${url.hostname}`);
+      }
+      
       const response = await axios.get(imageUrl, {
         responseType: 'arraybuffer',
         timeout: 10000
@@ -105,7 +113,7 @@ Return results in JSON format matching this structure:
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
       });
 
       const result = JSON.parse(response.choices[0].message.content || '{}');
