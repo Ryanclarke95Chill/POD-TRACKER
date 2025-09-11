@@ -16,7 +16,9 @@ import {
   AlertTriangle,
   Clock,
   LogOut,
-  BarChart3
+  BarChart3,
+  RefreshCw,
+  Home
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -46,6 +48,7 @@ export default function PODQuality() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   
+  const [isSyncing, setIsSyncing] = useState(false);
   const user = getUser();
 
   // Fetch all consignments and filter for delivered ones
@@ -422,50 +425,81 @@ export default function PODQuality() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header Navigation */}
-      <header className="gradient-header text-white p-6 shadow-lg">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-6">
-            <h1 className="text-2xl font-bold">POD Quality Report</h1>
-            <nav className="hidden md:flex space-x-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" className="text-white hover:bg-white/20" data-testid="link-dashboard">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Dashboard
-                </Button>
-              </Link>
-              <Link href="/analytics">
-                <Button variant="ghost" className="text-white hover:bg-white/20" data-testid="link-analytics">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Analytics
-                </Button>
-              </Link>
-              <Link href="/view-all">
-                <Button variant="ghost" className="text-white hover:bg-white/20" data-testid="link-view-all">
-                  View All
-                </Button>
-              </Link>
-            </nav>
-          </div>
+  // Handle sync from Axylog
+  const handleSyncFromAxylog = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/axylog/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          syncFromDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 7 days
+          syncToDate: new Date().toISOString().split('T')[0]
+        })
+      });
 
-          <div className="flex items-center space-x-4">
-            <span className="text-white/90">Welcome, {user?.name}</span>
-            <Button
-              onClick={logout}
-              variant="ghost"
-              className="text-white hover:bg-white/20"
-              data-testid="button-logout"
+      if (response.ok) {
+        // Refresh the consignments data
+        window.location.reload();
+      } else {
+        console.error('Sync failed');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Header */}
+      <header className="gradient-primary shadow-header z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-3 text-blue-100 text-sm">POD Quality Analysis</span>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <Link href="/">
+              <Button variant="ghost" className="text-white hover:bg-white/10">
+                <Home className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+            
+            <Button 
+              onClick={handleSyncFromAxylog}
+              disabled={isSyncing}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Syncing...' : 'Sync Axylog'}
+            </Button>
+            
+            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+              <span>{user?.email}</span>
+            </div>
+
+            <Button 
+              className="gradient-accent hover:opacity-90 text-white border-0"
+              onClick={logout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto p-6 space-y-6">
+      {/* Main Content */}
+      <div className="flex-1 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+
+        <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Summary Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -885,7 +919,8 @@ export default function PODQuality() {
             </div>
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
