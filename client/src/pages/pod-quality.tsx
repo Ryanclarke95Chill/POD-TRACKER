@@ -1092,12 +1092,14 @@ export default function PODQuality() {
       // Quality filter
       const matchesQuality = (() => {
         switch (selectedFilter) {
-          case "excellent":
-            return metrics.qualityScore >= 80;
-          case "good":
-            return metrics.qualityScore >= 60 && metrics.qualityScore < 80;
-          case "poor":
-            return metrics.qualityScore < 60;
+          case "gold":
+            return metrics.qualityScore >= 90;
+          case "silver":
+            return metrics.qualityScore >= 75 && metrics.qualityScore < 90;
+          case "bronze":
+            return metrics.qualityScore >= 60 && metrics.qualityScore < 75;
+          case "non-compliant":
+            return metrics.qualityScore === 0;
           case "missing-photos":
             return metrics.photoCount === 0;
           case "missing-signature":
@@ -1139,8 +1141,10 @@ export default function PODQuality() {
     allFilteredAnalyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries : 0;
 
   const getQualityBadge = (score: number) => {
-    if (score >= 80) return <Badge className="bg-green-100 text-green-800">Excellent</Badge>;
-    if (score >= 60) return <Badge className="bg-yellow-100 text-yellow-800">Good</Badge>;
+    if (score === 0) return <Badge className="bg-gray-100 text-gray-800">Non-compliant</Badge>;
+    if (score >= 90) return <Badge className="bg-green-100 text-green-800">Gold</Badge>;
+    if (score >= 75) return <Badge className="bg-blue-100 text-blue-800">Silver</Badge>;
+    if (score >= 60) return <Badge className="bg-yellow-100 text-yellow-800">Bronze</Badge>;
     return <Badge className="bg-red-100 text-red-800">Poor</Badge>;
   };
 
@@ -1470,28 +1474,36 @@ export default function PODQuality() {
                 All
               </Button>
               <Button
-                variant={selectedFilter === "excellent" ? "default" : "outline"}
-                onClick={() => setSelectedFilter("excellent")}
+                variant={selectedFilter === "gold" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("gold")}
                 size="sm"
-                data-testid="button-filter-excellent"
+                data-testid="button-filter-gold"
               >
-                Excellent (80+)
+                Gold (90-100)
               </Button>
               <Button
-                variant={selectedFilter === "good" ? "default" : "outline"}
-                onClick={() => setSelectedFilter("good")}
+                variant={selectedFilter === "silver" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("silver")}
                 size="sm"
-                data-testid="button-filter-good"
+                data-testid="button-filter-silver"
               >
-                Good (60-79)
+                Silver (75-89)
               </Button>
               <Button
-                variant={selectedFilter === "poor" ? "default" : "outline"}
-                onClick={() => setSelectedFilter("poor")}
+                variant={selectedFilter === "bronze" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("bronze")}
                 size="sm"
-                data-testid="button-filter-poor"
+                data-testid="button-filter-bronze"
               >
-                Poor (&lt;60)
+                Bronze (60-74)
+              </Button>
+              <Button
+                variant={selectedFilter === "non-compliant" ? "default" : "outline"}
+                onClick={() => setSelectedFilter("non-compliant")}
+                size="sm"
+                data-testid="button-filter-non-compliant"
+              >
+                Non-compliant (0)
               </Button>
               <Button
                 variant={selectedFilter === "missing-photos" ? "default" : "outline"}
@@ -1595,15 +1607,19 @@ export default function PODQuality() {
                             setScoreBreakdownOpen(true);
                           }}
                           className={`${
-                            metrics.qualityScore >= 80 ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                            metrics.qualityScore === 0 ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
+                            metrics.qualityScore >= 90 ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                            metrics.qualityScore >= 75 ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
                             metrics.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
                             'bg-red-100 text-red-800 hover:bg-red-200'
                           } border-0 font-medium cursor-pointer text-lg px-4 py-2`}
                           data-testid={`button-score-breakdown-${consignment.id}`}
                         >
                           <Info className="h-4 w-4 mr-2" />
-                          {metrics.qualityScore >= 80 ? "Excellent" :
-                           metrics.qualityScore >= 60 ? "Good" : "Poor"} {metrics.qualityScore}/100
+                          {metrics.qualityScore === 0 ? "Non-compliant" :
+                           metrics.qualityScore >= 90 ? "Gold" :
+                           metrics.qualityScore >= 75 ? "Silver" :
+                           metrics.qualityScore >= 60 ? "Bronze" : "Poor"} {metrics.qualityScore}/100
                         </Button>
                       </div>
                     </div>
@@ -1800,12 +1816,16 @@ export default function PODQuality() {
                     {selectedAnalysis.metrics.qualityScore}/100
                   </div>
                   <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedAnalysis.metrics.qualityScore >= 80 ? 'bg-green-100 text-green-800' :
+                    selectedAnalysis.metrics.qualityScore === 0 ? 'bg-gray-100 text-gray-800' :
+                    selectedAnalysis.metrics.qualityScore >= 90 ? 'bg-green-100 text-green-800' :
+                    selectedAnalysis.metrics.qualityScore >= 75 ? 'bg-blue-100 text-blue-800' :
                     selectedAnalysis.metrics.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800'
                   }`}>
-                    {selectedAnalysis.metrics.qualityScore >= 80 ? "Excellent" :
-                     selectedAnalysis.metrics.qualityScore >= 60 ? "Good" : "Poor"} Quality
+                    {selectedAnalysis.metrics.qualityScore === 0 ? "Non-compliant" :
+                     selectedAnalysis.metrics.qualityScore >= 90 ? "Gold" :
+                     selectedAnalysis.metrics.qualityScore >= 75 ? "Silver" :
+                     selectedAnalysis.metrics.qualityScore >= 60 ? "Bronze" : "Poor"} Quality
                   </div>
                 </div>
 
