@@ -349,38 +349,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  // Proxy tracking endpoint for photo extraction
-  app.get("/api/proxy-tracking", authenticate, async (req: AuthRequest, res: Response) => {
+  // Extract POD photos from tracking system
+  app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      const { url } = req.query;
+      const { trackingToken } = req.query;
       
-      if (!url || typeof url !== 'string') {
-        return res.status(400).json({ message: "URL parameter is required" });
+      if (!trackingToken || typeof trackingToken !== 'string') {
+        return res.status(400).json({ message: "trackingToken parameter is required" });
       }
       
-      // Validate that it's an Axylog URL for security
-      if (!url.includes('live.axylog.com')) {
-        return res.status(403).json({ message: "Only Axylog tracking URLs are allowed" });
+      // Extract tracking token from full URL if provided
+      let token = trackingToken;
+      if (token.includes('live.axylog.com/')) {
+        token = token.split('live.axylog.com/')[1];
       }
       
-      // Fetch the tracking page
-      const response = await fetch(url);
+      console.log(`Extracting photos for tracking token: ${token}`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tracking page: ${response.status}`);
+      // Try different potential API endpoints that the Angular SPA might use
+      const possibleEndpoints = [
+        `https://api.axylog.com/live/${token}/attachments`,
+        `https://api.axylog.com/live/${token}/documents`,
+        `https://api.axylog.com/live/${token}/files`,
+        `https://live.axylog.com/api/${token}/attachments`,
+        `https://live.axylog.com/api/attachments/${token}`,
+      ];
+      
+      let photos = [];
+      
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
+          const response = await fetch(endpoint);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Success from ${endpoint}:`, JSON.stringify(data, null, 2));
+            
+            // Try to extract photo URLs from various response formats
+            if (Array.isArray(data)) {
+              photos = data.filter((item: any) => 
+                item.url && 
+                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
+                 item.url.includes('.png') || item.url.includes('.gif'))
+              ).map((item: any) => item.url);
+            } else if (data.attachments && Array.isArray(data.attachments)) {
+              photos = data.attachments.filter((item: any) => 
+                item.url && 
+                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
+                 item.url.includes('.png') || item.url.includes('.gif'))
+              ).map((item: any) => item.url);
+            } else if (data.files && Array.isArray(data.files)) {
+              photos = data.files.filter((item: any) => 
+                item.url && 
+                (item.url.includes('.jpg') || item.url.includes('.jpeg') || 
+                 item.url.includes('.png') || item.url.includes('.gif'))
+              ).map((item: any) => item.url);
+            }
+            
+            if (photos.length > 0) {
+              break; // Found photos, stop trying other endpoints
+            }
+          }
+        } catch (endpointError: any) {
+          console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+          continue;
+        }
       }
       
-      const html = await response.text();
+      // Filter out signatures and duplicates
+      const filteredPhotos = photos.filter((url: any) => 
+        !url.toLowerCase().includes('signature') &&
+        !url.toLowerCase().includes('firma') &&
+        !url.toLowerCase().includes('sign')
+      );
       
-      // Return the HTML content for photo extraction
-      res.header('Content-Type', 'text/html');
-      res.send(html);
+      const uniquePhotos = Array.from(new Set(filteredPhotos));
+      
+      console.log(`Found ${uniquePhotos.length} photos for token ${token}`);
+      
+      res.json({
+        success: true,
+        photos: uniquePhotos,
+        count: uniquePhotos.length
+      });
       
     } catch (error: any) {
-      console.error("Error proxying tracking request:", error);
+      console.error("Error extracting POD photos:", error);
       res.status(500).json({ 
-        message: "Failed to fetch tracking data",
-        error: error instanceof Error ? error.message : 'Unknown error'
+        success: false,
+        message: "Failed to extract photos",
+        error: error instanceof Error ? error.message : 'Unknown error',
+        photos: []
       });
     }
   });
