@@ -250,70 +250,75 @@ export default function PODQuality() {
     // If no expected temperature is specified, we can't determine compliance
     if (!expectedTemp) return true;
     
-    // Get actual recorded temperature from paymentMethod field (e.g., "-18.5" for -18.5°C)
-    const actualTemp = (consignment as any).paymentMethod;
-    if (!actualTemp) {
-      // Fallback to old logic if no recorded temperature available
+    // Parse temperature range from expected temp zone (e.g., "Frozen -18C to -20C")
+    const parseTemperatureRange = (tempZone: string) => {
+      // Look for patterns like "-18C to -20C", "-18 to -20", "0–4°C", "2–8°C", etc.
+      const rangeMatch = tempZone.match(/(-?\d+)\s*(?:C|°C)?\s*(?:to|–|-)\s*(-?\d+)\s*(?:C|°C)?/i);
+      if (rangeMatch) {
+        const temp1 = parseFloat(rangeMatch[1]);
+        const temp2 = parseFloat(rangeMatch[2]);
+        return {
+          min: Math.min(temp1, temp2),
+          max: Math.max(temp1, temp2)
+        };
+      }
+      
+      // Look for single temperature values (e.g., "14°C")
+      const singleMatch = tempZone.match(/(-?\d+)\s*(?:C|°C)/i);
+      if (singleMatch) {
+        const temp = parseFloat(singleMatch[1]);
+        return { min: temp, max: temp };
+      }
+      
+      return null;
+    };
+    
+    // Get the expected temperature range
+    const expectedRange = parseTemperatureRange(expectedTemp);
+    if (!expectedRange) {
+      // Fallback to text matching if we can't parse numeric ranges
+      const expectedLower = expectedTemp.toLowerCase();
       const documentNote = consignment.documentNote;
       if (!documentNote) return true;
       
-      const actualTempZone = documentNote.split('\\')[0];
-      const fallbackExpectedTemp = consignment.expectedTemperature;
+      const actualTempZone = documentNote.split('\\')[0].toLowerCase();
       
-      const normalizeTemp = (temp: string | null) => (temp || '').toLowerCase().trim();
-      const expectedLower = normalizeTemp(fallbackExpectedTemp);
-      const actualLower = normalizeTemp(actualTempZone);
-      
-      if (expectedLower.includes('frozen') || expectedLower.includes('freezer') || expectedLower.includes('-18') || expectedLower.includes('-20')) {
-        return actualLower.includes('frozen') || actualLower.includes('freezer') || actualLower.includes('-18') || actualLower.includes('-20');
+      if (expectedLower.includes('frozen') || expectedLower.includes('freezer')) {
+        return actualTempZone.includes('frozen') || actualTempZone.includes('freezer');
       }
       
-      if (expectedLower.includes('chiller') || expectedLower.includes('0-4') || expectedLower.includes('0–4')) {
-        return actualLower.includes('chiller') || actualLower.includes('0-4') || actualLower.includes('0–4');
+      if (expectedLower.includes('chiller')) {
+        return actualTempZone.includes('chiller');
       }
       
       return true; // If we can't determine, assume compliant
     }
     
-    // Parse actual recorded temperature (e.g., "-18.5" -> -18.5)
-    const actualTempValue = parseFloat(actualTemp);
-    if (isNaN(actualTempValue)) return true; // Invalid temperature data
+    // Get all actual temperature readings
+    const temp1 = (consignment as any).amountToCollect;
+    const temp2 = (consignment as any).amountCollected;
+    const tempPayment = (consignment as any).paymentMethod;
     
-    // Get expected temperature ranges for each zone
-    const expectedTempLower = (expectedTemp || '').toLowerCase();
+    let actualTemps = [];
     
-    if (expectedTempLower.includes('freezer') || expectedTempLower.includes('-20')) {
-      // Freezer: typically -20°C ± 5°C tolerance
-      return actualTempValue >= -25 && actualTempValue <= -15;
+    // Collect all valid temperature readings (filter out 999 values)
+    if (temp1 && temp1 !== 999 && temp1 !== '999' && !isNaN(parseFloat(temp1.toString()))) {
+      actualTemps.push(parseFloat(temp1.toString()));
+    }
+    if (temp2 && temp2 !== 999 && temp2 !== '999' && !isNaN(parseFloat(temp2.toString()))) {
+      actualTemps.push(parseFloat(temp2.toString()));
+    }
+    if (tempPayment && tempPayment !== 999 && tempPayment !== '999' && !isNaN(parseFloat(tempPayment))) {
+      actualTemps.push(parseFloat(tempPayment));
     }
     
-    if (expectedTempLower.includes('chiller') || expectedTempLower.includes('0–4') || expectedTempLower.includes('0-4')) {
-      // Chiller: 0-4°C ± 2°C tolerance  
-      return actualTempValue >= -2 && actualTempValue <= 6;
-    }
+    // If no actual temperature readings, assume compliant
+    if (actualTemps.length === 0) return true;
     
-    if (expectedTempLower.includes('wine') || expectedTempLower.includes('14')) {
-      // Wine: 14°C ± 3°C tolerance
-      return actualTempValue >= 11 && actualTempValue <= 17;
-    }
-    
-    if (expectedTempLower.includes('confectionery') || expectedTempLower.includes('15–20') || expectedTempLower.includes('15-20')) {
-      // Confectionery: 15-20°C ± 2°C tolerance
-      return actualTempValue >= 13 && actualTempValue <= 22;
-    }
-    
-    if (expectedTempLower.includes('pharma') || expectedTempLower.includes('2–8') || expectedTempLower.includes('2-8')) {
-      // Pharma: 2-8°C ± 1°C tolerance
-      return actualTempValue >= 1 && actualTempValue <= 9;
-    }
-    
-    if (expectedTempLower.includes('dry') || expectedTempLower.includes('ambient')) {
-      // Dry: ambient temperature (typically 15-25°C range)
-      return actualTempValue >= 10 && actualTempValue <= 30;
-    }
-    
-    // If we can't determine compliance, assume compliant
-    return true;
+    // Check if ANY actual temperature falls within the expected range
+    return actualTemps.some(actualTemp => 
+      actualTemp >= expectedRange.min && actualTemp <= expectedRange.max
+    );
   };
 
   // Process and filter consignments
