@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { photoWorker } from "./photoIngestionWorker";
 import axylogProxy from "./axylog-proxy";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -133,7 +134,21 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Initialize and start background photo ingestion worker
+    try {
+      console.log('Starting background photo ingestion worker...');
+      await photoWorker.initialize();
+      
+      // Enqueue existing consignments for background processing
+      await photoWorker.enqueueFromConsignments();
+      
+      console.log('Background photo ingestion worker started successfully');
+    } catch (error) {
+      console.error('Failed to start photo ingestion worker:', error);
+      // Continue running server even if worker fails to start
+    }
   });
 })();

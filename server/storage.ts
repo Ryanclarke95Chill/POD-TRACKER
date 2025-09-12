@@ -155,9 +155,9 @@ export class DatabaseStorage implements IStorage {
       // Fast aggregation query for dashboard statistics
       const results = await db.select({
         total: sql<number>`COUNT(*)`,
-        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.status} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
-        delivered: sql<number>`COUNT(CASE WHEN ${consignments.status} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
-        pending: sql<number>`COUNT(CASE WHEN ${consignments.status} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
       }).from(consignments);
       
       return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
@@ -179,9 +179,9 @@ export class DatabaseStorage implements IStorage {
       
       const results = await db.select({
         total: sql<number>`COUNT(*)`,
-        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
-        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
-        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
       }).from(consignments).where(eq(consignments.userId, adminUser.id));
       
       return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
@@ -200,9 +200,9 @@ export class DatabaseStorage implements IStorage {
       
       const results = await db.select({
         total: sql<number>`COUNT(*)`,
-        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
-        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
-        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
       }).from(consignments).where(
         and(
           eq(consignments.userId, adminUser.id),
@@ -228,9 +228,9 @@ export class DatabaseStorage implements IStorage {
       
       const results = await db.select({
         total: sql<number>`COUNT(*)`,
-        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
-        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
-        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
       }).from(consignments).where(
         and(
           eq(consignments.userId, adminUser.id),
@@ -254,9 +254,9 @@ export class DatabaseStorage implements IStorage {
     return await safeQuery(async () => {
       const results = await db.select({
         total: sql<number>`COUNT(*)`,
-        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
-        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
-        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryStatus} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
+        inTransit: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('In Transit', 'Traveling', 'Out for delivery') THEN 1 END)`,
+        delivered: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} IN ('Delivered', 'Complete', 'POD') THEN 1 END)`,
+        pending: sql<number>`COUNT(CASE WHEN ${consignments.deliveryState} NOT IN ('In Transit', 'Traveling', 'Out for delivery', 'Delivered', 'Complete', 'POD') THEN 1 END)`
       }).from(consignments).where(eq(consignments.userId, userId));
       
       return results[0] || { total: 0, inTransit: 0, delivered: 0, pending: 0 };
@@ -353,7 +353,7 @@ export class DatabaseStorage implements IStorage {
 
   async getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined> {
     const result = await safeQuery(async () => {
-      const [consignment] = await db.select().from(consignments).where(eq(consignments.consignmentNumber, consignmentNumber));
+      const [consignment] = await db.select().from(consignments).where(eq(consignments.consignmentNo, consignmentNumber));
       return consignment || undefined;
     });
     return result;
@@ -383,83 +383,6 @@ export class DatabaseStorage implements IStorage {
   async seedDemoConsignments(userId: number): Promise<void> {
     // No more demo data - using real imported data only
     return;
-
-    const demoConsignments = [
-      {
-        userId,
-        consignmentNumber: "CH001234",
-        customerName: "Fresh Foods Co.",
-        consignmentReference: null,
-        trackingLink: null,
-        pickupAddress: "Sydney NSW 2000",
-        deliveryAddress: "Melbourne VIC 3000",
-        status: "In Transit",
-        estimatedDeliveryDate: format(addDays(new Date(), 2), "yyyy-MM-dd HH:mm:ss"),
-        lastKnownLocation: "Albury NSW",
-        temperatureZone: "Chiller 0-4°C",
-        deliveryDate: null,
-        dateDelivered: null,
-        deliveryRun: null,
-        quantity: null,
-        pallets: null,
-        spaces: null,
-        cubicMeters: null,
-        weightKg: null,
-        events: [
-          {
-            timestamp: format(subDays(new Date(), 1), "yyyy-MM-dd HH:mm:ss"),
-            description: "Package collected from sender",
-            location: "Sydney NSW",
-            type: "pickup"
-          },
-          {
-            timestamp: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
-            description: "In transit to destination",
-            location: "Albury NSW",
-            type: "transit"
-          }
-        ]
-      },
-      {
-        userId,
-        consignmentNumber: "CH005678",
-        customerName: "Wine Cellar Imports",
-        consignmentReference: null,
-        trackingLink: null,
-        pickupAddress: "Adelaide SA 5000",
-        deliveryAddress: "Brisbane QLD 4000",
-        status: "Delivered",
-        estimatedDeliveryDate: format(subDays(new Date(), 1), "yyyy-MM-dd HH:mm:ss"),
-        lastKnownLocation: "Brisbane QLD",
-        temperatureZone: "Wine 14°C",
-        deliveryDate: format(subDays(new Date(), 1), "yyyy-MM-dd"),
-        dateDelivered: format(subDays(new Date(), 1), "yyyy-MM-dd HH:mm:ss"),
-        deliveryRun: null,
-        quantity: null,
-        pallets: null,
-        spaces: null,
-        cubicMeters: null,
-        weightKg: null,
-        events: [
-          {
-            timestamp: format(subDays(new Date(), 3), "yyyy-MM-dd HH:mm:ss"),
-            description: "Package collected from sender",
-            location: "Adelaide SA",
-            type: "pickup"
-          },
-          {
-            timestamp: format(subDays(new Date(), 1), "yyyy-MM-dd HH:mm:ss"),
-            description: "Delivered successfully",
-            location: "Brisbane QLD",
-            type: "delivery"
-          }
-        ]
-      }
-    ];
-
-    for (const consignment of demoConsignments) {
-      await db.insert(consignments).values(consignment);
-    }
   }
 
   async clearAllConsignments(): Promise<void> {

@@ -14,14 +14,14 @@ import { photoAnalysisService } from "./photoAnalysis";
 
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
-const photoCache = new Map<string, { photos: string[], timestamp: number }>();
+const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Photo scraping queue system with concurrency control
 interface PhotoRequest {
   token: string;
   priority: 'high' | 'low'; // high = user clicks, low = background loading
-  resolve: (photos: string[]) => void;
+  resolve: (photos: {photos: string[], signaturePhotos: string[]}) => void;
   reject: (error: Error) => void;
 }
 
@@ -30,13 +30,16 @@ class PhotoScrapingQueue {
   private activeRequests = new Set<string>();
   private readonly maxConcurrency = 3; // Limit concurrent scraping operations
 
-  async addRequest(token: string, priority: 'high' | 'low'): Promise<string[]> {
+  async addRequest(token: string, priority: 'high' | 'low'): Promise<{photos: string[], signaturePhotos: string[]}> {
     // If already processing this token, wait for existing request
     if (this.activeRequests.has(token)) {
       // Return cached result if available
       const cached = photoCache.get(token);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return cached.photos;
+        return {
+          photos: cached.photos,
+          signaturePhotos: cached.signaturePhotos
+        };
       }
       
       // Wait a short time and try again
@@ -89,7 +92,7 @@ class PhotoScrapingQueue {
       console.log(`Using cached photos for token: ${token}`);
       return {
         photos: cached.photos,
-        signaturePhotos: cached.signaturePhotos || []
+        signaturePhotos: cached.signaturePhotos
       };
     }
 
@@ -749,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clean up old cache entries occasionally
       if (Math.random() < 0.01) { // 1% chance
         const now = Date.now();
-        for (const [key, value] of imageCache.entries()) {
+        for (const [key, value] of Array.from(imageCache.entries())) {
           if (now - value.timestamp > IMAGE_CACHE_DURATION) {
             imageCache.delete(key);
           }
