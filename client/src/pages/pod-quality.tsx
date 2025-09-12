@@ -207,16 +207,26 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
   );
 }
 
-// Inline Photo Modal Component
+// Modern Photo Modal Component with Enhanced UX
 function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, consignmentNo }: InlinePhotoModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialPhotoIndex);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const nextPhoto = () => {
     setCurrentIndex((prev) => (prev + 1) % photos.length);
+    setIsLoading(true);
+    setIsZoomed(false);
   };
 
   const prevPhoto = () => {
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setIsLoading(true);
+    setIsZoomed(false);
+  };
+
+  const toggleZoom = () => {
+    setIsZoomed(!isZoomed);
   };
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -224,6 +234,10 @@ function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, cons
     if (e.key === 'ArrowRight') nextPhoto();
     if (e.key === 'ArrowLeft') prevPhoto();
     if (e.key === 'Escape') onClose();
+    if (e.key === ' ') {
+      e.preventDefault();
+      toggleZoom();
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -233,71 +247,150 @@ function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, cons
 
   useEffect(() => {
     setCurrentIndex(initialPhotoIndex);
+    setIsLoading(true);
+    setIsZoomed(false);
   }, [initialPhotoIndex]);
 
   if (!isOpen || photos.length === 0) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl w-full h-[90vh] p-0">
-        <DialogHeader className="p-4 pb-2">
-          <DialogTitle className="flex items-center justify-between">
-            <span>Photo {currentIndex + 1} of {photos.length} - {consignmentNo}</span>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-7xl w-full h-[95vh] p-0 bg-black border-none">
+        {/* Enhanced Header */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 to-transparent p-6">
+          <div className="flex items-center justify-between text-white">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
+                <span className="font-medium">Photo {currentIndex + 1} of {photos.length}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
+                <span className="text-sm opacity-90">{consignmentNo}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={toggleZoom}
+                className="text-white hover:bg-white/20 transition-all duration-200"
+                title="Toggle zoom (Spacebar)"
+              >
+                {isZoomed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onClose}
+                className="text-white hover:bg-white/20 transition-all duration-200"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
         
-        <div className="flex-1 relative flex items-center justify-center bg-black">
-          {/* Navigation buttons */}
+        {/* Main Photo Display */}
+        <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+          {/* Loading Skeleton */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+          
+          {/* Navigation Buttons with Enhanced Design */}
           {photos.length > 1 && (
             <>
               <Button
                 variant="ghost"
-                size="sm"
-                className="absolute left-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+                size="lg"
+                className="absolute left-6 z-10 h-16 w-16 bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/20 rounded-full transition-all duration-300 hover:scale-110"
                 onClick={prevPhoto}
                 data-testid="button-prev-photo"
               >
-                <ChevronLeft className="h-6 w-6" />
+                <ChevronLeft className="h-8 w-8" />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="absolute right-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+                size="lg"
+                className="absolute right-6 z-10 h-16 w-16 bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/20 rounded-full transition-all duration-300 hover:scale-110"
                 onClick={nextPhoto}
                 data-testid="button-next-photo"
               >
-                <ChevronRight className="h-6 w-6" />
+                <ChevronRight className="h-8 w-8" />
               </Button>
             </>
           )}
           
-          {/* Main photo */}
-          <img
-            src={`/api/image?src=${encodeURIComponent(photos[currentIndex])}&w=1200&q=90&fmt=webp`}
-            alt={`Photo ${currentIndex + 1} for ${consignmentNo}`}
-            className="max-w-full max-h-full object-contain"
-            data-testid={`photo-modal-${currentIndex}`}
-          />
+          {/* Enhanced Photo Display */}
+          <div 
+            className={`transition-all duration-500 cursor-pointer ${
+              isZoomed ? 'scale-150 origin-center' : 'scale-100'
+            }`}
+            onClick={toggleZoom}
+          >
+            <img
+              src={`/api/image?src=${encodeURIComponent(photos[currentIndex])}&w=${isZoomed ? '2000' : '1400'}&q=95&fmt=webp`}
+              alt={`Photo ${currentIndex + 1} for ${consignmentNo}`}
+              className="max-w-full max-h-[95vh] object-contain transition-opacity duration-300"
+              onLoad={() => setIsLoading(false)}
+              data-testid={`photo-modal-${currentIndex}`}
+            />
+          </div>
         </div>
         
-        {/* Photo navigation dots */}
+        {/* Enhanced Navigation Bar */}
         {photos.length > 1 && (
-          <div className="flex justify-center p-4 bg-gray-50 gap-2">
-            {photos.map((_, index) => (
-              <button
-                key={index}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  index === currentIndex ? 'bg-blue-500' : 'bg-gray-300'
-                }`}
-                onClick={() => setCurrentIndex(index)}
-                data-testid={`photo-dot-${index}`}
+          <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/80 to-transparent p-6">
+            <div className="flex justify-center items-center gap-3">
+              {/* Thumbnail Navigation */}
+              <div className="flex gap-2 bg-white/10 backdrop-blur-sm rounded-full p-2 max-w-md overflow-x-auto">
+                {photos.map((photo, index) => (
+                  <button
+                    key={index}
+                    className={`flex-shrink-0 relative overflow-hidden rounded-lg transition-all duration-300 ${
+                      index === currentIndex 
+                        ? 'ring-2 ring-white scale-110 shadow-lg' 
+                        : 'hover:scale-105 opacity-60 hover:opacity-100'
+                    }`}
+                    onClick={() => {
+                      setCurrentIndex(index);
+                      setIsLoading(true);
+                      setIsZoomed(false);
+                    }}
+                    data-testid={`photo-thumb-nav-${index}`}
+                  >
+                    <img
+                      src={`/api/image?src=${encodeURIComponent(photo)}&w=60&q=80&fmt=webp`}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-12 h-12 object-cover"
+                    />
+                    {index === currentIndex && (
+                      <div className="absolute inset-0 bg-white/20" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Progress Indicator */}
+            <div className="mt-4 bg-white/10 rounded-full h-1 overflow-hidden">
+              <div 
+                className="h-full bg-white transition-all duration-500 ease-out"
+                style={{ width: `${((currentIndex + 1) / photos.length) * 100}%` }}
               />
-            ))}
+            </div>
           </div>
         )}
+        
+        {/* Keyboard Shortcuts Hint */}
+        <div className="absolute top-20 right-6 z-20 bg-black/50 backdrop-blur-sm rounded-lg p-3 text-white text-xs opacity-0 hover:opacity-100 transition-opacity duration-300">
+          <div className="space-y-1">
+            <div>← → Navigate</div>
+            <div>Space: Zoom</div>
+            <div>Esc: Close</div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -476,34 +569,99 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-4">
-        <p className="text-sm text-gray-600">
-          Found {photos.length} photo{photos.length !== 1 ? 's' : ''} for {consignmentNo}
-        </p>
+    <div className="p-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 min-h-[70vh]">
+      {/* Enhanced Header with Stats */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              POD Photos - {consignmentNo}
+            </h2>
+            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full">
+                <Camera className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="font-medium">{photos.length} photos</span>
+              </div>
+              <div className="text-xs opacity-75">
+                Use the tracking system to view and assess photo quality for POD scoring.
+              </div>
+            </div>
+          </div>
+          <Button 
+            onClick={() => window.open(trackingLink, '_blank')} 
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          >
+            <ExternalLink className="h-4 w-4" />
+            View Full Tracking Page
+          </Button>
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto">
+
+      {/* Modern Photo Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[60vh] overflow-y-auto pr-2">
         {photos.map((photoUrl, index) => (
           <div 
             key={index}
-            className="relative group cursor-pointer border rounded-lg overflow-hidden hover:shadow-lg transition-shadow bg-white"
+            className="group relative cursor-pointer transform transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1"
             onClick={() => {
               setSelectedPhotoIndex(index);
               setPhotoModalOpen(true);
             }}
             data-testid={`photo-${index}`}
           >
-            <ProgressiveImage
-              src={photoUrl}
-              alt={`POD Photo ${index + 1} for ${consignmentNo}`}
-              className="w-full h-48"
-              index={index}
-            />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-sm font-medium">Photo {index + 1}</p>
+            {/* Enhanced Photo Card */}
+            <div className="relative bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-md group-hover:shadow-2xl transition-all duration-300 border border-gray-100 dark:border-gray-700">
+              {/* Photo Container */}
+              <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-700">
+                <ProgressiveImage
+                  src={photoUrl}
+                  alt={`POD Photo ${index + 1} for ${consignmentNo}`}
+                  className="w-full h-full"
+                  index={index}
+                />
+                
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/20 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-3 transform scale-75 group-hover:scale-100 transition-transform duration-300">
+                      <Eye className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Photo Number Badge */}
+                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-sm font-medium px-3 py-1 rounded-full">
+                  {index + 1}
+                </div>
+                
+                {/* Quick Actions */}
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="flex gap-1">
+                    <button className="bg-white/20 backdrop-blur-sm hover:bg-white/30 rounded-full p-2 transition-colors duration-200">
+                      <Download className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Enhanced Footer */}
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      Photo {index + 1}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Click to view full size
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="High Quality" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ))}
