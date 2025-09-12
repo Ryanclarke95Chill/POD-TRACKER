@@ -248,10 +248,20 @@ const photoQueue = new PhotoScrapingQueue();
 
 // Image processing cache
 const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();
-const IMAGE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const IMAGE_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Allowed hosts for image proxy (security)
-const ALLOWED_HOSTS = ['axylogdata.blob.core.windows.net'];
+const ALLOWED_HOSTS = [
+  'axylogdata.blob.core.windows.net',
+  'live.axylog.com',
+  'www.live.axylog.com',
+  'assets.live.axylog.com'
+];
+
+// Helper to check if hostname is allowed (supports axylog.com suffix)
+function isHostAllowed(hostname: string): boolean {
+  return ALLOWED_HOSTS.includes(hostname) || hostname.endsWith('.axylog.com');
+}
 
 // Helper function to create cache key
 function createImageCacheKey(url: string, width?: number, quality?: number, format?: string): string {
@@ -657,7 +667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid URL' });
       }
       
-      if (!ALLOWED_HOSTS.includes(url.hostname)) {
+      if (!isHostAllowed(url.hostname)) {
+        console.log(`Blocked image from hostname: ${url.hostname}, src: ${src}`);
         return res.status(403).json({ error: 'Host not allowed' });
       }
       
@@ -685,7 +696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (cached && Date.now() - cached.timestamp < IMAGE_CACHE_DURATION) {
         res.set({
           'Content-Type': cached.contentType,
-          'Cache-Control': 'public, max-age=86400, immutable',
+          'Cache-Control': 'public, max-age=604800, immutable, stale-while-revalidate=86400',
           'X-Cache': 'HIT'
         });
         return res.send(cached.buffer);
@@ -747,7 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.set({
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400, immutable',
+        'Cache-Control': 'public, max-age=604800, immutable, stale-while-revalidate=86400',
         'X-Cache': 'MISS'
       });
       
