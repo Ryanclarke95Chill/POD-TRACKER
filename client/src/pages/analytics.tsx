@@ -700,309 +700,45 @@ export default function PODAnalytics() {
             </div>
           </TabsContent>
 
-          {/* State Comparison Tab */}
-          <TabsContent value="states" className="space-y-6">
-            <Card className="bg-card border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">State POD Performance Comparison</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Compare POD quality and completion rates across states
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={stateData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
-                    <XAxis dataKey="state" stroke="hsl(var(--chart-axis))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--chart-axis))" fontSize={12} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        color: 'hsl(var(--card-foreground))'
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="avgQuality" fill={COLORS[1]} name="Avg Photo Quality %" />
-                    <Bar dataKey="photoCompletionRate" fill={COLORS[0]} name="Photo Completion Rate %" />
-                    <Bar dataKey="verificationRate" fill={COLORS[2]} name="Verification Rate %" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {/* Quality Analysis Tab */}
+            <TabsContent value="quality" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <FileSignature className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                    <p className="text-2xl font-bold text-card-foreground">{podAnalytics.componentStats.signature.passRate.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">Signature Rate</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                    <p className="text-2xl font-bold text-card-foreground">{podAnalytics.componentStats.receiverName.passRate.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">Receiver Name Rate</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <Thermometer className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+                    <p className="text-2xl font-bold text-card-foreground">{podAnalytics.componentStats.temperature.passRate.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">Temperature Compliance</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <Camera className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                    <p className="text-2xl font-bold text-card-foreground">{podAnalytics.componentStats.photos.passRate.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">Photo Compliance</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
 
-            {/* Detailed State Table */}
-            <Card className="bg-card border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Detailed State POD Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-card-foreground">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4">State</th>
-                        <th className="text-left py-3 px-4">Total PODs</th>
-                        <th className="text-left py-3 px-4">Photo Quality</th>
-                        <th className="text-left py-3 px-4">Completion Rate</th>
-                        <th className="text-left py-3 px-4">Verification Rate</th>
-                        <th className="text-left py-3 px-4">Issue Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stateData.map((state, index) => (
-                        <tr key={index} className="border-b border-border/50 hover:bg-muted/50">
-                          <td className="py-3 px-4 font-medium">{state.state}</td>
-                          <td className="py-3 px-4">{state.totalPODs.toLocaleString()}</td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              {state.avgQuality}%
-                              {state.avgQuality >= 90 ? (
-                                <Star className="h-4 w-4 text-yellow-400" />
-                              ) : state.avgQuality >= 85 ? (
-                                <CheckCircle className="h-4 w-4 text-green-400" />
-                              ) : (
-                                <AlertTriangle className="h-4 w-4 text-orange-400" />
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">{state.photoCompletionRate}%</td>
-                          <td className="py-3 px-4">{state.verificationRate}%</td>
-                          <td className="py-3 px-4">
-                            <span className={`${state.issueRate < 4 ? 'text-green-400' : state.issueRate < 6 ? 'text-yellow-400' : 'text-red-400'}`}>
-                              {state.issueRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Driver Performance Tab */}
-          <TabsContent value="drivers" className="space-y-6">
-            <Card className="bg-card border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Driver POD Performance Rankings</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Top performing drivers based on POD quality and completion metrics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-card-foreground">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4">Rank</th>
-                        <th className="text-left py-3 px-4">Driver</th>
-                        <th className="text-left py-3 px-4">State</th>
-                        <th className="text-left py-3 px-4">Deliveries</th>
-                        <th className="text-left py-3 px-4">Photo Quality</th>
-                        <th className="text-left py-3 px-4">POD Completion</th>
-                        <th className="text-left py-3 px-4">Verification Accuracy</th>
-                        <th className="text-left py-3 px-4">Issues</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {driverData
-                        .sort((a, b) => (b.avgPhotoQuality + b.podCompletionRate) - (a.avgPhotoQuality + a.podCompletionRate))
-                        .map((driver, index) => (
-                        <tr key={index} className="border-b border-border/50 hover:bg-muted/50">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              {index + 1}
-                              {index < 3 && <Star className="h-4 w-4 text-yellow-400" />}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 font-medium">{driver.driverName}</td>
-                          <td className="py-3 px-4">
-                            <Badge variant="outline" className="text-xs">
-                              {driver.state}
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-4">{driver.totalDeliveries}</td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              {driver.avgPhotoQuality}%
-                              {driver.avgPhotoQuality >= 95 ? (
-                                <Star className="h-4 w-4 text-yellow-400" />
-                              ) : driver.avgPhotoQuality >= 90 ? (
-                                <CheckCircle className="h-4 w-4 text-green-400" />
-                              ) : (
-                                <AlertTriangle className="h-4 w-4 text-orange-400" />
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">{driver.podCompletionRate}%</td>
-                          <td className="py-3 px-4">{driver.verificationAccuracy}%</td>
-                          <td className="py-3 px-4">
-                            <span className={`${driver.totalIssues < 5 ? 'text-green-400' : driver.totalIssues < 10 ? 'text-yellow-400' : 'text-red-400'}`}>
-                              {driver.totalIssues}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Photo Quality Tab */}
-          <TabsContent value="quality" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-card border shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-card-foreground">Photo Quality Metrics</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-3xl font-bold text-green-400">94.2%</div>
-                      <div className="text-sm text-muted-foreground">Photos Above 80%</div>
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold text-blue-400">2.3s</div>
-                      <div className="text-sm text-muted-foreground">Avg Processing Time</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Excellent (90-100%)</span>
-                      <span className="text-green-400">45% of photos</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div className="bg-green-400 h-2 rounded-full" style={{ width: '45%' }}></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Good (80-89%)</span>
-                      <span className="text-blue-400">32% of photos</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div className="bg-blue-400 h-2 rounded-full" style={{ width: '32%' }}></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Needs Improvement (&lt;80%)</span>
-                      <span className="text-orange-400">23% of photos</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div className="bg-orange-400 h-2 rounded-full" style={{ width: '23%' }}></div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card border shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-card-foreground">Common Quality Issues</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Blurry Images</span>
-                    </div>
-                    <span className="text-red-400">28%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Poor Lighting</span>
-                    </div>
-                    <span className="text-orange-400">22%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Obstructed View</span>
-                    </div>
-                    <span className="text-yellow-400">18%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Wrong Angle</span>
-                    </div>
-                    <span className="text-blue-400">15%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Incomplete Coverage</span>
-                    </div>
-                    <span className="text-purple-400">12%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                      <span className="text-sm text-muted-foreground">Other Issues</span>
-                    </div>
-                    <span className="text-gray-400">5%</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Trends Tab */}
-          <TabsContent value="trends" className="space-y-6">
-            <Card className="bg-card border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">POD Quality Trends Over Time</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Track photo quality, completion rates, and verification accuracy over time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={qualityTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
-                    <XAxis dataKey="date" stroke="hsl(var(--chart-axis))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--chart-axis))" fontSize={12} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        color: 'hsl(var(--card-foreground))'
-                      }}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="photoQuality" 
-                      stroke="#8884d8" 
-                      strokeWidth={3}
-                      name="Photo Quality %"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="completionRate" 
-                      stroke="#82ca9d" 
-                      strokeWidth={3}
-                      name="Completion Rate %"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="verificationRate" 
-                      stroke="#ffc658" 
-                      strokeWidth={3}
-                      name="Verification Rate %"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Components Tab */}
           <TabsContent value="components" className="space-y-6">
