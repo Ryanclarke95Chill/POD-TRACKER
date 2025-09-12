@@ -101,7 +101,8 @@ export default function PODAnalytics() {
         minQuality: filters.qualityScore.min.toString(),
         maxQuality: filters.qualityScore.max.toString()
       });
-      return await apiRequest(`/api/pod-analytics?${params}`);
+      const response = await apiRequest('GET', `/api/pod-analytics?${params}`);
+      return await response.json();
     }
   });
 

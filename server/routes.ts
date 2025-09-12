@@ -772,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const maxQualityNum = maxQuality ? parseFloat(maxQuality as string) : 100;
 
       // Get all consignments for analysis
-      const consignments = await storage.getConsignments();
+      const consignments = await storage.getAllConsignments();
 
       // Filter consignments based on date range if provided
       let filteredConsignments = consignments;
