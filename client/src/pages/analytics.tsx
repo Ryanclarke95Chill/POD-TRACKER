@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { 
   BarChart, 
   Bar, 
@@ -26,12 +27,8 @@ import {
 import { 
   ArrowLeft,
   Calendar,
-  MapPin,
-  User,
   TrendingUp,
   TrendingDown,
-  BarChart3,
-  PieChart as PieChartIcon,
   Filter,
   RefreshCw,
   Download,
@@ -39,116 +36,365 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Star,
-  Eye
+  Thermometer,
+  FileSignature,
+  Shield,
+  Award,
+  Target
 } from 'lucide-react';
+import type { Consignment } from '@shared/schema';
 
-interface AnalyticsFilters {
+interface PODAnalyticsFilters {
   startDate: string;
   endDate: string;
-  states: string[];
-  drivers: string[];
-  qualityScore: {
-    min: number;
-    max: number;
-  };
+  warehouse: string;
+  driver: string;
+  qualityFilter: string;
 }
 
-interface StateComparison {
-  state: string;
+interface PODAnalyticsResponse {
   totalPODs: number;
-  avgQuality: number;
-  photoCompletionRate: number;
-  verificationRate: number;
-  issueRate: number;
+  gateSuccessRate: number;
+  avgQualityScore: number;
+  componentStats: {
+    photos: { passRate: number; avgCount: number };
+    signature: { passRate: number };
+    receiverName: { passRate: number };
+    temperature: { passRate: number };
+  };
+  qualityDistribution: {
+    gold: number; // 90-100
+    silver: number; // 75-89
+    bronze: number; // 60-74
+    nonCompliant: number; // 0
+  };
+  photoDistribution: {
+    zero: number;
+    one: number;
+    two: number;
+    three: number;
+    fourPlus: number;
+  };
+  gateFailureReasons: Array<{ reason: string; count: number; percentage: number }>;
+  driverPerformance: Array<{
+    name: string;
+    totalDeliveries: number;
+    avgScore: number;
+    goldRate: number;
+    gatePassRate: number;
+  }>;
+  warehousePerformance: Array<{
+    name: string;
+    totalPODs: number;
+    avgScore: number;
+    gatePassRate: number;
+  }>;
+  trends: Array<{
+    date: string;
+    avgScore: number;
+    gatePassRate: number;
+    photoComplianceRate: number;
+    tempComplianceRate: number;
+  }>;
 }
 
-interface DriverPerformance {
-  driverId: number;
-  driverName: string;
-  totalDeliveries: number;
-  avgPhotoQuality: number;
-  podCompletionRate: number;
-  verificationAccuracy: number;
-  totalIssues: number;
-  state: string;
-}
+// Chart color tokens for consistent theming
+const CHART_COLORS = {
+  gold: 'hsl(var(--chart-1))', // Green for high performance
+  silver: 'hsl(var(--chart-2))', // Blue for good performance  
+  bronze: 'hsl(var(--chart-3))', // Orange for fair performance
+  nonCompliant: 'hsl(var(--chart-5))', // Red for non-compliant
+  primary: 'hsl(var(--primary))',
+  secondary: 'hsl(var(--chart-4))', // Purple
+  accent: 'hsl(var(--chart-6))' // Cyan
+};
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0'];
-const US_STATES = [
-  'CA', 'TX', 'FL', 'NY', 'PA', 'IL', 'OH', 'GA', 'NC', 'MI',
-  'NJ', 'VA', 'WA', 'AZ', 'MA', 'TN', 'IN', 'MO', 'MD', 'WI'
-];
+// Quality tier definitions matching POD quality page
+const QUALITY_TIERS = {
+  gold: { min: 90, max: 100, label: 'Gold (90-100)', color: CHART_COLORS.gold },
+  silver: { min: 75, max: 89, label: 'Silver (75-89)', color: CHART_COLORS.silver },
+  bronze: { min: 60, max: 74, label: 'Bronze (60-74)', color: CHART_COLORS.bronze },
+  nonCompliant: { min: 0, max: 0, label: 'Non-Compliant', color: CHART_COLORS.nonCompliant }
+};
+
+// POD Analysis Helper Functions (mirrored from POD quality page)
+const getRequiredPhotoCount = (consignment: Consignment): { min: number; max: number; description: string } => {
+  const pallets = Number(consignment.qty2) || 0;
+  const cartons = Number(consignment.qty1) || 0;
+  
+  if (pallets > 0 && cartons > 0) {
+    if (pallets === 1) return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+    if (pallets >= 2 && pallets <= 3) return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+    if (pallets > 3) return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
+  }
+  
+  if (pallets > 0) {
+    if (pallets === 1) return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+    if (pallets >= 2 && pallets <= 3) return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+    if (pallets > 3) return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
+  }
+  
+  if (cartons > 0) {
+    if (cartons >= 1 && cartons <= 10) return { min: 1, max: 2, description: `1-2 photos for ${cartons} cartons` };
+    if (cartons > 10) return { min: 3, max: 3, description: `3 photos minimum for ${cartons} cartons` };
+  }
+  
+  return { min: 3, max: 3, description: '3 photos minimum (default)' };
+};
+
+const countPhotos = (consignment: Consignment): number => {
+  const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+  const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+  let count = Number(deliveryFileCount) + Number(pickupFileCount);
+  
+  if (consignment.deliverySignatureName && deliveryFileCount > 0) count = Math.max(0, count - 1);
+  if (consignment.pickupSignatureName && pickupFileCount > 0) count = Math.max(0, count - 1);
+  
+  return count;
+};
+
+const checkTemperatureCompliance = (consignment: Consignment): boolean => {
+  const actualTemp = (consignment as any).delivery_Temperature;
+  const expectedTemp = (consignment as any).shipmentExpectedTemperatureRange;
+  
+  if (!actualTemp || !expectedTemp) return true; // No temp data = compliant
+  
+  // Parse temperature range from expected
+  const parseRange = (label: string) => {
+    const patterns = [
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s+to\s+(-?\d+(?:\.\d+)?)\s*°?C?/i,
+      /(-?\d+(?:\.\d+)?)\s*to\s+(-?\d+(?:\.\d+)?)\s*°?C/i,
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s*-\s*(-?\d+(?:\.\d+)?)\s*°?C?/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = label.match(pattern);
+      if (match) {
+        const val1 = parseFloat(match[1]);
+        const val2 = parseFloat(match[2]);
+        return { min: Math.min(val1, val2), max: Math.max(val1, val2) };
+      }
+    }
+    return null;
+  };
+  
+  const range = parseRange(expectedTemp);
+  if (!range) return true;
+  
+  const actual = parseFloat(actualTemp);
+  return !isNaN(actual) && actual >= range.min && actual <= range.max;
+};
+
+const passesGates = (consignment: Consignment): { ok: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!consignment.deliverySignatureName) missing.push('Signature present');
+  
+  const receiverName = consignment.deliverySignatureName?.trim();
+  if (!receiverName || receiverName.length < 2) missing.push('Receiver name present');
+  
+  if (!checkTemperatureCompliance(consignment)) missing.push('Temperature compliance requirement');
+  
+  const photoCount = countPhotos(consignment);
+  const photoRequirement = getRequiredPhotoCount(consignment);
+  if (photoCount < photoRequirement.min) missing.push(`Photos requirement (${photoRequirement.description})`);
+  
+  return { ok: missing.length === 0, missing };
+};
+
+const calculatePODAnalytics = (analyses: any[]): PODAnalyticsResponse => {
+  const total = analyses.length;
+  if (total === 0) {
+    return {
+      totalPODs: 0, gateSuccessRate: 0, avgQualityScore: 0,
+      componentStats: { photos: { passRate: 0, avgCount: 0 }, signature: { passRate: 0 }, receiverName: { passRate: 0 }, temperature: { passRate: 0 } },
+      qualityDistribution: { gold: 0, silver: 0, bronze: 0, nonCompliant: 0 },
+      photoDistribution: { zero: 0, one: 0, two: 0, three: 0, fourPlus: 0 },
+      gateFailureReasons: [], driverPerformance: [], warehousePerformance: [], trends: []
+    };
+  }
+  
+  const gatesPassed = analyses.filter(a => a.metrics.gatesPassed).length;
+  const avgScore = analyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / total;
+  
+  const gold = analyses.filter(a => a.metrics.qualityScore >= 90).length;
+  const silver = analyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+  const bronze = analyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+  const nonCompliant = analyses.filter(a => a.metrics.qualityScore === 0).length;
+  
+  const photoStats = { passRate: 0, avgCount: 0 };
+  const signatureStats = { passRate: 0 };
+  const receiverNameStats = { passRate: 0 };
+  const temperatureStats = { passRate: 0 };
+  
+  let totalPhotos = 0;
+  analyses.forEach(a => {
+    totalPhotos += a.metrics.photoCount;
+    if (a.metrics.hasSignature) signatureStats.passRate++;
+    if (a.metrics.hasReceiverName) receiverNameStats.passRate++;
+    if (a.metrics.temperatureCompliant) temperatureStats.passRate++;
+  });
+  
+  photoStats.avgCount = totalPhotos / total;
+  photoStats.passRate = (analyses.filter(a => a.metrics.photoCount >= getRequiredPhotoCount(a.consignment).min).length / total) * 100;
+  signatureStats.passRate = (signatureStats.passRate / total) * 100;
+  receiverNameStats.passRate = (receiverNameStats.passRate / total) * 100;
+  temperatureStats.passRate = (temperatureStats.passRate / total) * 100;
+  
+  // Photo distribution
+  const photoDistribution = {
+    zero: analyses.filter(a => a.metrics.photoCount === 0).length,
+    one: analyses.filter(a => a.metrics.photoCount === 1).length,
+    two: analyses.filter(a => a.metrics.photoCount === 2).length,
+    three: analyses.filter(a => a.metrics.photoCount === 3).length,
+    fourPlus: analyses.filter(a => a.metrics.photoCount >= 4).length
+  };
+  
+  return {
+    totalPODs: total,
+    gateSuccessRate: (gatesPassed / total) * 100,
+    avgQualityScore: avgScore,
+    componentStats: {
+      photos: photoStats,
+      signature: signatureStats,
+      receiverName: receiverNameStats,
+      temperature: temperatureStats
+    },
+    qualityDistribution: {
+      gold: (gold / total) * 100,
+      silver: (silver / total) * 100,
+      bronze: (bronze / total) * 100,
+      nonCompliant: (nonCompliant / total) * 100
+    },
+    photoDistribution,
+    gateFailureReasons: [],
+    driverPerformance: [],
+    warehousePerformance: [],
+    trends: []
+  };
+};
 
 export default function PODAnalytics() {
-  const [filters, setFilters] = useState<AnalyticsFilters>({
+  const [filters, setFilters] = useState<PODAnalyticsFilters>({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
-    states: [],
-    drivers: [],
-    qualityScore: { min: 0, max: 100 }
+    warehouse: 'all',
+    driver: 'all',
+    qualityFilter: 'all'
   });
 
-  // Fetch POD analytics data based on filters
-  const { data: analyticsData, isLoading, refetch } = useQuery({
-    queryKey: ['pod-analytics', filters],
+  // Fetch real consignments and run POD analysis
+  const { data: consignments, isLoading: loadingConsignments, refetch } = useQuery({
+    queryKey: ['consignments'],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        states: filters.states.join(','),
-        drivers: filters.drivers.join(','),
-        minQuality: filters.qualityScore.min.toString(),
-        maxQuality: filters.qualityScore.max.toString()
-      });
-      const response = await apiRequest('GET', `/api/pod-analytics?${params}`);
+      const response = await apiRequest('GET', '/api/consignments');
       return await response.json();
     }
   });
 
-  // POD analytics data from API
-  const stateData: StateComparison[] = analyticsData?.data?.stateComparisons || [
-    { state: 'CA', totalPODs: 1243, avgQuality: 92.4, photoCompletionRate: 97.8, verificationRate: 94.1, issueRate: 3.2 },
-    { state: 'TX', totalPODs: 1087, avgQuality: 89.6, photoCompletionRate: 95.2, verificationRate: 91.8, issueRate: 4.1 },
-    { state: 'FL', totalPODs: 892, avgQuality: 87.1, photoCompletionRate: 93.4, verificationRate: 89.7, issueRate: 5.3 },
-    { state: 'NY', totalPODs: 756, avgQuality: 94.2, photoCompletionRate: 98.1, verificationRate: 95.2, issueRate: 2.8 },
-    { state: 'IL', totalPODs: 634, avgQuality: 86.3, photoCompletionRate: 92.1, verificationRate: 87.4, issueRate: 6.2 }
-  ];
+  // Process consignments through POD quality analysis
+  const podAnalytics = useMemo(() => {
+    if (!consignments) return null;
 
-  const driverData: DriverPerformance[] = analyticsData?.data?.driverPerformances || [
-    { driverId: 1001, driverName: 'Mike Johnson', totalDeliveries: 234, avgPhotoQuality: 95.2, podCompletionRate: 98.3, verificationAccuracy: 96.8, totalIssues: 4, state: 'CA' },
-    { driverId: 1002, driverName: 'Sarah Williams', totalDeliveries: 198, avgPhotoQuality: 91.5, podCompletionRate: 96.1, verificationAccuracy: 94.4, totalIssues: 8, state: 'TX' },
-    { driverId: 1003, driverName: 'David Brown', totalDeliveries: 187, avgPhotoQuality: 88.7, podCompletionRate: 93.5, verificationAccuracy: 91.2, totalIssues: 12, state: 'FL' },
-    { driverId: 1004, driverName: 'Lisa Davis', totalDeliveries: 176, avgPhotoQuality: 96.8, podCompletionRate: 99.1, verificationAccuracy: 97.2, totalIssues: 3, state: 'NY' },
-    { driverId: 1005, driverName: 'James Wilson', totalDeliveries: 163, avgPhotoQuality: 85.4, podCompletionRate: 91.2, verificationAccuracy: 89.6, totalIssues: 15, state: 'IL' }
-  ];
+    // Analyze each consignment using POD quality functions (mirrored from POD quality page)
+    const analyses = consignments.map((consignment: Consignment) => {
+      const photoCount = countPhotos(consignment);
+      const hasSignature = Boolean(consignment.deliverySignatureName);
+      const hasReceiverName = Boolean(consignment.deliverySignatureName?.trim() && consignment.deliverySignatureName.trim().length > 1);
+      const temperatureCompliant = checkTemperatureCompliance(consignment);
+      const gateCheck = passesGates(consignment);
+      
+      // Calculate quality score using same logic as POD quality page
+      let qualityScore = 0;
+      if (gateCheck.ok) {
+        const photoRequirement = getRequiredPhotoCount(consignment);
+        let score = 0;
+        
+        // Photos (40 points) 
+        if (photoCount >= photoRequirement.min) {
+          score += 35 + Math.min(5, photoCount - photoRequirement.min);
+        }
+        
+        // Signature (20 points)
+        if (hasSignature) score += 20;
+        
+        // Receiver name (15 points)  
+        if (hasReceiverName) score += 15;
+        
+        // Temperature compliance (25 points)
+        if (temperatureCompliant) score += 25;
+        
+        qualityScore = Math.min(100, score);
+      }
+      
+      return {
+        consignment,
+        metrics: {
+          photoCount,
+          hasSignature,
+          hasReceiverName,
+          temperatureCompliant,
+          qualityScore,
+          gatesPassed: gateCheck.ok,
+          gateFailures: gateCheck.missing,
+          deliveryTime: consignment.delivery_OutcomeDateTime
+        }
+      };
+    });
 
-  const qualityTrendData = analyticsData?.data?.qualityTrend || [
-    { date: '2024-01-01', photoQuality: 88.1, completionRate: 94.5, verificationRate: 91.2 },
-    { date: '2024-01-02', photoQuality: 90.3, completionRate: 95.7, verificationRate: 92.8 },
-    { date: '2024-01-03', photoQuality: 87.9, completionRate: 93.2, verificationRate: 90.6 },
-    { date: '2024-01-04', photoQuality: 92.2, completionRate: 97.1, verificationRate: 94.3 },
-    { date: '2024-01-05', photoQuality: 94.5, completionRate: 98.2, verificationRate: 95.7 },
-    { date: '2024-01-06', photoQuality: 89.9, completionRate: 95.8, verificationRate: 92.4 },
-    { date: '2024-01-07', photoQuality: 93.1, completionRate: 97.4, verificationRate: 94.8 }
-  ];
+    // Apply filters
+    const filteredAnalyses = analyses.filter(analysis => {
+      // Date range filter
+      if (filters.startDate && filters.endDate) {
+        const deliveryTime = analysis.metrics.deliveryTime;
+        if (deliveryTime) {
+          const utcDate = new Date(deliveryTime);
+          const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000));
+          const dateString = aestDate.toISOString().split('T')[0];
+          if (dateString < filters.startDate || dateString > filters.endDate) return false;
+        }
+      }
+      
+      // Warehouse filter
+      if (filters.warehouse !== 'all') {
+        if ((analysis.consignment as any).shipFromCompanyName !== filters.warehouse) return false;
+      }
+      
+      // Driver filter
+      if (filters.driver !== 'all') {
+        if (analysis.consignment.driverName !== filters.driver) return false;
+      }
+      
+      // Quality filter
+      if (filters.qualityFilter !== 'all') {
+        const score = analysis.metrics.qualityScore;
+        switch (filters.qualityFilter) {
+          case 'gold': return score >= 90;
+          case 'silver': return score >= 75 && score < 90;
+          case 'bronze': return score >= 60 && score < 75;
+          case 'non-compliant': return score === 0;
+          default: return true;
+        }
+      }
+      
+      return true;
+    });
 
-  const podIssueDistribution = [
-    { name: 'Poor Photo Quality', value: 28, color: '#ff7c7c' },
-    { name: 'Missing Photos', value: 22, color: '#ffc658' },
-    { name: 'Incorrect Location', value: 18, color: '#82ca9d' },
-    { name: 'Signature Issues', value: 15, color: '#8884d8' },
-    { name: 'Timing Discrepancies', value: 12, color: '#d084d0' },
-    { name: 'Other', value: 5, color: '#8dd1e1' }
-  ];
+    // Calculate comprehensive analytics from filtered data
+    return calculatePODAnalytics(filteredAnalyses);
+  }, [consignments, filters]);
 
-  const photoQualityBreakdown = [
-    { name: 'Excellent (90-100)', value: 45, color: '#22c55e' },
-    { name: 'Good (80-89)', value: 32, color: '#84cc16' },
-    { name: 'Fair (70-79)', value: 18, color: '#eab308' },
-    { name: 'Poor (60-69)', value: 4, color: '#f97316' },
-    { name: 'Very Poor (<60)', value: 1, color: '#ef4444' }
-  ];
+  const isLoading = loadingConsignments;
+
+  // Get available filter options from consignments
+  const filterOptions = useMemo(() => {
+    if (!consignments) return { warehouses: [], drivers: [] };
+    
+    const warehouses = [...new Set(consignments.map((c: Consignment) => (c as any).shipFromCompanyName).filter(Boolean))];
+    const drivers = [...new Set(consignments.map((c: Consignment) => c.driverName).filter(Boolean))];
+    
+    return { warehouses, drivers };
+  }, [consignments]);
 
   const handleStateFilter = (state: string) => {
     setFilters(prev => ({
@@ -175,7 +421,7 @@ export default function PODAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-900 dark:via-blue-900 dark:to-slate-900">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 max-w-7xl">
         {/* Header with Navigation */}
         <div className="flex items-center justify-between mb-8">
@@ -213,13 +459,13 @@ export default function PODAnalytics() {
         </div>
 
         {/* Smart Filters */}
-        <Card className="mb-8 gradient-card border border-white/20">
+        <Card className="mb-8 bg-card border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
+            <CardTitle className="flex items-center gap-2 text-card-foreground">
               <Filter className="h-5 w-5" />
               Smart Filters
             </CardTitle>
-            <CardDescription className="text-slate-200">
+            <CardDescription className="text-muted-foreground">
               Customize your POD analytics view with advanced filtering options
             </CardDescription>
           </CardHeader>
@@ -227,227 +473,226 @@ export default function PODAnalytics() {
             {/* Date Range */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Start Date</label>
+                <label className="text-sm font-medium text-card-foreground mb-2 block">Start Date</label>
                 <Input
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
+                  className="bg-input border text-foreground"
                   data-testid="input-start-date"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">End Date</label>
+                <label className="text-sm font-medium text-card-foreground mb-2 block">End Date</label>
                 <Input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
+                  className="bg-input border text-foreground"
                   data-testid="input-end-date"
                 />
               </div>
             </div>
 
-            {/* State Selection */}
+            {/* Warehouse Filter */}
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">States</label>
-              <div className="flex flex-wrap gap-2">
-                {US_STATES.slice(0, 10).map(state => (
-                  <Badge
-                    key={state}
-                    variant={filters.states.includes(state) ? "default" : "outline"}
-                    className={`cursor-pointer transition-all ${
-                      filters.states.includes(state) 
-                        ? 'bg-blue-500 hover:bg-blue-600' 
-                        : 'bg-white/10 hover:bg-white/20 text-white border-white/30'
-                    }`}
-                    onClick={() => handleStateFilter(state)}
-                    data-testid={`badge-state-${state}`}
-                  >
-                    {state}
-                  </Badge>
-                ))}
-              </div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">Warehouse</label>
+              <Select value={filters.warehouse} onValueChange={(value) => setFilters(prev => ({ ...prev, warehouse: value }))}>
+                <SelectTrigger className="bg-input border text-foreground" data-testid="select-warehouse">
+                  <SelectValue placeholder="Select warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  {filterOptions.warehouses.map(warehouse => (
+                    <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Photo Quality Score Range */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-white mb-2 block">Min Photo Quality Score</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={filters.qualityScore.min}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    qualityScore: { ...prev.qualityScore, min: parseInt(e.target.value) || 0 }
-                  }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  data-testid="input-min-quality"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-white mb-2 block">Max Photo Quality Score</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={filters.qualityScore.max}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    qualityScore: { ...prev.qualityScore, max: parseInt(e.target.value) || 100 }
-                  }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  data-testid="input-max-quality"
-                />
-              </div>
+            {/* Driver Filter */}
+            <div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">Driver</label>
+              <Select value={filters.driver} onValueChange={(value) => setFilters(prev => ({ ...prev, driver: value }))}>
+                <SelectTrigger className="bg-input border text-foreground" data-testid="select-driver">
+                  <SelectValue placeholder="Select driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Drivers</SelectItem>
+                  {filterOptions.drivers.map(driver => (
+                    <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <Button onClick={clearFilters} variant="outline" className="border-white/30 text-white hover:bg-white/10" data-testid="button-clear-filters">
+            {/* Quality Tier Filter */}
+            <div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">Quality Tier</label>
+              <Select value={filters.qualityFilter} onValueChange={(value) => setFilters(prev => ({ ...prev, qualityFilter: value }))}>
+                <SelectTrigger className="bg-input border text-foreground" data-testid="select-quality">
+                  <SelectValue placeholder="Select quality tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Quality Levels</SelectItem>
+                  <SelectItem value="gold">Gold (90-100)</SelectItem>
+                  <SelectItem value="silver">Silver (75-89)</SelectItem>
+                  <SelectItem value="bronze">Bronze (60-74)</SelectItem>
+                  <SelectItem value="non-compliant">Non-Compliant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button onClick={() => setFilters({ startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], warehouse: 'all', driver: 'all', qualityFilter: 'all' })} variant="outline" className="border text-foreground hover:bg-accent hover:text-accent-foreground" data-testid="button-clear-filters">
               Clear All Filters
             </Button>
           </CardContent>
         </Card>
 
-        {/* Analytics Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white/10 border border-white/20">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
-            <TabsTrigger value="states" className="text-white data-[state=active]:bg-white/20">State Comparison</TabsTrigger>
-            <TabsTrigger value="drivers" className="text-white data-[state=active]:bg-white/20">Driver Performance</TabsTrigger>
-            <TabsTrigger value="quality" className="text-white data-[state=active]:bg-white/20">Photo Quality</TabsTrigger>
-            <TabsTrigger value="trends" className="text-white data-[state=active]:bg-white/20">Trends</TabsTrigger>
-          </TabsList>
+        {/* POD Quality Analytics Results */}
+        {isLoading ? (
+          <Card className="bg-card border shadow-sm">
+            <CardContent className="p-12 text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Analyzing POD quality data...</p>
+            </CardContent>
+          </Card>
+        ) : podAnalytics ? (
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 bg-muted p-1 rounded-lg">
+              <TabsTrigger value="overview" className="text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">POD Overview</TabsTrigger>
+              <TabsTrigger value="quality" className="text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Quality Analysis</TabsTrigger>
+              <TabsTrigger value="components" className="text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Components</TabsTrigger>
+            </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Key POD Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="gradient-card border border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-200">Total PODs</p>
-                      <p className="text-3xl font-bold text-white">{analyticsData?.data?.totalPODs || 4612}</p>
-                      <p className="text-sm text-green-400 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-1" />
-                        +12.5% from last month
-                      </p>
+            {/* POD Overview Tab */}
+            <TabsContent value="overview" className="space-y-6">
+              {/* Key POD Quality Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total PODs</p>
+                        <p className="text-3xl font-bold text-card-foreground">{podAnalytics.totalPODs}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Filtered results</p>
+                      </div>
+                      <Target className="h-8 w-8 text-primary" />
                     </div>
-                    <Camera className="h-8 w-8 text-blue-400" />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card className="gradient-card border border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-200">Avg Photo Quality</p>
-                      <p className="text-3xl font-bold text-white">{analyticsData?.data?.summary?.avgPhotoQuality || 91.4}%</p>
-                      <p className="text-sm text-green-400 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-1" />
-                        +3.2% from last month
-                      </p>
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Gate Success Rate</p>
+                        <p className="text-3xl font-bold text-card-foreground">{podAnalytics.gateSuccessRate.toFixed(1)}%</p>
+                        <p className="text-xs text-muted-foreground mt-1">Meets all requirements</p>
+                      </div>
+                      <Shield className="h-8 w-8 text-green-600" />
                     </div>
-                    <Star className="h-8 w-8 text-yellow-400" />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card className="gradient-card border border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-200">POD Completion Rate</p>
-                      <p className="text-3xl font-bold text-white">{analyticsData?.data?.summary?.completionRate || 96.8}%</p>
-                      <p className="text-sm text-green-400 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-1" />
-                        +1.7% from last month
-                      </p>
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Avg Quality Score</p>
+                        <p className="text-3xl font-bold text-card-foreground">{podAnalytics.avgQualityScore.toFixed(1)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Out of 100 points</p>
+                      </div>
+                      <Award className="h-8 w-8 text-yellow-500" />
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card className="gradient-card border border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-200">Verification Issues</p>
-                      <p className="text-3xl font-bold text-white">{analyticsData?.data?.summary?.issueRate || 2.7}%</p>
-                      <p className="text-sm text-green-400 flex items-center">
-                        <TrendingDown className="h-4 w-4 mr-1" />
-                        -0.8% from last month
-                      </p>
+                <Card className="bg-card border shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Photo Compliance</p>
+                        <p className="text-3xl font-bold text-card-foreground">{podAnalytics.componentStats.photos.passRate.toFixed(1)}%</p>
+                        <p className="text-xs text-muted-foreground mt-1">Avg: {podAnalytics.componentStats.photos.avgCount.toFixed(1)} photos</p>
+                      </div>
+                      <Camera className="h-8 w-8 text-blue-600" />
                     </div>
-                    <AlertTriangle className="h-8 w-8 text-red-400" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* POD Issue Distribution */}
-              <Card className="gradient-card border border-white/20">
+              {/* Quality Distribution Chart */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="bg-card border shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-card-foreground">
+                      <Award className="h-5 w-5 mr-2" />
+                      Quality Tier Distribution
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      POD quality scores grouped by performance tiers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Gold (90-100)', value: podAnalytics.qualityDistribution.gold, color: CHART_COLORS.gold },
+                            { name: 'Silver (75-89)', value: podAnalytics.qualityDistribution.silver, color: CHART_COLORS.silver },
+                            { name: 'Bronze (60-74)', value: podAnalytics.qualityDistribution.bronze, color: CHART_COLORS.bronze },
+                            { name: 'Non-Compliant', value: podAnalytics.qualityDistribution.nonCompliant, color: CHART_COLORS.nonCompliant }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Gold (90-100)', value: podAnalytics.qualityDistribution.gold, color: CHART_COLORS.gold },
+                            { name: 'Silver (75-89)', value: podAnalytics.qualityDistribution.silver, color: CHART_COLORS.silver },
+                            { name: 'Bronze (60-74)', value: podAnalytics.qualityDistribution.bronze, color: CHART_COLORS.bronze },
+                            { name: 'Non-Compliant', value: podAnalytics.qualityDistribution.nonCompliant, color: CHART_COLORS.nonCompliant }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+              {/* Photo Quality Components Breakdown */}
+              <Card className="bg-card border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-white">POD Issue Distribution</CardTitle>
-                  <CardDescription className="text-slate-200">
-                    Common issues in proof-of-delivery process
+                  <CardTitle className="flex items-center text-card-foreground">
+                    <Camera className="h-5 w-5 mr-2" />
+                    Photo Distribution Analysis
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Number of photos captured per POD delivery
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={podIssueDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {podIssueDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
+                    <BarChart data={[
+                      { name: '0 Photos', value: podAnalytics.photoDistribution.zero },
+                      { name: '1 Photo', value: podAnalytics.photoDistribution.one },
+                      { name: '2 Photos', value: podAnalytics.photoDistribution.two },
+                      { name: '3 Photos', value: podAnalytics.photoDistribution.three },
+                      { name: '4+ Photos', value: podAnalytics.photoDistribution.fourPlus }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" className="fill-muted-foreground" />
+                      <YAxis className="fill-muted-foreground" />
                       <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Photo Quality Breakdown */}
-              <Card className="gradient-card border border-white/20">
-                <CardHeader>
-                  <CardTitle className="text-white">Photo Quality Distribution</CardTitle>
-                  <CardDescription className="text-slate-200">
-                    Breakdown of photo quality scores
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={photoQualityBreakdown} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis type="number" stroke="#9CA3AF" />
-                      <YAxis dataKey="name" type="category" width={120} stroke="#9CA3AF" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1F2937', 
-                          border: '1px solid #374151',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Bar dataKey="value" fill={(entry, index) => photoQualityBreakdown[index]?.color || '#8884d8'}>
-                        {photoQualityBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
+                      <Bar dataKey="value" fill={CHART_COLORS.primary} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -457,45 +702,46 @@ export default function PODAnalytics() {
 
           {/* State Comparison Tab */}
           <TabsContent value="states" className="space-y-6">
-            <Card className="gradient-card border border-white/20">
+            <Card className="bg-card border shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">State POD Performance Comparison</CardTitle>
-                <CardDescription className="text-slate-200">
+                <CardTitle className="text-card-foreground">State POD Performance Comparison</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Compare POD quality and completion rates across states
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={stateData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis dataKey="state" stroke="#9CA3AF" />
-                    <YAxis stroke="#9CA3AF" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                    <XAxis dataKey="state" stroke="hsl(var(--chart-axis))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--chart-axis))" fontSize={12} />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: '#1F2937', 
-                        border: '1px solid #374151',
-                        borderRadius: '8px'
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--card-foreground))'
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="avgQuality" fill="#8884d8" name="Avg Photo Quality %" />
-                    <Bar dataKey="photoCompletionRate" fill="#82ca9d" name="Photo Completion Rate %" />
-                    <Bar dataKey="verificationRate" fill="#ffc658" name="Verification Rate %" />
+                    <Bar dataKey="avgQuality" fill={COLORS[1]} name="Avg Photo Quality %" />
+                    <Bar dataKey="photoCompletionRate" fill={COLORS[0]} name="Photo Completion Rate %" />
+                    <Bar dataKey="verificationRate" fill={COLORS[2]} name="Verification Rate %" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
             {/* Detailed State Table */}
-            <Card className="gradient-card border border-white/20">
+            <Card className="bg-card border shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">Detailed State POD Metrics</CardTitle>
+                <CardTitle className="text-card-foreground">Detailed State POD Metrics</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-white">
+                  <table className="w-full text-sm text-card-foreground">
                     <thead>
-                      <tr className="border-b border-white/20">
+                      <tr className="border-b border-border">
                         <th className="text-left py-3 px-4">State</th>
                         <th className="text-left py-3 px-4">Total PODs</th>
                         <th className="text-left py-3 px-4">Photo Quality</th>
@@ -506,7 +752,7 @@ export default function PODAnalytics() {
                     </thead>
                     <tbody>
                       {stateData.map((state, index) => (
-                        <tr key={index} className="border-b border-white/10 hover:bg-white/5">
+                        <tr key={index} className="border-b border-border/50 hover:bg-muted/50">
                           <td className="py-3 px-4 font-medium">{state.state}</td>
                           <td className="py-3 px-4">{state.totalPODs.toLocaleString()}</td>
                           <td className="py-3 px-4">
@@ -539,18 +785,18 @@ export default function PODAnalytics() {
 
           {/* Driver Performance Tab */}
           <TabsContent value="drivers" className="space-y-6">
-            <Card className="gradient-card border border-white/20">
+            <Card className="bg-card border shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">Driver POD Performance Rankings</CardTitle>
-                <CardDescription className="text-slate-200">
+                <CardTitle className="text-card-foreground">Driver POD Performance Rankings</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Top performing drivers based on POD quality and completion metrics
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-white">
+                  <table className="w-full text-sm text-card-foreground">
                     <thead>
-                      <tr className="border-b border-white/20">
+                      <tr className="border-b border-border">
                         <th className="text-left py-3 px-4">Rank</th>
                         <th className="text-left py-3 px-4">Driver</th>
                         <th className="text-left py-3 px-4">State</th>
@@ -565,7 +811,7 @@ export default function PODAnalytics() {
                       {driverData
                         .sort((a, b) => (b.avgPhotoQuality + b.podCompletionRate) - (a.avgPhotoQuality + a.podCompletionRate))
                         .map((driver, index) => (
-                        <tr key={index} className="border-b border-white/10 hover:bg-white/5">
+                        <tr key={index} className="border-b border-border/50 hover:bg-muted/50">
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
                               {index + 1}
@@ -610,24 +856,24 @@ export default function PODAnalytics() {
           {/* Photo Quality Tab */}
           <TabsContent value="quality" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="gradient-card border border-white/20">
+              <Card className="bg-card border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-white">Photo Quality Metrics</CardTitle>
+                  <CardTitle className="text-card-foreground">Photo Quality Metrics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div>
                       <div className="text-3xl font-bold text-green-400">94.2%</div>
-                      <div className="text-sm text-slate-200">Photos Above 80%</div>
+                      <div className="text-sm text-muted-foreground">Photos Above 80%</div>
                     </div>
                     <div>
                       <div className="text-3xl font-bold text-blue-400">2.3s</div>
-                      <div className="text-sm text-slate-200">Avg Processing Time</div>
+                      <div className="text-sm text-muted-foreground">Avg Processing Time</div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-200">Excellent (90-100%)</span>
+                      <span className="text-muted-foreground">Excellent (90-100%)</span>
                       <span className="text-green-400">45% of photos</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
@@ -636,7 +882,7 @@ export default function PODAnalytics() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-200">Good (80-89%)</span>
+                      <span className="text-muted-foreground">Good (80-89%)</span>
                       <span className="text-blue-400">32% of photos</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
@@ -645,7 +891,7 @@ export default function PODAnalytics() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-200">Needs Improvement (&lt;80%)</span>
+                      <span className="text-muted-foreground">Needs Improvement (&lt;80%)</span>
                       <span className="text-orange-400">23% of photos</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
@@ -655,50 +901,50 @@ export default function PODAnalytics() {
                 </CardContent>
               </Card>
 
-              <Card className="gradient-card border border-white/20">
+              <Card className="bg-card border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-white">Common Quality Issues</CardTitle>
+                  <CardTitle className="text-card-foreground">Common Quality Issues</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Blurry Images</span>
+                      <span className="text-sm text-muted-foreground">Blurry Images</span>
                     </div>
                     <span className="text-red-400">28%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Poor Lighting</span>
+                      <span className="text-sm text-muted-foreground">Poor Lighting</span>
                     </div>
                     <span className="text-orange-400">22%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Obstructed View</span>
+                      <span className="text-sm text-muted-foreground">Obstructed View</span>
                     </div>
                     <span className="text-yellow-400">18%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Wrong Angle</span>
+                      <span className="text-sm text-muted-foreground">Wrong Angle</span>
                     </div>
                     <span className="text-blue-400">15%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Incomplete Coverage</span>
+                      <span className="text-sm text-muted-foreground">Incomplete Coverage</span>
                     </div>
                     <span className="text-purple-400">12%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                      <span className="text-sm text-slate-200">Other Issues</span>
+                      <span className="text-sm text-muted-foreground">Other Issues</span>
                     </div>
                     <span className="text-gray-400">5%</span>
                   </div>
@@ -709,24 +955,25 @@ export default function PODAnalytics() {
 
           {/* Trends Tab */}
           <TabsContent value="trends" className="space-y-6">
-            <Card className="gradient-card border border-white/20">
+            <Card className="bg-card border shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">POD Quality Trends Over Time</CardTitle>
-                <CardDescription className="text-slate-200">
+                <CardTitle className="text-card-foreground">POD Quality Trends Over Time</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Track photo quality, completion rates, and verification accuracy over time
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={qualityTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis dataKey="date" stroke="#9CA3AF" />
-                    <YAxis stroke="#9CA3AF" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                    <XAxis dataKey="date" stroke="hsl(var(--chart-axis))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--chart-axis))" fontSize={12} />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: '#1F2937', 
-                        border: '1px solid #374151',
-                        borderRadius: '8px'
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--card-foreground))'
                       }}
                     />
                     <Legend />
@@ -756,7 +1003,44 @@ export default function PODAnalytics() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Components Tab */}
+          <TabsContent value="components" className="space-y-6">
+            <Card className="bg-card border shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-card-foreground">Component Pass Rates</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Breakdown of POD quality requirements and compliance rates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={[
+                    { name: 'Photos', rate: podAnalytics?.componentStats.photos.passRate || 0, color: CHART_COLORS.primary },
+                    { name: 'Signature', rate: podAnalytics?.componentStats.signature.passRate || 0, color: CHART_COLORS.secondary },
+                    { name: 'Receiver Name', rate: podAnalytics?.componentStats.receiverName.passRate || 0, color: CHART_COLORS.accent },
+                    { name: 'Temperature', rate: podAnalytics?.componentStats.temperature.passRate || 0, color: CHART_COLORS.gold }
+                  ]} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" domain={[0, 100]} className="fill-muted-foreground" />
+                    <YAxis dataKey="name" type="category" width={100} className="fill-muted-foreground" />
+                    <Tooltip formatter={(value) => [`${value.toFixed(1)}%`, 'Pass Rate']} />
+                    <Bar dataKey="rate" fill={CHART_COLORS.primary} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+        ) : (
+          <Card className="bg-card border shadow-sm">
+            <CardContent className="p-12 text-center">
+              <XCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg font-medium text-card-foreground mb-2">No Data Available</p>
+              <p className="text-muted-foreground">Unable to load POD analytics data. Please check your filters and try again.</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
