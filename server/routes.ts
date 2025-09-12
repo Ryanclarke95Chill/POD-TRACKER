@@ -11,6 +11,7 @@ import puppeteer from "puppeteer";
 import sharp from "sharp";
 import { createHash } from "crypto";
 import { photoAnalysisService } from "./photoAnalysis";
+import { photoWorker } from "./photoIngestionWorker";
 
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
@@ -495,6 +496,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching consignment:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // New photos endpoint that serves from PhotoAsset cache
+  app.get('/api/consignments/:id/photos', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const consignmentId = parseInt(req.params.id);
+      const consignment = await storage.getConsignmentById(consignmentId);
+      
+      if (!consignment) {
+        return res.status(404).json({ success: false, error: 'Consignment not found' });
+      }
+
+      // Extract tracking token from axylog URL - check both delivery and pickup links
+      const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+      const axylogMatch = trackingLink?.match(/live\.axylog\.com\/([^/?]+)/);
+      if (!axylogMatch || !axylogMatch[1]) {
+        return res.json({ success: true, photos: [], status: 'no_tracking' });
+      }
+
+      const token = axylogMatch[1];
+      
+      // Get photos from cache
+      const cachedPhotos = await storage.getPhotoAssetsByToken(token);
+      
+      if (cachedPhotos.length === 0) {
+        // No photos in cache - trigger background processing and return pending state
+        try {
+          await photoWorker.enqueueToken(token, 'high');
+        } catch (error) {
+          console.error('Failed to enqueue token for processing:', error);
+        }
+        return res.json({ success: true, photos: [], status: 'preparing' });
+      }
+      
+      // Check if we have any failed photos
+      const availablePhotos = cachedPhotos.filter(photo => photo.status === 'available');
+      const failedPhotos = cachedPhotos.filter(photo => photo.status === 'failed');
+      const pendingPhotos = cachedPhotos.filter(photo => photo.status === 'pending');
+      
+      if (pendingPhotos.length > 0) {
+        return res.json({ success: true, photos: [], status: 'preparing' });
+      }
+      
+      if (availablePhotos.length === 0 && failedPhotos.length > 0) {
+        return res.json({ success: true, photos: [], status: 'failed' });
+      }
+      
+      // Return available photos
+      const photos = availablePhotos.map(photo => photo.url);
+      return res.json({ success: true, photos, status: 'ready' });
+      
+    } catch (error) {
+      console.error('Error fetching photos for consignment:', error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch photos' });
     }
   });
 

@@ -45,6 +45,7 @@ interface PODMetrics {
 }
 
 interface PhotoGalleryProps {
+  consignmentId: number;
   trackingLink: string;
   consignmentNo: string;
 }
@@ -105,7 +106,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
         return;
       }
       
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
+      const response = await fetch(`/api/consignments/${consignment.id}/photos`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -121,12 +122,15 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       if (!response.ok) throw new Error('Failed to load photos');
       
       const data = await response.json();
-      const loadedPhotos = data.photos || [];
-      const signaturePhotos = data.signaturePhotos || [];
       
-      setPhotos(loadedPhotos);
-      photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos});
-      onPhotoLoad(consignment.id, loadedPhotos);
+      if (data.success) {
+        const loadedPhotos = data.photos || [];
+        setPhotos(loadedPhotos);
+        photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos: []});
+        onPhotoLoad(consignment.id, loadedPhotos);
+      } else {
+        throw new Error(data.error || 'Failed to load photos');
+      }
     } catch (error) {
       console.error('Error loading photos:', error);
       setError(true);
@@ -467,12 +471,17 @@ function ProgressiveImage({ src, alt, className, index }: ProgressiveImageProps)
   );
 }
 
-function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
+function PhotoGallery({ consignmentId, trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryTimeoutId, setRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  
+  const MAX_RETRIES = 5;
+  const BASE_RETRY_DELAY = 2000; // Start with 2 seconds
 
   // Check cache first for instant loading
   useEffect(() => {
@@ -491,12 +500,18 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       setLoading(true);
       setError(null);
       
+      // Clear any existing retry timeout
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        setRetryTimeoutId(null);
+      }
+      
       const token = getToken();
       if (!token || !isAuthenticated()) {
         throw new Error('No valid authentication token available');
       }
       
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
+      const response = await fetch(`/api/consignments/${consignmentId}/photos`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -515,23 +530,63 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       const data = await response.json();
       
       if (data.success) {
-        const regularPhotos = data.photos || [];
-        const signaturePhotos = data.signaturePhotos || [];
-        setPhotos(regularPhotos);
-        // Update cache with both types
-        photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos});
+        const photos = data.photos || [];
+        
+        if (data.status === 'preparing') {
+          if (retryCount >= MAX_RETRIES) {
+            setError('Timeout: Photos took too long to prepare');
+            setPhotos([]);
+            return;
+          }
+          
+          setError(`Preparing photos... (${retryCount + 1}/${MAX_RETRIES})`);
+          setPhotos([]);
+          
+          // Use exponential backoff: 2s, 4s, 8s, 16s, 32s
+          const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+          
+          const timeoutId = setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            extractPhotos();
+          }, delay);
+          
+          setRetryTimeoutId(timeoutId);
+          return;
+        } else if (data.status === 'failed') {
+          setError('Failed to load photos from tracking system');
+          setPhotos([]);
+        } else if (data.status === 'no_tracking') {
+          setError('No tracking link available for this consignment');
+          setPhotos([]);
+        } else {
+          // status === 'ready' - reset retry count on success
+          setRetryCount(0);
+          setPhotos(photos);
+          // Update cache
+          photoCache.set(trackingLink, {photos, signaturePhotos: []});
+        }
       } else {
-        throw new Error(data.message || 'Failed to extract photos');
+        throw new Error(data.error || 'Failed to fetch photos');
       }
       
     } catch (err) {
-      console.error('Error fetching POD photos:', err);
+      console.error('Error loading photos:', err);
       setError('Unable to load photos from tracking system');
       setPhotos([]);
+      setRetryCount(0); // Reset retry count on error
     } finally {
       setLoading(false);
     }
   };
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+      }
+    };
+  }, [retryTimeoutId]);
 
   useEffect(() => {
     if (trackingLink) {
@@ -2639,6 +2694,7 @@ export default function PODQuality() {
             <div className="flex-1 overflow-hidden">
               {selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink ? (
                 <PhotoGallery 
+                  consignmentId={selectedConsignment.id}
                   trackingLink={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
                   consignmentNo={selectedConsignment.consignmentNo || ''}
                 />
