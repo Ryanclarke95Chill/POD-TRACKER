@@ -30,7 +30,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Link } from "wouter";
-import { getUser, logout } from "@/lib/auth";
+import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
 import { Consignment, ScoreBreakdown } from "@shared/schema";
 
 interface PODMetrics {
@@ -98,12 +98,26 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     setError(false);
     
     try {
+      const token = getToken();
+      if (!token || !isAuthenticated()) {
+        console.error('No valid authentication token available');
+        setError(true);
+        return;
+      }
+      
       const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
+      if (response.status === 401) {
+        console.error('Authentication failed - token may be expired');
+        // Redirect to login or refresh page
+        logout();
+        return;
+      }
+      
       if (!response.ok) throw new Error('Failed to load photos');
       
       const data = await response.json();
@@ -477,11 +491,22 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
       setLoading(true);
       setError(null);
       
+      const token = getToken();
+      if (!token || !isAuthenticated()) {
+        throw new Error('No valid authentication token available');
+      }
+      
       const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        console.error('Authentication failed - redirecting to login');
+        logout();
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(`Failed to fetch photos: ${response.status}`);
@@ -1680,9 +1705,14 @@ export default function PODQuality() {
   // Fetch POD photos for a tracking token
   const fetchPODPhotos = async (trackingToken: string) => {
     try {
+      const token = getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
       const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=high`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -1729,7 +1759,7 @@ export default function PODQuality() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${getToken()}`
         },
         body: JSON.stringify({ imageUrls: photosToAnalyze })
       });
@@ -1782,7 +1812,7 @@ export default function PODQuality() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${getToken()}`
         },
         body: JSON.stringify({
           syncFromDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 7 days
@@ -1888,8 +1918,8 @@ export default function PODQuality() {
           </Card>
         </div>
 
-        {/* Summary Section */}
-        <div className="flex justify-center mb-6">
+        {/* Summary and Analytics Section */}
+        <div className="flex justify-center gap-4 mb-6">
           <Button
             onClick={() => setShowSummary(!showSummary)}
             className="gradient-accent hover:opacity-90 text-white border-0 px-6 py-3 text-lg font-semibold shadow-lg"
@@ -1907,6 +1937,16 @@ export default function PODQuality() {
                   Get Summary
                 </>
               )}
+            </div>
+          </Button>
+          <Button
+            onClick={() => window.location.href = '/analytics'}
+            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 px-6 py-3 text-lg font-semibold shadow-lg"
+            data-testid="button-pod-analytics"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              POD Analytics
             </div>
           </Button>
         </div>
