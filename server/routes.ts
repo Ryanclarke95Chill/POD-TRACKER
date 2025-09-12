@@ -522,13 +522,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cachedPhotos = await storage.getPhotoAssetsByToken(token);
       
       if (cachedPhotos.length === 0) {
-        // No photos in cache - trigger background processing and return pending state
-        try {
-          await photoWorker.enqueueToken(token, 'high');
-        } catch (error) {
-          console.error('Failed to enqueue token for processing:', error);
+        // No photos in cache - try background worker first, fallback to direct scraping
+        const canUseWorker = photoWorker && typeof (photoWorker as any).enqueueJob === 'function';
+        
+        if (canUseWorker) {
+          try {
+            await (photoWorker as any).enqueueJob(token, 'high');
+            return res.json({ success: true, photos: [], status: 'preparing' });
+          } catch (error) {
+            console.error('Background worker failed, falling back to direct scraping:', error);
+          }
         }
-        return res.json({ success: true, photos: [], status: 'preparing' });
+        
+        // Fallback to direct scraping when worker is unavailable
+        console.log(`Background worker unavailable for token ${token}, using direct scraping fallback`);
+        try {
+          const photoResult = await photoQueue.addRequest(token, 'high');
+          return res.json({ 
+            success: true, 
+            photos: photoResult.photos || [], 
+            status: 'ready'
+          });
+        } catch (error) {
+          console.error('Direct scraping fallback failed:', error);
+          return res.json({ success: true, photos: [], status: 'failed' });
+        }
       }
       
       // Check if we have any failed photos

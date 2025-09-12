@@ -45,7 +45,6 @@ interface PODMetrics {
 }
 
 interface PhotoGalleryProps {
-  consignmentId: number;
   trackingLink: string;
   consignmentNo: string;
 }
@@ -69,8 +68,17 @@ interface PhotoThumbnailsProps {
   loadImmediately?: boolean; // For current page items - load right away
 }
 
+interface SignatureThumbnailProps {
+  consignment: Consignment;
+  onSignatureLoad: (consignmentId: number, signatures: string[]) => void;
+  loadImmediately?: boolean;
+}
+
 // Global cache for photos to avoid re-extraction
 const photoCache = new Map<string, {photos: string[], signaturePhotos: string[]}>;
+
+// Global cache for signature photos specifically
+const signaturePhotoState = new Map<number, string[]>();
 
 function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately = false }: PhotoThumbnailsProps) {
   const [photos, setPhotos] = useState<string[]>([]);
@@ -106,7 +114,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
         return;
       }
       
-      const response = await fetch(`/api/consignments/${consignment.id}/photos`, {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -125,8 +133,9 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       
       if (data.success) {
         const loadedPhotos = data.photos || [];
+        const loadedSignatures = data.signaturePhotos || [];
         setPhotos(loadedPhotos);
-        photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos: []});
+        photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos: loadedSignatures});
         onPhotoLoad(consignment.id, loadedPhotos);
       } else {
         throw new Error(data.error || 'Failed to load photos');
@@ -221,6 +230,142 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
         )}
       </div>
       <span className="text-sm text-gray-700">{photos.length} photos</span>
+    </div>
+  );
+}
+
+// Signature Thumbnail Component
+function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = false }: SignatureThumbnailProps) {
+  const [signatures, setSignatures] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const elementRef = useRef<HTMLDivElement>(null);
+
+  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
+  const cacheKey = trackingLink;
+
+  const loadSignatures = useCallback(async () => {
+    // Prevent multiple simultaneous loads and ensure we have a tracking link
+    if (loading || !trackingLink) return;
+
+    // Check cache first
+    if (photoCache.has(cacheKey)) {
+      const cachedData = photoCache.get(cacheKey);
+      if (cachedData && cachedData.signaturePhotos) {
+        setSignatures(cachedData.signaturePhotos);
+        onSignatureLoad(consignment.id, cachedData.signaturePhotos);
+      }
+      return;
+    }
+
+    setLoading(true);
+    setError(false);
+    
+    try {
+      const token = getToken();
+      if (!token || !isAuthenticated()) {
+        console.error('No valid authentication token available');
+        setError(true);
+        return;
+      }
+      
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        console.error('Authentication failed - token may be expired');
+        logout();
+        return;
+      }
+      
+      if (!response.ok) throw new Error('Failed to load signatures');
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const loadedPhotos = data.photos || [];
+        const loadedSignatures = data.signaturePhotos || [];
+        setSignatures(loadedSignatures);
+        photoCache.set(cacheKey, {photos: loadedPhotos, signaturePhotos: loadedSignatures});
+        onSignatureLoad(consignment.id, loadedSignatures);
+      } else {
+        throw new Error(data.error || 'Failed to load signatures');
+      }
+    } catch (error) {
+      console.error('Error loading signatures:', error);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [trackingLink, cacheKey, consignment.id, onSignatureLoad, loading]);
+
+  // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
+  useEffect(() => {
+    if (loadImmediately) {
+      loadSignatures();
+      return;
+    }
+
+    // Use intersection observer for future page items with large margin
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadSignatures();
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '800px' }
+    );
+
+    if (elementRef.current) {
+      observer.observe(elementRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadSignatures]);
+
+  if (loading) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-gray-200 rounded animate-pulse" />
+        <span className="text-sm text-gray-500">Loading...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2 text-red-500">
+        <AlertTriangle className="h-4 w-4" />
+        <span className="text-sm">Failed to load</span>
+      </div>
+    );
+  }
+
+  if (signatures.length === 0) {
+    return (
+      <div ref={elementRef} className="flex items-center gap-2 text-gray-500">
+        <FileSignature className="h-4 w-4" />
+        <span className="text-sm">No signature</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={elementRef} className="flex items-center gap-2">
+      <img
+        src={`/api/image?src=${encodeURIComponent(signatures[0])}&w=32&q=60&fmt=webp`}
+        alt="Signature"
+        className="w-8 h-8 object-cover rounded border"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+      <span className="text-sm text-gray-700">Signature</span>
     </div>
   );
 }
@@ -471,7 +616,7 @@ function ProgressiveImage({ src, alt, className, index }: ProgressiveImageProps)
   );
 }
 
-function PhotoGallery({ consignmentId, trackingLink, consignmentNo }: PhotoGalleryProps) {
+function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -511,7 +656,7 @@ function PhotoGallery({ consignmentId, trackingLink, consignmentNo }: PhotoGalle
         throw new Error('No valid authentication token available');
       }
       
-      const response = await fetch(`/api/consignments/${consignmentId}/photos`, {
+      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -530,43 +675,13 @@ function PhotoGallery({ consignmentId, trackingLink, consignmentNo }: PhotoGalle
       const data = await response.json();
       
       if (data.success) {
-        const photos = data.photos || [];
-        
-        if (data.status === 'preparing') {
-          if (retryCount >= MAX_RETRIES) {
-            setError('Timeout: Photos took too long to prepare');
-            setPhotos([]);
-            return;
-          }
-          
-          setError(`Preparing photos... (${retryCount + 1}/${MAX_RETRIES})`);
-          setPhotos([]);
-          
-          // Use exponential backoff: 2s, 4s, 8s, 16s, 32s
-          const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount);
-          
-          const timeoutId = setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-            extractPhotos();
-          }, delay);
-          
-          setRetryTimeoutId(timeoutId);
-          return;
-        } else if (data.status === 'failed') {
-          setError('Failed to load photos from tracking system');
-          setPhotos([]);
-        } else if (data.status === 'no_tracking') {
-          setError('No tracking link available for this consignment');
-          setPhotos([]);
-        } else {
-          // status === 'ready' - reset retry count on success
-          setRetryCount(0);
-          setPhotos(photos);
-          // Update cache
-          photoCache.set(trackingLink, {photos, signaturePhotos: []});
-        }
+        const regularPhotos = data.photos || [];
+        const signaturePhotos = data.signaturePhotos || [];
+        setPhotos(regularPhotos);
+        // Update cache with both types
+        photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos});
       } else {
-        throw new Error(data.error || 'Failed to fetch photos');
+        throw new Error(data.message || 'Failed to extract photos');
       }
       
     } catch (err) {
@@ -796,6 +911,12 @@ export default function PODQuality() {
   
   const handlePhotoLoad = useCallback((consignmentId: number, photos: string[]) => {
     setLoadedPhotos(prev => new Map(prev).set(consignmentId, photos));
+  }, []);
+
+  // Handle signature loading for caching
+  const handleSignatureLoad = useCallback((consignmentId: number, signatures: string[]) => {
+    // Store signature data for future use
+    signaturePhotoState.set(consignmentId, signatures);
   }, []);
   const user = getUser();
 
@@ -2593,9 +2714,11 @@ export default function PODQuality() {
                             <XCircle className="h-5 w-5 text-red-500" />
                           }
                         </div>
-                        <p className="text-lg font-bold text-gray-900" data-testid={`text-signature-${consignment.id}`}>
-                          {metrics.hasSignature ? 'Signed' : 'Missing'}
-                        </p>
+                        <SignatureThumbnail 
+                          consignment={consignment}
+                          onSignatureLoad={handleSignatureLoad}
+                          loadImmediately={index < 10}
+                        />
                       </div>
 
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -2694,7 +2817,6 @@ export default function PODQuality() {
             <div className="flex-1 overflow-hidden">
               {selectedConsignment?.deliveryLiveTrackLink || selectedConsignment?.pickupLiveTrackLink ? (
                 <PhotoGallery 
-                  consignmentId={selectedConsignment.id}
                   trackingLink={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
                   consignmentNo={selectedConsignment.consignmentNo || ''}
                 />
