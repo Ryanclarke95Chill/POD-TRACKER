@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard, dataSyncLog, type DataSyncLog, type InsertDataSyncLog } from "@shared/schema";
+import { users, type User, type InsertUser, consignments, type Consignment, type InsertConsignment, type ConsignmentEvent, statusTypes, temperatureZones, dashboards, type Dashboard, type InsertDashboard, dataSyncLog, type DataSyncLog, type InsertDataSyncLog, photoAssets, type PhotoAsset, type InsertPhotoAsset } from "@shared/schema";
 import { format, addDays, subDays } from "date-fns";
 import { db, executeWithRetry, safeQuery } from "./db";
 import { eq, sql, inArray, and, or, like } from "drizzle-orm";
@@ -33,6 +33,14 @@ export interface IStorage {
   logDataSync(syncLog: Omit<DataSyncLog, "id" | "syncDateTime">): Promise<DataSyncLog>;
   getLastSuccessfulSync(): Promise<DataSyncLog | undefined>;
   copyConsignmentsForNonAdminUsers(): Promise<void>;
+  // PhotoAsset operations for background photo ingestion
+  getPhotoAssetsByToken(token: string): Promise<PhotoAsset[]>;
+  getPhotoAssetsByTokenAndKind(token: string, kind: string): Promise<PhotoAsset[]>;
+  createPhotoAsset(asset: Omit<PhotoAsset, "id" | "fetchedAt">): Promise<PhotoAsset>;
+  createPhotoAssetsBatch(assets: Omit<PhotoAsset, "id" | "fetchedAt">[]): Promise<PhotoAsset[]>;
+  updatePhotoAssetStatus(id: number, status: string, errorMessage?: string): Promise<PhotoAsset>;
+  getPhotoAssetsByStatus(status: string): Promise<PhotoAsset[]>;
+  deletePhotoAssetsByToken(token: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -609,6 +617,81 @@ export class DatabaseStorage implements IStorage {
           console.log(`Copied ${consignmentsCopy.length} consignments to user ${user.id}`);
         }
       }
+    });
+  }
+
+  // PhotoAsset storage methods for background photo ingestion
+  async getPhotoAssetsByToken(token: string): Promise<PhotoAsset[]> {
+    const result = await safeQuery(async () => {
+      return await db.select().from(photoAssets).where(eq(photoAssets.token, token));
+    });
+    return result || [];
+  }
+
+  async getPhotoAssetsByTokenAndKind(token: string, kind: string): Promise<PhotoAsset[]> {
+    const result = await safeQuery(async () => {
+      return await db.select().from(photoAssets).where(
+        and(eq(photoAssets.token, token), eq(photoAssets.kind, kind))
+      );
+    });
+    return result || [];
+  }
+
+  async createPhotoAsset(asset: Omit<PhotoAsset, "id" | "fetchedAt">): Promise<PhotoAsset> {
+    return await executeWithRetry(async () => {
+      const [photoAsset] = await db
+        .insert(photoAssets)
+        .values(asset)
+        .returning();
+      return photoAsset;
+    });
+  }
+
+  async createPhotoAssetsBatch(assets: Omit<PhotoAsset, "id" | "fetchedAt">[]): Promise<PhotoAsset[]> {
+    return await executeWithRetry(async () => {
+      if (assets.length === 0) return [];
+      
+      const result = await db
+        .insert(photoAssets)
+        .values(assets)
+        .returning();
+      return result;
+    });
+  }
+
+  async updatePhotoAssetStatus(id: number, status: string, errorMessage?: string): Promise<PhotoAsset> {
+    return await executeWithRetry(async () => {
+      const updates: Partial<PhotoAsset> = { 
+        status,
+        fetchedAt: status === 'available' || status === 'failed' ? new Date() : undefined 
+      };
+      if (errorMessage !== undefined) {
+        updates.errorMessage = errorMessage;
+      }
+      
+      const [updated] = await db
+        .update(photoAssets)
+        .set(updates)
+        .where(eq(photoAssets.id, id))
+        .returning();
+      
+      if (!updated) {
+        throw new Error(`PhotoAsset with id ${id} not found`);
+      }
+      return updated;
+    });
+  }
+
+  async getPhotoAssetsByStatus(status: string): Promise<PhotoAsset[]> {
+    const result = await safeQuery(async () => {
+      return await db.select().from(photoAssets).where(eq(photoAssets.status, status));
+    });
+    return result || [];
+  }
+
+  async deletePhotoAssetsByToken(token: string): Promise<void> {
+    await executeWithRetry(async () => {
+      await db.delete(photoAssets).where(eq(photoAssets.token, token));
     });
   }
 

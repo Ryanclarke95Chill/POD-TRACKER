@@ -352,6 +352,40 @@ export type ConsignmentEvent = {
   type: string;
 };
 
+// PhotoAsset for background photo ingestion and SWR caching
+export const photoAssets = pgTable("photo_assets", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull(), // Axylog tracking token
+  url: text("url").notNull(), // Photo URL
+  kind: text("kind").notNull(), // 'photo' | 'signature'
+  width: integer("width"), // Image width (optional metadata)
+  height: integer("height"), // Image height (optional metadata)
+  hash: text("hash"), // Content hash for deduplication
+  status: text("status").notNull().default('pending'), // 'pending' | 'available' | 'failed'
+  fetchedAt: timestamp("fetched_at").defaultNow(),
+  errorMessage: text("error_message"), // If status is 'failed'
+}, (table) => ({
+  // Indexes for efficient lookups
+  tokenIdx: index("photo_assets_token_idx").on(table.token),
+  statusIdx: index("photo_assets_status_idx").on(table.status),
+  tokenKindIdx: index("photo_assets_token_kind_idx").on(table.token, table.kind),
+  hashIdx: index("photo_assets_hash_idx").on(table.hash),
+}));
+
+export const insertPhotoAssetSchema = createInsertSchema(photoAssets).pick({
+  token: true,
+  url: true,
+  kind: true,
+  width: true,
+  height: true,
+  hash: true,
+  status: true,
+  errorMessage: true,
+});
+
+export type PhotoAsset = typeof photoAssets.$inferSelect;
+export type InsertPhotoAsset = z.infer<typeof insertPhotoAssetSchema>;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertConsignment = z.infer<typeof insertConsignmentSchema>;
