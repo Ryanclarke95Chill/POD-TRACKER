@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { pool, db } from "./db";
+import { pool, db, executeWithRetry } from "./db";
 import { axylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
 import { consignments } from "@shared/schema";
@@ -526,7 +526,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clear ALL consignments from ALL users to ensure clean slate
       console.log("Clearing all existing consignments from all users...");
-      await db.delete(consignments);
+      await executeWithRetry(async () => {
+        await db.delete(consignments);
+      });
       console.log("All consignments cleared successfully");
       
       let syncStatus = 'success';

@@ -8,6 +8,21 @@ import axylogProxy from "./axylog-proxy";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Add unhandled rejection and exception handlers to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Log the error but don't exit the process
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Log the error but don't exit the process in development
+  if (process.env.NODE_ENV === 'production') {
+    // In production, we might want to gracefully shut down
+    process.exit(1);
+  }
+});
+
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
@@ -64,13 +79,49 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   }
 
-  // Global error handler (after Vite setup)
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  // Enhanced global error handler (after Vite setup)
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+    // Log the error for debugging
+    console.error('Express error handler caught:', {
+      error: err.message,
+      stack: err.stack,
+      url: req.url,
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+
+    // Check if this is a database connection error
+    const isDatabaseError = err.message?.includes('connection') ||
+                           err.message?.includes('database') ||
+                           err.message?.includes('WebSocket closed') ||
+                           err.message?.includes('SQL client unable to establish connection') ||
+                           err.code === '57P01' ||
+                           err.code === '57P03' ||
+                           err.code === '08006' ||
+                           err.code === '08000' ||
+                           err.code === 'ECONNRESET' ||
+                           err.code === 'ECONNREFUSED' ||
+                           err.code === 'ETIMEDOUT' ||
+                           err.code === 'EHOSTUNREACH';
+
+    let status = err.status || err.statusCode || 500;
+    let message = err.message || "Internal Server Error";
+
+    // Provide user-friendly messages for database errors
+    if (isDatabaseError) {
+      status = 503; // Service Unavailable
+      message = "Database temporarily unavailable. Please try again in a moment.";
+    }
     
+    // Only send response if headers haven't been sent yet
     if (!res.headersSent) {
-      res.status(status).json({ message });
+      res.status(status).json({ 
+        message,
+        ...(process.env.NODE_ENV === 'development' && { 
+          stack: err.stack,
+          originalError: err.message 
+        })
+      });
     }
   });
 

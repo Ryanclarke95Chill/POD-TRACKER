@@ -601,6 +601,13 @@ export default function PODQuality() {
 
   // Helper function to check if consignment is an internal transfer
   const isInternalTransfer = (consignment: Consignment): boolean => {
+    // First check if temperature zone indicates internal transfer
+    const tempZone = getTemperatureZone(consignment);
+    if (tempZone === 'Internal Transfer') {
+      return true;
+    }
+    
+    // Also check for depot transfer patterns as fallback
     const shipFrom = (consignment as any).shipFromMasterDataCode;
     const shipTo = (consignment as any).shipToMasterDataCode;
     
@@ -657,10 +664,6 @@ export default function PODQuality() {
     const isInternalTx = isInternalTransfer(consignment);
     const isReturnOrder = isReturn(consignment);
     
-    // Debug: Log filtering for first few items to verify logic
-    if ((allConsignments as Consignment[]).indexOf(consignment) < 5) {
-      console.log(`Consignment ${consignment.consignmentNo}: Delivered=${isDelivered}, Internal=${isInternalTx}, Return=${isReturnOrder}, Type="${consignment.type}", ShipTo="${(consignment as any).shipToCompanyName}", Warehouse="${consignment.warehouseCompanyName}"`);
-    }
     
     // Only include delivered consignments that are NOT returns or internal transfers
     return isDelivered && !isInternalTx && !isReturnOrder;
@@ -710,6 +713,46 @@ export default function PODQuality() {
     return null;
   };
 
+  // Calculate required photo count based on cartons and pallets
+  const getRequiredPhotoCount = (consignment: Consignment): { min: number; max: number; description: string } => {
+    const pallets = Number(consignment.qty2) || 0;
+    const cartons = Number(consignment.qty1) || 0;
+    
+    // If both pallets and cartons exist, use pallet logic only
+    if (pallets > 0 && cartons > 0) {
+      if (pallets === 1) {
+        return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+      } else if (pallets >= 2 && pallets <= 3) {
+        return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+      } else if (pallets > 3) {
+        return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
+      }
+    }
+    
+    // If only pallets exist
+    if (pallets > 0) {
+      if (pallets === 1) {
+        return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+      } else if (pallets >= 2 && pallets <= 3) {
+        return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+      } else if (pallets > 3) {
+        return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
+      }
+    }
+    
+    // If only cartons exist
+    if (cartons > 0) {
+      if (cartons >= 1 && cartons <= 10) {
+        return { min: 1, max: 2, description: `1-2 photos for ${cartons} cartons (1 if label visible)` };
+      } else if (cartons > 10) {
+        return { min: 3, max: 3, description: `3 photos minimum for ${cartons} cartons (must include label)` };
+      }
+    }
+    
+    // Default fallback if no quantity information
+    return { min: 3, max: 3, description: '3 photos minimum (default)' };
+  };
+
   // Gate checks (pass/fail before scoring)
   const passesGates = (consignment: Consignment): { ok: boolean; missing: string[] } => {
     const missing: string[] = [];
@@ -731,10 +774,11 @@ export default function PODQuality() {
       missing.push('Temperature compliance requirement');
     }
     
-    // Photos requirement: temporary rule ≥3 photos (until photo type detection is implemented)
+    // Photos requirement: dynamic based on cartons and pallets
     const photoCount = countPhotos(consignment);
-    if (photoCount < 3) {
-      missing.push('Photos requirement (≥3 photos)');
+    const photoRequirement = getRequiredPhotoCount(consignment);
+    if (photoCount < photoRequirement.min) {
+      missing.push(`Photos requirement (${photoRequirement.description})`);
     }
     
     // QTY provided (optional if available - don't gate on it if not in data)
@@ -749,13 +793,14 @@ export default function PODQuality() {
   // Helper function to evaluate individual component compliance
   const evaluateComponentCompliance = (consignment: Consignment, photoCount: number, hasSignature: boolean, hasReceiverName: boolean) => {
     const temperatureCompliant = checkTemperatureCompliance(consignment);
+    const photoRequirement = getRequiredPhotoCount(consignment);
     
     return {
       photos: {
-        compliant: photoCount >= 3,
-        reason: photoCount >= 3 ? 
-          `${photoCount} photos provided (≥3 required)` : 
-          `Only ${photoCount} photos (need ≥3 for mandatory set)`
+        compliant: photoCount >= photoRequirement.min,
+        reason: photoCount >= photoRequirement.min ? 
+          `${photoCount} photos provided (${photoRequirement.description})` : 
+          `${photoCount} out of ${photoRequirement.min} minimum photos`
       },
       signature: {
         compliant: hasSignature,
@@ -839,22 +884,23 @@ export default function PODQuality() {
       total: 0
     };
     
-    // 1. Photos (40 points total)
+    // 1. Photos (40 points total) - dynamic based on cartons/pallets
     let photoPoints = 0;
-    if (photoCount >= 3) {
+    const photoRequirement = getRequiredPhotoCount(consignment);
+    if (photoCount >= photoRequirement.min) {
       photoPoints += 35; // Mandatory set present
       // Extra useful photos bonus: +1 each up to +5 (cap 40 total)
-      const extraPhotos = Math.min(5, photoCount - 3);
+      const extraPhotos = Math.min(5, photoCount - photoRequirement.min);
       photoPoints += extraPhotos;
       breakdown.photos = { 
         points: photoPoints, 
-        reason: `Mandatory photos (${photoCount} ≥ 3) +35pts, ${extraPhotos} extra photos +${extraPhotos}pts`, 
+        reason: `Required photos (${photoCount} ≥ ${photoRequirement.min}) +35pts, ${extraPhotos} extra photos +${extraPhotos}pts`, 
         status: 'pass' 
       };
     } else {
       breakdown.photos = { 
         points: 0, 
-        reason: `Only ${photoCount} photos (need ≥3 for mandatory set)`, 
+        reason: `${photoCount} out of ${photoRequirement.min} minimum photos (${photoRequirement.description})`, 
         status: 'fail' 
       };
     }
@@ -1395,6 +1441,57 @@ export default function PODQuality() {
     return <Badge className="bg-red-100 text-red-800">Non-compliant</Badge>;
   };
 
+  // Generate non-compliance reason text based on scoreBreakdown
+  const getNonComplianceReasons = (scoreBreakdown: ScoreBreakdown): string[] => {
+    const reasons: string[] = [];
+    
+    // Check photos
+    if (scoreBreakdown.photos.status === 'fail') {
+      if (scoreBreakdown.photos.reason.includes('No photos')) {
+        reasons.push('No photos provided');
+      } else if (scoreBreakdown.photos.reason.includes('minimum')) {
+        // Extract number from reason like "Only 2 photos (minimum 3 required)"
+        const match = scoreBreakdown.photos.reason.match(/Only (\d+) photos.*minimum (\d+)/);
+        if (match) {
+          reasons.push(`${match[1]} out of ${match[2]} minimum photos`);
+        } else {
+          reasons.push('Insufficient photos');
+        }
+      }
+    }
+    
+    // Check signature
+    if (scoreBreakdown.signature.status === 'fail') {
+      if (scoreBreakdown.signature.reason.includes('No signature')) {
+        reasons.push('No signature provided');
+      } else {
+        reasons.push('Missing signature');
+      }
+    }
+    
+    // Check receiver name
+    if (scoreBreakdown.receiverName.status === 'fail') {
+      if (scoreBreakdown.receiverName.reason.includes('No receiver name')) {
+        reasons.push('No receiver name provided');
+      } else {
+        reasons.push('Missing receiver name');
+      }
+    }
+    
+    // Check temperature
+    if (scoreBreakdown.temperature.status === 'fail') {
+      if (scoreBreakdown.temperature.reason.includes('Temperature out of range')) {
+        reasons.push('Temperature out of range');
+      } else if (scoreBreakdown.temperature.reason.includes('No temperature data')) {
+        reasons.push('No temperature data');
+      } else {
+        reasons.push('Temperature non-compliant');
+      }
+    }
+    
+    return reasons;
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
     try {
@@ -1763,10 +1860,20 @@ export default function PODQuality() {
                     <h5 className="text-md font-semibold text-green-800 mb-3">🏆 Top Performers</h5>
                     <div className="space-y-2">
                       {driverPerformance.topPerformers.map((driver, index) => (
-                        <div key={driver.name} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div 
+                          key={driver.name} 
+                          className="bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 hover:border-green-300 transition-colors duration-200"
+                          onClick={() => {
+                            setSelectedDriver(driver.name);
+                            setShowSummary(false);
+                            setCurrentPage(1);
+                          }}
+                          data-testid={`driver-top-${driver.name.replace(/\s+/g, '-')}`}
+                        >
                           <div className="flex justify-between items-center">
-                            <div className="font-medium text-green-900">
+                            <div className="font-medium text-green-900 flex items-center gap-2">
                               #{index + 1} {driver.name}
+                              <ExternalLink className="h-3 w-3 text-green-600" />
                             </div>
                             <div className="text-green-700 font-bold">
                               {driver.avgScore.toFixed(1)}
@@ -1785,10 +1892,20 @@ export default function PODQuality() {
                     <h5 className="text-md font-semibold text-red-800 mb-3">📉 Needs Improvement</h5>
                     <div className="space-y-2">
                       {driverPerformance.bottomPerformers.map((driver, index) => (
-                        <div key={driver.name} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div 
+                          key={driver.name} 
+                          className="bg-red-50 border border-red-200 rounded-lg p-3 cursor-pointer hover:bg-red-100 hover:border-red-300 transition-colors duration-200"
+                          onClick={() => {
+                            setSelectedDriver(driver.name);
+                            setShowSummary(false);
+                            setCurrentPage(1);
+                          }}
+                          data-testid={`driver-bottom-${driver.name.replace(/\s+/g, '-')}`}
+                        >
                           <div className="flex justify-between items-center">
-                            <div className="font-medium text-red-900">
+                            <div className="font-medium text-red-900 flex items-center gap-2">
                               #{driverPerformance.totalQualifiedDrivers - index} {driver.name}
+                              <ExternalLink className="h-3 w-3 text-red-600" />
                             </div>
                             <div className="text-red-700 font-bold">
                               {driver.avgScore.toFixed(1)}
@@ -2146,7 +2263,7 @@ export default function PODQuality() {
                           Delivered: {formatDate(metrics.deliveryTime)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -2169,6 +2286,17 @@ export default function PODQuality() {
                            metrics.qualityScore >= 75 ? "Silver" :
                            metrics.qualityScore >= 60 ? "Bronze" : "Non-compliant"} {metrics.qualityScore}/100
                         </Button>
+                        
+                        {/* Non-compliance reasons sub-heading */}
+                        {metrics.qualityScore === 0 && metrics.scoreBreakdown && (
+                          <div className="text-right space-y-1 max-w-xs">
+                            {getNonComplianceReasons(metrics.scoreBreakdown).map((reason, index) => (
+                              <div key={index} className="text-xs text-gray-600 font-medium">
+                                {reason}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
