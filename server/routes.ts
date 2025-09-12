@@ -98,6 +98,7 @@ class PhotoScrapingQueue {
     }
 
     let photos: string[] = [];
+    let signaturePhotos: string[] = [];
 
     // Reuse browser instance for better performance
     if (!browserInstance) {
@@ -201,11 +202,41 @@ class PhotoScrapingQueue {
       });
       
       console.log(`Found ${imageData.length} potential photos on page`);
-      photos = imageData.map((img: any) => img.src);
       
       imageData.forEach((img: any, index: number) => {
         console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
       });
+      
+      // Separate signature photos from regular photos using dimensions and text
+      const signatureImages = imageData.filter((img: any) => {
+        const aspectRatio = img.width / Math.max(img.height, 1);
+        const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
+        
+        // Signature photos are typically wide and short (high aspect ratio)
+        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        
+        // Also check text content as backup
+        const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+        
+        return isDimensionSignature || isTextSignature;
+      });
+      
+      const regularImages = imageData.filter((img: any) => {
+        const aspectRatio = img.width / Math.max(img.height, 1);
+        const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
+        
+        // Signature photos are typically wide and short (high aspect ratio)
+        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        
+        // Also check text content as backup
+        const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+        
+        return !(isDimensionSignature || isTextSignature);
+      });
+      
+      const signaturePhotos: string[] = signatureImages.map((img: any) => img.src);
+      const regularPhotos: string[] = regularImages.map((img: any) => img.src);
+      photos = regularPhotos; // Keep for backward compatibility
       
     } catch (error: any) {
       console.error(`Error scraping photos: ${error.message}`);
@@ -216,21 +247,8 @@ class PhotoScrapingQueue {
       }
     }
     
-    // Separate signature photos from regular photos
-    const signaturePhotos = photos.filter((url: any) => 
-      url.toLowerCase().includes('signature') ||
-      url.toLowerCase().includes('firma') ||
-      url.toLowerCase().includes('sign')
-    );
-    
-    const regularPhotos = photos.filter((url: any) => 
-      !url.toLowerCase().includes('signature') &&
-      !url.toLowerCase().includes('firma') &&
-      !url.toLowerCase().includes('sign')
-    );
-    
-    const uniqueRegularPhotos = Array.from(new Set(regularPhotos));
-    const uniqueSignaturePhotos = Array.from(new Set(signaturePhotos));
+    const uniqueRegularPhotos: string[] = Array.from(new Set(photos));
+    const uniqueSignaturePhotos: string[] = Array.from(new Set(signaturePhotos));
     
     // Cache the results
     photoCache.set(token, {

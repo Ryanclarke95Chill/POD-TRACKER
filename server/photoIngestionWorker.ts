@@ -109,10 +109,17 @@ export class PhotoIngestionWorker {
           if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
           if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
           
-          // Classify as signature or regular photo
-          const isSignature = img.src.toLowerCase().includes('sign') || 
-                            img.alt?.toLowerCase().includes('sign') ||
-                            img.className?.toLowerCase().includes('sign');
+          // Classify as signature or regular photo using dimensions and text
+          const aspectRatio = img.width / Math.max(img.height, 1);
+          const text = (img.alt + ' ' + img.className).toLowerCase();
+          
+          // Signature photos are typically wide and short (high aspect ratio)
+          const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+          
+          // Also check text content as backup
+          const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+          
+          const isSignature = isDimensionSignature || isTextSignature;
           
           extractedPhotos.push({
             url: img.src,
