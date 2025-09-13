@@ -32,7 +32,6 @@ import {
 import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
 import { Consignment, ScoreBreakdown } from "@shared/schema";
-import { calculateDriverStats, getDriversByCohort, getCohortSummary, DriverStats, DriverCohortConfig, DEFAULT_COHORT_CONFIG } from "@/utils/driverStats";
 
 interface PODMetrics {
   photoCount: number;
@@ -925,9 +924,6 @@ export default function PODQuality() {
   // Summary state
   const [showSummary, setShowSummary] = useState(false);
   
-  // Driver cohort comparison state
-  const [selectedCohort, setSelectedCohort] = useState<'regular' | 'high-volume' | 'new-casual'>('regular');
-  const [timeWindowWeeks, setTimeWindowWeeks] = useState(4);
   
   // Track loaded photos for instant modal opening
   const [loadedPhotos, setLoadedPhotos] = useState<Map<number, string[]>>(new Map());
@@ -2250,211 +2246,123 @@ export default function PODQuality() {
               </div>
             </div>
 
-            {/* Fair Driver Comparison System */}
+            {/* Simple Driver Performance Leaderboard */}
             {(() => {
-              // Calculate driver statistics using the fair comparison system
-              const cohortConfig: DriverCohortConfig = {
-                ...DEFAULT_COHORT_CONFIG,
-                timeWindowWeeks: timeWindowWeeks
-              };
-              
-              const allDriverStats = calculateDriverStats(deliveredConsignments, cohortConfig);
-              const regularDrivers = getDriversByCohort(allDriverStats, 'regular');
-              const highVolumeDrivers = getDriversByCohort(allDriverStats, 'high-volume');
-              const newCasualDrivers = getDriversByCohort(allDriverStats, 'new-casual');
-              
-              const currentCohortDrivers = selectedCohort === 'regular' ? regularDrivers : 
-                                         selectedCohort === 'high-volume' ? highVolumeDrivers : 
-                                         newCasualDrivers;
-              
-              const cohortSummary = getCohortSummary(currentCohortDrivers);
-              
-              if (allDriverStats.length === 0) return null;
-              
-              return (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mt-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                    <h4 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-purple-600" />
-                      Fair Driver Comparison System
-                    </h4>
-                    
-                    {/* Time Window Selector */}
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm font-medium text-purple-700">Time Window:</label>
-                      <select
-                        value={timeWindowWeeks}
-                        onChange={(e) => setTimeWindowWeeks(Number(e.target.value))}
-                        className="px-3 py-1 border border-purple-300 rounded-md text-sm focus:border-purple-500 focus:ring-purple-500/20 focus:outline-none"
-                        data-testid="select-time-window"
-                      >
-                        <option value={1}>1 week</option>
-                        <option value={2}>2 weeks</option>
-                        <option value={4}>4 weeks</option>
-                        <option value={8}>8 weeks</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {/* Cohort Tabs */}
-                  <div className="flex border-b border-purple-200 mb-6">
-                    <button
-                      onClick={() => setSelectedCohort('regular')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'regular'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-regular-drivers"
-                    >
-                      Regular Drivers ({regularDrivers.length})
-                    </button>
-                    <button
-                      onClick={() => setSelectedCohort('high-volume')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'high-volume'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-high-volume-drivers"
-                    >
-                      High-Volume Drivers ({highVolumeDrivers.length})
-                    </button>
-                    <button
-                      onClick={() => setSelectedCohort('new-casual')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'new-casual'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-new-casual-drivers"
-                    >
-                      New/Casual Drivers ({newCasualDrivers.length})
-                    </button>
-                  </div>
-                  
-                  {/* Cohort Summary */}
-                  <div className="bg-white/60 rounded-lg p-4 mb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                      <div>
-                        <div className="text-lg font-bold text-purple-800">{cohortSummary.totalDrivers}</div>
-                        <div className="text-xs text-purple-600">Total Drivers</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-purple-800">{cohortSummary.averageDeliveries}</div>
-                        <div className="text-xs text-purple-600">Avg Deliveries</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-purple-800">{(cohortSummary.averageValidPodRate * 100).toFixed(1)}%</div>
-                        <div className="text-xs text-purple-600">Avg POD Rate</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-purple-800">{(cohortSummary.averageSignatureRate * 100).toFixed(1)}%</div>
-                        <div className="text-xs text-purple-600">Avg Signature Rate</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {currentCohortDrivers.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Top Performers */}
-                      <div>
-                        <h5 className="text-md font-semibold text-green-800 mb-3 flex items-center gap-2">
-                          🏆 Top Performers 
-                          {selectedCohort === 'new-casual' && (
-                            <span className="text-xs text-gray-500">(need {cohortConfig.regularDriverMinDeliveries}+ deliveries to compare fairly)</span>
-                          )}
-                        </h5>
-                        <div className="space-y-2">
-                          {currentCohortDrivers.slice(0, 5).map((driver, index) => (
-                            <div 
-                              key={`${driver.driverId}-${driver.driverName}`}
-                              className="bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 hover:border-green-300 transition-colors duration-200"
-                              onClick={() => {
-                                setSelectedDriver(driver.driverName);
-                                setShowSummary(false);
-                                setCurrentPage(1);
-                              }}
-                              data-testid={`driver-top-${driver.driverName.replace(/\s+/g, '-')}`}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="font-medium text-green-900 flex items-center gap-2">
-                                  #{index + 1} {driver.driverName}
-                                  <Badge variant="outline" className="text-xs bg-green-100 border-green-300">
-                                    {driver.cohort === 'high-volume' ? 'High Vol' : 
-                                     driver.cohort === 'regular' ? 'Regular' : 'New'}
-                                  </Badge>
-                                  <ExternalLink className="h-3 w-3 text-green-600" />
-                                </div>
-                                <div className="text-green-700 font-bold">
-                                  {(driver.compositeScore * 100).toFixed(1)}%
-                                </div>
-                              </div>
-                              <div className="text-xs text-green-600 mt-1 flex items-center gap-4">
-                                <span>N={driver.totalDeliveries}</span>
-                                <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
-                                <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
-                                <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+              // Calculate simple driver statistics
+              const driverStats = new Map<string, {
+                driverName: string;
+                totalDeliveries: number;
+                validPodCount: number;
+                signatureCount: number;
+                validPodRate: number;
+                signatureRate: number;
+              }>();
 
-                      {/* Bottom Performers */}
-                      <div>
-                        <h5 className="text-md font-semibold text-red-800 mb-3">📉 Needs Improvement</h5>
-                        <div className="space-y-2">
-                          {currentCohortDrivers.slice(-5).reverse().map((driver, index) => (
-                            <div 
-                              key={`${driver.driverId}-${driver.driverName}`}
-                              className="bg-red-50 border border-red-200 rounded-lg p-3 cursor-pointer hover:bg-red-100 hover:border-red-300 transition-colors duration-200"
-                              onClick={() => {
-                                setSelectedDriver(driver.driverName);
-                                setShowSummary(false);
-                                setCurrentPage(1);
-                              }}
-                              data-testid={`driver-bottom-${driver.driverName.replace(/\s+/g, '-')}`}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="font-medium text-red-900 flex items-center gap-2">
-                                  #{currentCohortDrivers.length - index} {driver.driverName}
-                                  <Badge variant="outline" className="text-xs bg-red-100 border-red-300">
-                                    {driver.cohort === 'high-volume' ? 'High Vol' : 
-                                     driver.cohort === 'regular' ? 'Regular' : 'New'}
-                                  </Badge>
-                                  <ExternalLink className="h-3 w-3 text-red-600" />
-                                </div>
-                                <div className="text-red-700 font-bold">
-                                  {(driver.compositeScore * 100).toFixed(1)}%
-                                </div>
+              // Aggregate driver data from delivered consignments
+              deliveredConsignments.forEach(consignment => {
+                const driverName = consignment.driverName;
+                if (!driverName) return;
+
+                const currentStats = driverStats.get(driverName) || {
+                  driverName,
+                  totalDeliveries: 0,
+                  validPodCount: 0,
+                  signatureCount: 0,
+                  validPodRate: 0,
+                  signatureRate: 0
+                };
+
+                currentStats.totalDeliveries++;
+
+                // Count valid POD (deliveries with photos)
+                const photoCount = consignment.photoUrls?.length || 0;
+                if (photoCount > 0) {
+                  currentStats.validPodCount++;
+                }
+
+                // Count signatures
+                if (consignment.hasSignature) {
+                  currentStats.signatureCount++;
+                }
+
+                driverStats.set(driverName, currentStats);
+              });
+
+              // Calculate rates and filter drivers with ≥20 deliveries
+              const qualifiedDrivers = Array.from(driverStats.values())
+                .map(stats => ({
+                  ...stats,
+                  validPodRate: stats.totalDeliveries > 0 ? stats.validPodCount / stats.totalDeliveries : 0,
+                  signatureRate: stats.totalDeliveries > 0 ? stats.signatureCount / stats.totalDeliveries : 0
+                }))
+                .filter(driver => driver.totalDeliveries >= 20)
+                .sort((a, b) => {
+                  // Sort by Valid POD % descending, then by delivery count descending
+                  if (b.validPodRate !== a.validPodRate) {
+                    return b.validPodRate - a.validPodRate;
+                  }
+                  return b.totalDeliveries - a.totalDeliveries;
+                });
+
+              // Count excluded drivers
+              const excludedDriversCount = Array.from(driverStats.values())
+                .filter(driver => driver.totalDeliveries < 20).length;
+
+              if (qualifiedDrivers.length === 0) return null;
+
+              return (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-6">
+                  <h4 className="text-lg font-semibold text-green-900 mb-6 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    Driver Performance Leaderboard
+                  </h4>
+                  
+                  {/* Driver Leaderboard */}
+                  <div className="space-y-3">
+                    {qualifiedDrivers.map((driver, index) => (
+                      <div 
+                        key={driver.driverName}
+                        className="bg-white border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors duration-200"
+                        onClick={() => {
+                          setSelectedDriver(driver.driverName);
+                          setShowSummary(false);
+                          setCurrentPage(1);
+                        }}
+                        data-testid={`driver-leaderboard-${driver.driverName.replace(/\s+/g, '-')}`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-3">
+                            <div className="text-lg font-bold text-green-700 min-w-[2rem] text-center">
+                              #{index + 1}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-green-900 flex items-center gap-2">
+                                {driver.driverName}
+                                <ExternalLink className="h-4 w-4 text-green-600" />
                               </div>
-                              <div className="text-xs text-red-600 mt-1 flex items-center gap-4">
+                              <div className="text-sm text-green-600 flex items-center gap-4">
                                 <span>N={driver.totalDeliveries}</span>
-                                <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
-                                <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
-                                <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
+                                <span>Valid POD: {(driver.validPodRate * 100).toFixed(1)}%</span>
+                                <span>Signature: {(driver.signatureRate * 100).toFixed(1)}%</span>
                               </div>
                             </div>
-                          ))}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold text-green-700">
+                              {(driver.validPodRate * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-green-600">Valid POD Rate</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No drivers found in this cohort for the selected time window.
-                    </div>
-                  )}
+                    ))}
+                  </div>
                   
-                  {/* Statistical Notice */}
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="text-xs text-blue-700">
-                      <Info className="h-4 w-4 inline mr-1" />
-                      Rankings use Wilson 95% confidence intervals for statistical fairness. 
-                      "N=" shows sample size. Lower bounds prevent small samples from appearing artificially high.
-                      {selectedCohort === 'regular' && ` Regular drivers: ≥${cohortConfig.regularDriverMinDeliveries} deliveries + ≥${cohortConfig.regularDriverMinActiveDays} active days.`}
-                      {selectedCohort === 'high-volume' && ` High-volume drivers: top 25% by delivery count within regular drivers.`}
-                      {selectedCohort === 'new-casual' && ` New/casual drivers: <${cohortConfig.regularDriverMinDeliveries} deliveries or <${cohortConfig.regularDriverMinActiveDays} active days.`}
+                  {/* Footer Note */}
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="text-sm text-yellow-800 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Hiding {excludedDriversCount} drivers with fewer than 20 deliveries for fair comparison.
                     </div>
                   </div>
                 </div>
