@@ -630,14 +630,21 @@ export default function PODQuality() {
   const user = getUser();
 
   // Fetch consignments data
-  const { data: consignments = [], isLoading } = useQuery({
+  const { data: consignments = [], isLoading } = useQuery<Consignment[]>({
     queryKey: ['/api/consignments'],
     enabled: !!user,
   });
 
+  // Helper function to check if consignment is delivered
+  const isDelivered = (c: Consignment): boolean => {
+    const outcomeEnum = (c.delivery_OutcomeEnum || '').toLowerCase();
+    const deliveredByEnum = outcomeEnum.includes('deliver') || outcomeEnum === 'ok' || outcomeEnum.includes('success');
+    return c.delivery_Outcome === true || deliveredByEnum || (!!c.delivery_OutcomeDateTime && c.delivery_NotDeliverd !== true);
+  };
+
   // Process consignments for POD analysis
   const podAnalyses = consignments
-    .filter(c => c.delivery_StateLabel === 'Delivered')
+    .filter(isDelivered)
     .map(analyzePODCompliance);
 
   // Get unique values for filters
@@ -647,8 +654,8 @@ export default function PODQuality() {
   )].sort();
 
   const uniqueDeliveryStates = [...new Set(consignments
-    .filter(c => c.delivery_StateLabel)
-    .map(c => c.delivery_StateLabel!)
+    .filter(c => c.delivery_OutcomeEnum)
+    .map(c => c.delivery_OutcomeEnum!)
   )].sort();
 
   const uniqueWarehouses = [...new Set(consignments
@@ -701,7 +708,7 @@ export default function PODQuality() {
       }
       
       // Delivery state filter
-      if (deliveryState !== "all" && consignment.delivery_StateLabel !== deliveryState) {
+      if (deliveryState !== "all" && consignment.delivery_OutcomeEnum !== deliveryState) {
         return false;
       }
       
@@ -1007,7 +1014,7 @@ export default function PODQuality() {
                           <p className="text-gray-600">Customer: <span className="font-medium text-gray-900">{analysis.consignment.shipToCompanyName || 'N/A'}</span></p>
                         </div>
                         <div>
-                          <p className="text-gray-600">State: <span className="font-medium text-gray-900">{analysis.consignment.delivery_StateLabel || 'N/A'}</span></p>
+                          <p className="text-gray-600">State: <span className="font-medium text-gray-900">{analysis.consignment.delivery_OutcomeEnum || 'N/A'}</span></p>
                           <p className="text-gray-600">Photos: <span className="font-medium text-gray-900">{analysis.photoCount}</span></p>
                         </div>
                         <div>
