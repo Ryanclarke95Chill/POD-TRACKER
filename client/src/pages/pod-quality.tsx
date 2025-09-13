@@ -502,7 +502,7 @@ const hasSignature = (consignment: Consignment): boolean => {
 };
 
 const hasReceiverName = (consignment: Consignment): boolean => {
-  const receiverName = consignment.deliverySignatureName?.trim();
+  const receiverName = consignment.shipToCompanyName?.trim();
   return !!(receiverName && receiverName.length >= 2);
 };
 
@@ -606,7 +606,7 @@ export default function PODQuality() {
 
   // Process consignments for POD analysis (simple version)
   const podAnalyses = consignments
-    .filter(c => c.delivery_StateLabel === 'Delivered' || c.delivery_Outcome)
+    .filter(c => c.delivery_StateLabel === 'Delivered')
     .map(analyzePODCompliance);
 
   // Get unique drivers and delivery states for filters
@@ -637,7 +637,8 @@ export default function PODQuality() {
       
       // Date range filter
       if (dateRange !== "all") {
-        const deliveryDate = consignment.contextPlannedDeliveryDateTime || consignment.departureDateTime;
+        const deliveryDate = consignment.delivery_OutcomeDateTime;
+        if (!deliveryDate) return false; // Skip if no actual delivery date
         switch (dateRange) {
           case "today":
             if (!isToday(deliveryDate)) return false;
@@ -684,8 +685,8 @@ export default function PODQuality() {
       // Sort by issues first (issues at top), then by date
       if (a.issues.hasAnyIssues && !b.issues.hasAnyIssues) return -1;
       if (!a.issues.hasAnyIssues && b.issues.hasAnyIssues) return 1;
-      const dateA = new Date(a.consignment.contextPlannedDeliveryDateTime || a.consignment.departureDateTime || '');
-      const dateB = new Date(b.consignment.contextPlannedDeliveryDateTime || b.consignment.departureDateTime || '');
+      const dateA = new Date(a.consignment.delivery_OutcomeDateTime || '');
+      const dateB = new Date(b.consignment.delivery_OutcomeDateTime || '');
       return dateB.getTime() - dateA.getTime();
     });
 
@@ -949,8 +950,8 @@ export default function PODQuality() {
                         <div>
                           <p className="text-gray-600">
                             Date: <span className="font-medium text-gray-900">
-                              {analysis.consignment.contextPlannedDeliveryDateTime ? 
-                                new Date(analysis.consignment.contextPlannedDeliveryDateTime).toLocaleDateString() : 
+                              {analysis.consignment.delivery_OutcomeDateTime ? 
+                                new Date(analysis.consignment.delivery_OutcomeDateTime).toLocaleDateString() : 
                                 'N/A'
                               }
                             </span>
