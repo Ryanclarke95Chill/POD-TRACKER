@@ -70,6 +70,128 @@ interface PhotoGalleryProps {
 // Global cache for photos
 const photoCache = new Map<string, {photos: string[], signaturePhotos: string[]}>();
 
+// Component for inline photo thumbnails in consignment cards
+interface ConsignmentThumbnailsProps {
+  consignment: Consignment;
+  onPhotoClick: (photoIndex: number) => void;
+}
+
+function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbnailsProps) {
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [signatures, setSignatures] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadThumbnails = async () => {
+      if (!consignment.deliveryLiveTrackLink && !consignment.pickupLiveTrackLink) return;
+      
+      const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+      
+      // Check cache first
+      const cached = photoCache.get(trackingLink!);
+      if (cached) {
+        setPhotos(cached.photos);
+        setSignatures(cached.signaturePhotos);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const token = getToken();
+        if (!token || !isAuthenticated()) return;
+        
+        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink!)}&priority=low`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            const regularPhotos = data.photos || [];
+            const signaturePhotos = data.signaturePhotos || [];
+            setPhotos(regularPhotos);
+            setSignatures(signaturePhotos);
+            photoCache.set(trackingLink!, {photos: regularPhotos, signaturePhotos});
+          }
+        }
+      } catch (err) {
+        console.error('Error loading thumbnails:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadThumbnails();
+  }, [consignment.deliveryLiveTrackLink, consignment.pickupLiveTrackLink]);
+
+  if (loading) {
+    return (
+      <div className="flex gap-2">
+        <div className="w-12 h-12 bg-gray-200 rounded animate-pulse"></div>
+        <div className="w-12 h-12 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    );
+  }
+
+  if (photos.length === 0 && signatures.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400">
+        <Camera className="h-4 w-4" />
+        <span className="text-xs">No photos</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {/* Photo thumbnails */}
+      {photos.slice(0, 3).map((photo, index) => (
+        <button
+          key={index}
+          onClick={() => onPhotoClick(index)}
+          className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-colors group"
+          data-testid={`photo-thumb-${index}`}
+        >
+          <img
+            src={`/api/image?src=${encodeURIComponent(photo)}&w=100&q=70&fmt=webp`}
+            alt={`Photo ${index + 1}`}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+        </button>
+      ))}
+      
+      {/* Show count if more photos */}
+      {photos.length > 3 && (
+        <button
+          onClick={() => onPhotoClick(0)}
+          className="w-12 h-12 rounded-lg border-2 border-gray-300 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center justify-center"
+        >
+          <span className="text-xs font-medium text-gray-600">+{photos.length - 3}</span>
+        </button>
+      )}
+      
+      {/* Signature thumbnails */}
+      {signatures.slice(0, 2).map((signature, index) => (
+        <button
+          key={`sig-${index}`}
+          onClick={() => onPhotoClick(photos.length + index)}
+          className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-400 transition-colors group"
+          data-testid={`signature-thumb-${index}`}
+        >
+          <img
+            src={`/api/image?src=${encodeURIComponent(signature)}&w=100&q=70&fmt=webp`}
+            alt={`Signature ${index + 1}`}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+          />
+          <div className="absolute top-0 right-0 w-3 h-3 bg-green-500 rounded-full border border-white"></div>
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Photo Modal Component (unchanged)
 function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, consignmentNo }: InlinePhotoModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialPhotoIndex);
@@ -604,7 +726,7 @@ export default function PODQuality() {
         {/* Simple Summary Cards with minor styling improvements */}
         <div className="mb-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <CheckCircle className="h-8 w-8 text-green-600" />
@@ -617,7 +739,7 @@ export default function PODQuality() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Package className="h-8 w-8 text-blue-600" />
@@ -630,7 +752,7 @@ export default function PODQuality() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-red-50 to-red-100 border-red-200">
+            <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <FileSignature className="h-8 w-8 text-red-600" />
@@ -643,7 +765,7 @@ export default function PODQuality() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Camera className="h-8 w-8 text-orange-600" />
@@ -656,7 +778,7 @@ export default function PODQuality() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Thermometer className="h-8 w-8 text-purple-600" />
@@ -669,7 +791,7 @@ export default function PODQuality() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-200">
+            <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <AlertTriangle className="h-8 w-8 text-yellow-600" />
@@ -684,8 +806,8 @@ export default function PODQuality() {
           </div>
         </div>
 
-        {/* Simple Filters with minor UI improvements */}
-        <Card className="mb-6">
+        {/* Filters with enhanced styling */}
+        <Card className="mb-6 shadow-sm bg-gradient-to-r from-gray-50 to-white border-gray-200">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
               <div className="flex items-center gap-2">
@@ -781,8 +903,10 @@ export default function PODQuality() {
             filteredAnalyses.map(analysis => (
               <Card 
                 key={analysis.consignment.id} 
-                className={`hover:shadow-md transition-shadow ${
-                  analysis.issues.hasAnyIssues ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                className={`hover:shadow-lg transition-all duration-200 ${
+                  analysis.issues.hasAnyIssues 
+                    ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-25 shadow-red-100/50' 
+                    : 'border-gray-200 bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-blue-25'
                 }`}
               >
                 <CardContent className="p-6">
@@ -852,32 +976,47 @@ export default function PODQuality() {
                       )}
                     </div>
 
-                    <div className="flex gap-2 ml-4">
-                      {analysis.consignment.liveTrackLink && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
+                    <div className="flex flex-col gap-3 ml-4">
+                      {/* Photo and signature thumbnails */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 font-medium">Photos:</span>
+                        <ConsignmentThumbnails
+                          consignment={analysis.consignment}
+                          onPhotoClick={(photoIndex) => {
                             setSelectedConsignment(analysis.consignment);
                             setPhotoModalOpen(true);
                           }}
+                        />
+                      </div>
+                      
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        {(analysis.consignment.deliveryLiveTrackLink || analysis.consignment.pickupLiveTrackLink) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedConsignment(analysis.consignment);
+                              setPhotoModalOpen(true);
+                            }}
+                            className="flex items-center gap-2"
+                            data-testid={`button-view-photos-${analysis.consignment.consignmentNo}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                            View Photos
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(analysis.consignment.deliveryLiveTrackLink || analysis.consignment.pickupLiveTrackLink, '_blank')}
                           className="flex items-center gap-2"
-                          data-testid={`button-view-photos-${analysis.consignment.consignmentNo}`}
+                          data-testid={`button-tracking-${analysis.consignment.consignmentNo}`}
                         >
-                          <Eye className="h-4 w-4" />
-                          View Photos
+                          <ExternalLink className="h-4 w-4" />
+                          Tracking
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(analysis.consignment.liveTrackLink, '_blank')}
-                        className="flex items-center gap-2"
-                        data-testid={`button-tracking-${analysis.consignment.consignmentNo}`}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Tracking
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -893,12 +1032,12 @@ export default function PODQuality() {
               <DialogHeader>
                 <DialogTitle>POD Photos - {selectedConsignment.consignmentNo}</DialogTitle>
                 <DialogDescription>
-                  Delivery photos for this consignment
+                  Delivery photos and signatures for this consignment
                 </DialogDescription>
               </DialogHeader>
               <div className="overflow-auto max-h-[calc(90vh-120px)]">
                 <PhotoGallery
-                  trackingLink={selectedConsignment.liveTrackLink!}
+                  trackingLink={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink!}
                   consignmentNo={selectedConsignment.consignmentNo!}
                 />
               </div>
