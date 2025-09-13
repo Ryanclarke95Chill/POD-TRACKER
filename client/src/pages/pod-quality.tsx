@@ -86,9 +86,10 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
       if (!consignment.deliveryLiveTrackLink && !consignment.pickupLiveTrackLink) return;
       
       const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+      if (!trackingLink) return;
       
       // Check cache first
-      const cached = photoCache.get(trackingLink!);
+      const cached = photoCache.get(trackingLink);
       if (cached) {
         setPhotos(cached.photos);
         setSignatures(cached.signaturePhotos);
@@ -98,10 +99,16 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
       try {
         setLoading(true);
         const token = getToken();
-        if (!token || !isAuthenticated()) return;
+        if (!token || !isAuthenticated()) {
+          setLoading(false);
+          return;
+        }
         
-        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink!)}&priority=low`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         
         if (response.ok) {
@@ -111,17 +118,23 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
             const signaturePhotos = data.signaturePhotos || [];
             setPhotos(regularPhotos);
             setSignatures(signaturePhotos);
-            photoCache.set(trackingLink!, {photos: regularPhotos, signaturePhotos});
+            photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos});
           }
+        } else {
+          console.warn(`Failed to load thumbnails: ${response.status} ${response.statusText}`);
         }
       } catch (err) {
-        console.error('Error loading thumbnails:', err);
+        // Silently handle fetch errors - don't log them as they're not critical
+        console.debug('Thumbnail loading failed (non-critical):', err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadThumbnails();
+    loadThumbnails().catch(() => {
+      // Catch any remaining async errors to prevent unhandled rejections
+      setLoading(false);
+    });
   }, [consignment.deliveryLiveTrackLink, consignment.pickupLiveTrackLink]);
 
   if (loading) {
