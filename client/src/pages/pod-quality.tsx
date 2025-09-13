@@ -72,6 +72,7 @@ interface SignatureThumbnailProps {
   consignment: Consignment;
   onSignatureLoad: (consignmentId: number, signatures: string[]) => void;
   loadImmediately?: boolean;
+  onSignatureClick?: (signatures: string[], consignmentNo: string) => void;
 }
 
 // Global cache for photos to avoid re-extraction
@@ -235,7 +236,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
 }
 
 // Signature Thumbnail Component
-function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = false }: SignatureThumbnailProps) {
+function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = false, onSignatureClick }: SignatureThumbnailProps) {
   const [signatures, setSignatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -357,8 +358,18 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
 
   const displayPhoto = signatures[0];
   
+  const handleClick = () => {
+    if (onSignatureClick && signatures.length > 0) {
+      onSignatureClick(signatures, consignment.consignmentNo || consignment.orderNumberRef || consignment.id.toString());
+    }
+  };
+  
   return (
-    <div ref={elementRef} className="flex items-center gap-2">
+    <div 
+      ref={elementRef} 
+      className={`flex items-center gap-2 ${onSignatureClick ? 'cursor-pointer hover:bg-gray-50 rounded p-1 -m-1 transition-colors' : ''}`}
+      onClick={handleClick}
+    >
       <img
         src={`/api/image?src=${encodeURIComponent(displayPhoto!)}&w=32&q=60&fmt=webp`}
         alt="Signature"
@@ -901,6 +912,11 @@ export default function PODQuality() {
   const [photoAnalysisLoading, setPhotoAnalysisLoading] = useState<number | null>(null);
   const [photoAnalysisResults, setPhotoAnalysisResults] = useState<Map<number, any>>(new Map());
   
+  // Signature modal state
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [selectedSignatures, setSelectedSignatures] = useState<string[]>([]);
+  const [selectedSignatureConsignment, setSelectedSignatureConsignment] = useState<string>("");
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -919,6 +935,13 @@ export default function PODQuality() {
   const handleSignatureLoad = useCallback((consignmentId: number, signatures: string[]) => {
     // Store signature data for future use
     signaturePhotoState.set(consignmentId, signatures);
+  }, []);
+
+  // Handle signature click to open modal
+  const handleSignatureClick = useCallback((signatures: string[], consignmentNo: string) => {
+    setSelectedSignatures(signatures);
+    setSelectedSignatureConsignment(consignmentNo);
+    setSignatureModalOpen(true);
   }, []);
   const user = getUser();
 
@@ -2720,6 +2743,7 @@ export default function PODQuality() {
                           consignment={consignment}
                           onSignatureLoad={handleSignatureLoad}
                           loadImmediately={index < 10}
+                          onSignatureClick={handleSignatureClick}
                         />
                       </div>
 
@@ -3053,6 +3077,15 @@ export default function PODQuality() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Signature Photo Modal */}
+        <InlinePhotoModal
+          photos={selectedSignatures}
+          isOpen={signatureModalOpen}
+          onClose={() => setSignatureModalOpen(false)}
+          initialPhotoIndex={0}
+          consignmentNo={selectedSignatureConsignment}
+        />
       </div>
     </div>
   );
