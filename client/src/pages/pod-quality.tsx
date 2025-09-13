@@ -82,14 +82,20 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadThumbnails = async () => {
       if (!consignment.deliveryLiveTrackLink && !consignment.pickupLiveTrackLink) return;
       
       const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
       if (!trackingLink) return;
       
+      // Extract token from URL (e.g., https://live.axylog.com/TOKEN -> TOKEN)
+      const trackingToken = trackingLink.split('/').pop();
+      if (!trackingToken) return;
+      
       // Check cache first
-      const cached = photoCache.get(trackingLink);
+      const cached = photoCache.get(trackingToken);
       if (cached) {
         setPhotos(cached.photos);
         setSignatures(cached.signaturePhotos);
@@ -104,11 +110,11 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
           return;
         }
         
-        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`, {
+        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=low`, {
           headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            'Authorization': `Bearer ${token}`
+          },
+          signal: abortController.signal
         });
         
         if (response.ok) {
@@ -118,13 +124,15 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
             const signaturePhotos = data.signaturePhotos || [];
             setPhotos(regularPhotos);
             setSignatures(signaturePhotos);
-            photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos});
+            photoCache.set(trackingToken, {photos: regularPhotos, signaturePhotos});
           }
         } else {
           console.warn(`Failed to load thumbnails: ${response.status} ${response.statusText}`);
         }
-      } catch (err) {
-        // Silently handle fetch errors - don't log them as they're not critical
+      } catch (err: any) {
+        // Ignore aborted requests - they're not errors
+        if (err.name === 'AbortError') return;
+        // Silently handle other fetch errors - they're not critical for thumbnails
         console.debug('Thumbnail loading failed (non-critical):', err);
       } finally {
         setLoading(false);
@@ -135,6 +143,11 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
       // Catch any remaining async errors to prevent unhandled rejections
       setLoading(false);
     });
+    
+    // Cleanup: abort the request if component unmounts
+    return () => {
+      abortController.abort();
+    };
   }, [consignment.deliveryLiveTrackLink, consignment.pickupLiveTrackLink]);
 
   if (loading) {
@@ -334,20 +347,29 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadPhotos = async () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Extract token from URL (e.g., https://live.axylog.com/TOKEN -> TOKEN)
+        const trackingToken = trackingLink.split('/').pop();
+        if (!trackingToken) {
+          throw new Error('Invalid tracking link format');
+        }
         
         const token = getToken();
         if (!token || !isAuthenticated()) {
           throw new Error('No valid authentication token available');
         }
         
-        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
+        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=high`, {
           headers: {
             'Authorization': `Bearer ${token}`
-          }
+          },
+          signal: abortController.signal
         });
         
         if (response.status === 401) {
@@ -364,12 +386,14 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
         if (data.success) {
           const regularPhotos = data.photos || [];
           setPhotos(regularPhotos);
-          photoCache.set(trackingLink, {photos: regularPhotos, signaturePhotos: data.signaturePhotos || []});
+          photoCache.set(trackingToken, {photos: regularPhotos, signaturePhotos: data.signaturePhotos || []});
         } else {
           throw new Error(data.message || 'Failed to extract photos');
         }
         
-      } catch (err) {
+      } catch (err: any) {
+        // Ignore aborted requests - they're not errors
+        if (err.name === 'AbortError') return;
         console.error('Error loading photos:', err);
         setError('Unable to load photos from tracking system');
         setPhotos([]);
@@ -381,6 +405,11 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
     if (trackingLink) {
       loadPhotos();
     }
+    
+    // Cleanup: abort the request if component unmounts
+    return () => {
+      abortController.abort();
+    };
   }, [trackingLink]);
 
   if (loading) {
@@ -606,9 +635,9 @@ export default function PODQuality() {
     enabled: !!user,
   });
 
-  // Process consignments for POD analysis (temporarily include all to debug)
+  // Process consignments for POD analysis
   const podAnalyses = consignments
-    .filter(c => c.delivery_StateLabel) // Show all consignments with any delivery state
+    .filter(c => c.delivery_StateLabel === 'Delivered')
     .map(analyzePODCompliance);
 
   // Get unique values for filters
