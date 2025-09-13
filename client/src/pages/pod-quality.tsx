@@ -606,9 +606,9 @@ export default function PODQuality() {
     enabled: !!user,
   });
 
-  // Process consignments for POD analysis (simple version)
+  // Process consignments for POD analysis (temporarily include all to debug)
   const podAnalyses = consignments
-    .filter(c => c.delivery_StateLabel === 'Delivered')
+    .filter(c => c.delivery_StateLabel) // Show all consignments with any delivery state
     .map(analyzePODCompliance);
 
   // Get unique values for filters
