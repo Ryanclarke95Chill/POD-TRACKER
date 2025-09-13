@@ -16,7 +16,7 @@ import { photoWorker } from "./photoIngestionWorker";
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 0; // Disable cache for testing signature detection
 
 // Photo scraping queue system with concurrency control
 interface PhotoRequest {
@@ -218,6 +218,8 @@ class PhotoScrapingQueue {
         // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
+        console.log(`Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
+        
         return isDimensionSignature || isTextSignature;
       });
       
@@ -234,9 +236,10 @@ class PhotoScrapingQueue {
         return !(isDimensionSignature || isTextSignature);
       });
       
-      const signaturePhotos: string[] = signatureImages.map((img: any) => img.src);
+      const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
       const regularPhotos: string[] = regularImages.map((img: any) => img.src);
       photos = regularPhotos; // Keep for backward compatibility
+      signaturePhotos = tempSignaturePhotos; // Update the outer scope variable
       
     } catch (error: any) {
       console.error(`Error scraping photos: ${error.message}`);
@@ -267,6 +270,7 @@ class PhotoScrapingQueue {
 }
 
 const photoQueue = new PhotoScrapingQueue();
+console.log('🔧 SIGNATURE DETECTION LOGIC LOADED - Version 6:41 AM with debug logging');
 
 // Image processing cache
 const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();

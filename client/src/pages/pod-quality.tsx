@@ -355,10 +355,12 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
     );
   }
 
+  const displayPhoto = signatures[0];
+  
   return (
     <div ref={elementRef} className="flex items-center gap-2">
       <img
-        src={`/api/image?src=${encodeURIComponent(signatures[0])}&w=32&q=60&fmt=webp`}
+        src={`/api/image?src=${encodeURIComponent(displayPhoto!)}&w=32&q=60&fmt=webp`}
         alt="Signature"
         className="w-8 h-8 object-cover rounded border"
         onError={(e) => {
