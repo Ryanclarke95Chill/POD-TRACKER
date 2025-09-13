@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Camera, 
   ExternalLink, 
@@ -24,30 +25,48 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Calendar,
+  Filter,
+  RotateCcw
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
 import { Consignment } from "@shared/schema";
 
-// Types for our simplified approach
+// Quality tier definitions matching analytics page
+const QUALITY_TIERS = {
+  gold: { min: 90, max: 100, label: 'Gold (90-100)', color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' },
+  silver: { min: 75, max: 89, label: 'Silver (75-89)', color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' },
+  bronze: { min: 60, max: 74, label: 'Bronze (60-74)', color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
+  nonCompliant: { min: 0, max: 0, label: 'Non-Compliant', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
+};
+
 interface PODSummary {
   total: number;
-  validPODs: number;
-  missingSignatures: number;
-  noPhotos: number;
-  temperatureIssues: number;
-  missingReceiver: number;
+  gold: number;
+  silver: number;
+  bronze: number;
+  nonCompliant: number;
+  avgScore: number;
+  gatePassRate: number;
 }
 
-interface ConsignmentWithIssues {
-  consignment: Consignment;
-  issues: string[];
-  hasIssues: boolean;
+interface PODMetrics {
+  qualityScore: number;
+  qualityTier: 'gold' | 'silver' | 'bronze' | 'nonCompliant';
+  gatesPassed: boolean;
+  missingGates: string[];
   photoCount: number;
   hasSignature: boolean;
-  hasReceiver: boolean;
-  tempCompliant: boolean;
+  hasReceiverName: boolean;
+  temperatureCompliant: boolean;
+  photoRequirement: { min: number; max: number; description: string };
+}
+
+interface ConsignmentWithAnalysis {
+  consignment: Consignment;
+  metrics: PODMetrics;
 }
 
 interface DriverStats {
@@ -353,85 +372,188 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   );
 }
 
-// Helper functions for POD analysis
-function countPhotos(consignment: Consignment): number {
-  const deliveryFiles = consignment.receivedDeliveryPodFiles;
-  if (!deliveryFiles) return 0;
+// POD Analysis Helper Functions (from analytics page)
+const getRequiredPhotoCount = (consignment: Consignment): { min: number; max: number; description: string } => {
+  const pallets = Number(consignment.qty2) || 0;
+  const cartons = Number(consignment.qty1) || 0;
   
-  try {
-    const files = Array.isArray(deliveryFiles) ? deliveryFiles : JSON.parse(deliveryFiles);
-    return files.length;
-  } catch {
-    return 0;
-  }
-}
-
-function hasSignature(consignment: Consignment): boolean {
-  return !!(consignment.deliverySignatureName || 
-           consignment.pickupSignatureName ||
-           (consignment as any).receiverName);
-}
-
-function hasReceiverName(consignment: Consignment): boolean {
-  return !!(consignment.deliverySignatureName || 
-           consignment.pickupSignatureName ||
-           (consignment as any).receiverName ||
-           (consignment as any).delivery_SignatureName);
-}
-
-function isTemperatureCompliant(consignment: Consignment): boolean {
-  const expectedTemp = consignment.expectedTemperature;
-  const actualTemp = consignment.actualTemperature;
-  
-  if (!expectedTemp || !actualTemp) {
-    // If no temp requirements, assume compliant
-    return !expectedTemp;
+  if (pallets > 0 && cartons > 0) {
+    if (pallets === 1) return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+    if (pallets >= 2 && pallets <= 3) return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+    if (pallets > 3) return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
   }
   
-  // Simple compliance check - adjust as needed
-  if (expectedTemp.toLowerCase().includes('freezer')) {
-    return actualTemp <= -15;
-  } else if (expectedTemp.toLowerCase().includes('chiller')) {
-    return actualTemp >= 0 && actualTemp <= 8;
+  if (pallets > 0) {
+    if (pallets === 1) return { min: 2, max: 2, description: '2 photos required for 1 pallet' };
+    if (pallets >= 2 && pallets <= 3) return { min: 3, max: 3, description: `3 photos minimum for ${pallets} pallets` };
+    if (pallets > 3) return { min: 4, max: 4, description: `4 photos minimum for ${pallets} pallets` };
   }
   
-  return true; // Assume compliant for other cases
-}
+  if (cartons > 0) {
+    if (cartons >= 1 && cartons <= 10) return { min: 1, max: 2, description: `1-2 photos for ${cartons} cartons` };
+    if (cartons > 10) return { min: 3, max: 3, description: `3 photos minimum for ${cartons} cartons` };
+  }
+  
+  return { min: 3, max: 3, description: '3 photos minimum (default)' };
+};
 
-function analyzePODCompliance(consignment: Consignment): ConsignmentWithIssues {
-  const issues: string[] = [];
+const countPhotos = (consignment: Consignment): number => {
+  const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+  const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+  let count = Number(deliveryFileCount) + Number(pickupFileCount);
+  
+  // Subtract signature files from photo count
+  if (consignment.deliverySignatureName && deliveryFileCount > 0) count = Math.max(0, count - 1);
+  if (consignment.pickupSignatureName && pickupFileCount > 0) count = Math.max(0, count - 1);
+  
+  return count;
+};
+
+const hasSignature = (consignment: Consignment): boolean => {
+  return !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
+};
+
+const hasReceiverName = (consignment: Consignment): boolean => {
+  const receiverName = consignment.deliverySignatureName?.trim();
+  return !!(receiverName && receiverName.length >= 2);
+};
+
+const checkTemperatureCompliance = (consignment: Consignment): boolean => {
+  const actualTemp = (consignment as any).delivery_Temperature;
+  const expectedTemp = (consignment as any).shipmentExpectedTemperatureRange;
+  
+  if (!actualTemp || !expectedTemp) return true; // No temp data = compliant
+  
+  // Parse temperature range from expected
+  const parseRange = (label: string) => {
+    const patterns = [
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s+to\s+(-?\d+(?:\.\d+)?)\s*°?C?/i,
+      /(-?\d+(?:\.\d+)?)\s*to\s+(-?\d+(?:\.\d+)?)\s*°?C/i,
+      /(-?\d+(?:\.\d+)?)\s*°?C?\s*-\s*(-?\d+(?:\.\d+)?)\s*°?C?/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = label.match(pattern);
+      if (match) {
+        const val1 = parseFloat(match[1]);
+        const val2 = parseFloat(match[2]);
+        return { min: Math.min(val1, val2), max: Math.max(val1, val2) };
+      }
+    }
+    return null;
+  };
+  
+  const range = parseRange(expectedTemp);
+  if (!range) return true;
+  
+  const actual = parseFloat(actualTemp);
+  return !isNaN(actual) && actual >= range.min && actual <= range.max;
+};
+
+const passesGates = (consignment: Consignment): { ok: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!hasSignature(consignment)) missing.push('Signature present');
+  if (!hasReceiverName(consignment)) missing.push('Receiver name present');
+  if (!checkTemperatureCompliance(consignment)) missing.push('Temperature compliance requirement');
+  
+  const photoCount = countPhotos(consignment);
+  const photoRequirement = getRequiredPhotoCount(consignment);
+  if (photoCount < photoRequirement.min) missing.push(`Photos requirement (${photoRequirement.description})`);
+  
+  return { ok: missing.length === 0, missing };
+};
+
+const calculateQualityScore = (consignment: Consignment): number => {
+  let score = 0;
+  
+  // Only score if gates pass
+  const gates = passesGates(consignment);
+  if (!gates.ok) return 0;
+  
+  // Photos (30 points)
+  const photoCount = countPhotos(consignment);
+  const photoRequirement = getRequiredPhotoCount(consignment);
+  if (photoCount >= photoRequirement.min) {
+    score += 25; // Base photo requirement
+    const extraPhotos = Math.max(0, photoCount - photoRequirement.min);
+    score += Math.min(5, extraPhotos); // Up to 5 bonus points for extra photos
+  }
+  
+  // Recipient confirmation (15 points)
+  if (hasSignature(consignment)) score += 8;
+  if (hasReceiverName(consignment)) score += 7;
+  
+  // Temperature compliance (25 points)
+  if (checkTemperatureCompliance(consignment)) {
+    score += 25; // Full points for temperature compliance
+  }
+  
+  // Quantity accuracy (15 points) - simplified for now
+  if (consignment.qty1 || consignment.qty2) {
+    score += 5; // QTY present
+    score += 10; // Assume matches evidence for now
+  }
+  
+  return Math.min(100, score);
+};
+
+const getQualityTier = (score: number): 'gold' | 'silver' | 'bronze' | 'nonCompliant' => {
+  if (score === 0) return 'nonCompliant';
+  if (score >= 90) return 'gold';
+  if (score >= 75) return 'silver';
+  if (score >= 60) return 'bronze';
+  return 'nonCompliant';
+};
+
+const analyzePODCompliance = (consignment: Consignment): ConsignmentWithAnalysis => {
   const photoCount = countPhotos(consignment);
   const hasSignatureVal = hasSignature(consignment);
   const hasReceiverVal = hasReceiverName(consignment);
-  const tempCompliantVal = isTemperatureCompliant(consignment);
+  const tempCompliantVal = checkTemperatureCompliance(consignment);
+  const photoRequirement = getRequiredPhotoCount(consignment);
+  const gates = passesGates(consignment);
   
-  if (photoCount === 0) {
-    issues.push("No photos");
-  } else if (photoCount < 3) {
-    issues.push("Few photos");
-  }
-  
-  if (!hasSignatureVal) {
-    issues.push("Missing signature");
-  }
-  
-  if (!hasReceiverVal) {
-    issues.push("No receiver name");
-  }
-  
-  if (!tempCompliantVal) {
-    issues.push("Temperature issue");
-  }
+  const qualityScore = calculateQualityScore(consignment);
+  const qualityTier = getQualityTier(qualityScore);
   
   return {
     consignment,
-    issues,
-    hasIssues: issues.length > 0,
-    photoCount,
-    hasSignature: hasSignatureVal,
-    hasReceiver: hasReceiverVal,
-    tempCompliant: tempCompliantVal
+    metrics: {
+      qualityScore,
+      qualityTier,
+      gatesPassed: gates.ok,
+      missingGates: gates.missing,
+      photoCount,
+      hasSignature: hasSignatureVal,
+      hasReceiverName: hasReceiverVal,
+      temperatureCompliant: tempCompliantVal,
+      photoRequirement
+    }
   };
+};
+
+// Helper functions for date filtering
+function isToday(date: string | null): boolean {
+  if (!date) return false;
+  const today = new Date();
+  const itemDate = new Date(date);
+  return itemDate.toDateString() === today.toDateString();
+}
+
+function isThisWeek(date: string | null): boolean {
+  if (!date) return false;
+  const today = new Date();
+  const weekStart = new Date(today.setDate(today.getDate() - today.getDay()));
+  const itemDate = new Date(date);
+  return itemDate >= weekStart;
+}
+
+function isThisMonth(date: string | null): boolean {
+  if (!date) return false;
+  const today = new Date();
+  const itemDate = new Date(date);
+  return itemDate.getMonth() === today.getMonth() && itemDate.getFullYear() === today.getFullYear();
 }
 
 // Main POD Quality Component
@@ -440,6 +562,14 @@ export default function PODQuality() {
   const [showIssuesOnly, setShowIssuesOnly] = useState(false);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  
+  // New filter states
+  const [dateRange, setDateRange] = useState<string>("all");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [selectedDriver, setSelectedDriver] = useState<string>("all");
+  const [deliveryState, setDeliveryState] = useState<string>("all");
+  const [qualityFilter, setQualityFilter] = useState<string>("all");
 
   const user = getUser();
 
@@ -454,46 +584,98 @@ export default function PODQuality() {
     .filter(c => c.delivery_StateLabel === 'Delivered' || c.delivery_Outcome)
     .map(analyzePODCompliance);
 
+  // Get unique drivers and delivery states for filters
+  const uniqueDrivers = [...new Set(consignments
+    .filter(c => c.driverName)
+    .map(c => c.driverName!)
+  )].sort();
+
+  const uniqueDeliveryStates = [...new Set(consignments
+    .filter(c => c.delivery_StateLabel)
+    .map(c => c.delivery_StateLabel!)
+  )].sort();
+
   // Calculate summary metrics
   const summary: PODSummary = {
     total: podAnalyses.length,
-    validPODs: podAnalyses.filter(p => !p.hasIssues).length,
-    missingSignatures: podAnalyses.filter(p => !p.hasSignature).length,
-    noPhotos: podAnalyses.filter(p => p.photoCount === 0).length,
-    temperatureIssues: podAnalyses.filter(p => !p.tempCompliant).length,
-    missingReceiver: podAnalyses.filter(p => !p.hasReceiver).length,
+    gold: podAnalyses.filter(p => p.metrics.qualityTier === 'gold').length,
+    silver: podAnalyses.filter(p => p.metrics.qualityTier === 'silver').length,
+    bronze: podAnalyses.filter(p => p.metrics.qualityTier === 'bronze').length,
+    nonCompliant: podAnalyses.filter(p => p.metrics.qualityTier === 'nonCompliant').length,
+    avgScore: podAnalyses.reduce((sum, p) => sum + p.metrics.qualityScore, 0) / podAnalyses.length || 0,
+    gatePassRate: podAnalyses.length > 0 ? (podAnalyses.filter(p => p.metrics.gatesPassed).length / podAnalyses.length) * 100 : 0,
   };
 
   // Filter and search logic
   const filteredAnalyses = podAnalyses
     .filter(analysis => {
+      const consignment = analysis.consignment;
+      
+      // Date range filter
+      if (dateRange !== "all") {
+        const deliveryDate = consignment.contextPlannedDeliveryDateTime || consignment.departureDateTime;
+        switch (dateRange) {
+          case "today":
+            if (!isToday(deliveryDate)) return false;
+            break;
+          case "week":
+            if (!isThisWeek(deliveryDate)) return false;
+            break;
+          case "month":
+            if (!isThisMonth(deliveryDate)) return false;
+            break;
+        }
+      }
+      
+      // Custom date range filter
+      if (fromDate || toDate) {
+        const deliveryDate = new Date(consignment.contextPlannedDeliveryDateTime || consignment.departureDateTime || '');
+        if (fromDate && deliveryDate < new Date(fromDate)) return false;
+        if (toDate && deliveryDate > new Date(toDate + 'T23:59:59')) return false;
+      }
+      
+      // Driver filter
+      if (selectedDriver !== "all" && consignment.driverName !== selectedDriver) {
+        return false;
+      }
+      
+      // Delivery state filter
+      if (deliveryState !== "all" && consignment.delivery_StateLabel !== deliveryState) {
+        return false;
+      }
+      
+      // Quality tier filter
+      if (qualityFilter !== "all" && analysis.metrics.qualityTier !== qualityFilter) {
+        return false;
+      }
+      
       // Search filter
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        const consignment = analysis.consignment;
         return (
           consignment.consignmentNo?.toLowerCase().includes(term) ||
           consignment.driverName?.toLowerCase().includes(term) ||
           consignment.shipToCompanyName?.toLowerCase().includes(term)
         );
       }
+      
       return true;
     })
     .filter(analysis => {
-      // Issues filter
+      // Issues filter - now means non-compliant or failed gates
       if (showIssuesOnly) {
-        return analysis.hasIssues;
+        return !analysis.metrics.gatesPassed || analysis.metrics.qualityTier === 'nonCompliant';
       }
       return true;
     })
     .sort((a, b) => {
-      // Sort issues first
-      if (a.hasIssues && !b.hasIssues) return -1;
-      if (!a.hasIssues && b.hasIssues) return 1;
-      return 0;
+      // Sort by quality tier (non-compliant first, then by score)
+      if (a.metrics.qualityTier === 'nonCompliant' && b.metrics.qualityTier !== 'nonCompliant') return -1;
+      if (a.metrics.qualityTier !== 'nonCompliant' && b.metrics.qualityTier === 'nonCompliant') return 1;
+      return b.metrics.qualityScore - a.metrics.qualityScore;
     });
 
-  // Calculate simple driver stats
+  // Calculate driver stats with quality scores
   const driverStats: DriverStats[] = consignments
     .filter(c => c.delivery_StateLabel === 'Delivered' || c.delivery_Outcome)
     .filter(c => c.driverName)
@@ -510,7 +692,7 @@ export default function PODQuality() {
       
       acc[driverName].totalDeliveries++;
       const analysis = analyzePODCompliance(consignment);
-      if (!analysis.hasIssues) {
+      if (analysis.metrics.gatesPassed && analysis.metrics.qualityTier !== 'nonCompliant') {
         acc[driverName].validPODs++;
       }
       
@@ -651,31 +833,163 @@ export default function PODQuality() {
           </div>
         </div>
 
-        {/* Minimal Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Search consignments or drivers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="issues-only"
-              checked={showIssuesOnly}
-              onCheckedChange={setShowIssuesOnly}
-              data-testid="switch-issues-only"
-            />
-            <label htmlFor="issues-only" className="text-sm font-medium text-gray-700">
-              Show issues only
-            </label>
-          </div>
-        </div>
+        {/* Enhanced Filter Controls */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("");
+                  setDateRange("all");
+                  setFromDate("");
+                  setToDate("");
+                  setSelectedDriver("all");
+                  setDeliveryState("all");
+                  setQualityFilter("all");
+                  setShowIssuesOnly(false);
+                }}
+                className="ml-auto text-sm text-gray-600 hover:text-gray-900"
+                data-testid="button-clear-filters"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Clear All
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search consignments..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+              
+              {/* Date Range Filter */}
+              <div>
+                <Select value={dateRange} onValueChange={setDateRange}>
+                  <SelectTrigger data-testid="select-date-range">
+                    <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                    <SelectValue placeholder="Date range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Driver Filter */}
+              <div>
+                <Select value={selectedDriver} onValueChange={setSelectedDriver}>
+                  <SelectTrigger data-testid="select-driver">
+                    <User className="h-4 w-4 mr-2 text-gray-500" />
+                    <SelectValue placeholder="All drivers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Drivers</SelectItem>
+                    {uniqueDrivers.map((driver) => (
+                      <SelectItem key={driver} value={driver}>
+                        {driver}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Delivery State Filter */}
+              <div>
+                <Select value={deliveryState} onValueChange={setDeliveryState}>
+                  <SelectTrigger data-testid="select-delivery-state">
+                    <Package className="h-4 w-4 mr-2 text-gray-500" />
+                    <SelectValue placeholder="All states" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All States</SelectItem>
+                    {uniqueDeliveryStates.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Issues Only Toggle */}
+              <div className="flex items-center justify-center gap-2 p-2">
+                <Switch
+                  id="issues-only"
+                  checked={showIssuesOnly}
+                  onCheckedChange={setShowIssuesOnly}
+                  data-testid="switch-issues-only"
+                />
+                <label htmlFor="issues-only" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Issues only
+                </label>
+              </div>
+            </div>
+            
+            {/* Active Filter Summary */}
+            {(searchTerm || dateRange !== "all" || fromDate || toDate || qualityFilter !== "all" || selectedDriver !== "all" || deliveryState !== "all" || showIssuesOnly) && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-sm text-gray-600">Active filters:</span>
+                  {searchTerm && (
+                    <Badge variant="secondary" className="text-xs">
+                      Search: "{searchTerm}"
+                    </Badge>
+                  )}
+                  {dateRange !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Date: {dateRange === "today" ? "Today" : dateRange === "week" ? "This Week" : "This Month"}
+                    </Badge>
+                  )}
+                  {fromDate && (
+                    <Badge variant="secondary" className="text-xs">
+                      From: {fromDate}
+                    </Badge>
+                  )}
+                  {toDate && (
+                    <Badge variant="secondary" className="text-xs">
+                      To: {toDate}
+                    </Badge>
+                  )}
+                  {qualityFilter !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Quality: {QUALITY_TIERS[qualityFilter as keyof typeof QUALITY_TIERS].label}
+                    </Badge>
+                  )}
+                  {selectedDriver !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Driver: {selectedDriver}
+                    </Badge>
+                  )}
+                  {deliveryState !== "all" && (
+                    <Badge variant="secondary" className="text-xs">
+                      State: {deliveryState}
+                    </Badge>
+                  )}
+                  {showIssuesOnly && (
+                    <Badge variant="destructive" className="text-xs">
+                      Issues Only
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Issues-First Consignment List */}
@@ -692,105 +1006,120 @@ export default function PODQuality() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-gray-100 max-h-[70vh] overflow-y-auto">
-                  {filteredAnalyses.map((analysis, index) => (
-                    <div 
-                      key={analysis.consignment.id} 
-                      className={`p-4 hover:bg-gray-50 transition-colors ${
-                        analysis.hasIssues ? 'bg-red-25 border-l-4 border-red-400' : ''
-                      }`}
-                      data-testid={`consignment-${analysis.consignment.id}`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-gray-900" data-testid={`text-consignment-${analysis.consignment.id}`}>
-                              {analysis.consignment.consignmentNo || `#${analysis.consignment.id}`}
-                            </h3>
-                            {analysis.hasIssues && (
-                              <Badge variant="destructive" className="text-xs">
-                                {analysis.issues.length} issue{analysis.issues.length > 1 ? 's' : ''}
+                  {filteredAnalyses.map((analysis, index) => {
+                    const tier = QUALITY_TIERS[analysis.metrics.qualityTier];
+                    return (
+                      <div 
+                        key={analysis.consignment.id} 
+                        className={`p-4 hover:bg-gray-50 transition-colors ${
+                          !analysis.metrics.gatesPassed ? 'bg-red-25 border-l-4 border-red-400' : 
+                          analysis.metrics.qualityTier === 'gold' ? 'bg-yellow-25 border-l-4 border-yellow-400' :
+                          ''
+                        }`}
+                        data-testid={`consignment-${analysis.consignment.id}`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-gray-900" data-testid={`text-consignment-${analysis.consignment.id}`}>
+                                {analysis.consignment.consignmentNo || `#${analysis.consignment.id}`}
+                              </h3>
+                              
+                              {/* Quality Score and Tier Badge */}
+                              <Badge 
+                                variant={analysis.metrics.qualityTier === 'nonCompliant' ? 'destructive' : 'secondary'}
+                                className={`text-xs font-bold ${tier.color}`}
+                                data-testid={`badge-quality-${analysis.consignment.id}`}
+                              >
+                                {analysis.metrics.qualityScore}/100 {analysis.metrics.qualityTier.charAt(0).toUpperCase() + analysis.metrics.qualityTier.slice(1)}
                               </Badge>
-                            )}
+                              
+                              {!analysis.metrics.gatesPassed && (
+                                <Badge variant="destructive" className="text-xs">
+                                  {analysis.metrics.missingGates.length} gate{analysis.metrics.missingGates.length > 1 ? 's' : ''} failed
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600" data-testid={`text-company-${analysis.consignment.id}`}>
+                              {analysis.consignment.shipToCompanyName || 'Unknown Company'}
+                            </p>
+                            <p className="text-sm text-gray-500" data-testid={`text-driver-${analysis.consignment.id}`}>
+                              Driver: {analysis.consignment.driverName || 'N/A'}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-600" data-testid={`text-company-${analysis.consignment.id}`}>
-                            {analysis.consignment.shipToCompanyName || 'Unknown Company'}
-                          </p>
-                          <p className="text-sm text-gray-500" data-testid={`text-driver-${analysis.consignment.id}`}>
-                            Driver: {analysis.consignment.driverName || 'N/A'}
-                          </p>
+
+                          {/* Status Chips */}
+                          <div className="flex flex-wrap gap-2">
+                            <Badge 
+                              variant={analysis.metrics.photoCount >= analysis.metrics.photoRequirement.min ? "default" : analysis.metrics.photoCount > 0 ? "secondary" : "destructive"}
+                              className="text-xs"
+                              data-testid={`badge-photos-${analysis.consignment.id}`}
+                            >
+                              <Camera className="h-3 w-3 mr-1" />
+                              {analysis.metrics.photoCount} photos (need {analysis.metrics.photoRequirement.min})
+                            </Badge>
+
+                            <Badge 
+                              variant={analysis.metrics.hasSignature ? "default" : "destructive"}
+                              className="text-xs"
+                              data-testid={`badge-signature-${analysis.consignment.id}`}
+                            >
+                              <FileSignature className="h-3 w-3 mr-1" />
+                              {analysis.metrics.hasSignature ? "Signed" : "No signature"}
+                            </Badge>
+
+                            <Badge 
+                              variant={analysis.metrics.temperatureCompliant ? "default" : "destructive"}
+                              className="text-xs"
+                              data-testid={`badge-temp-${analysis.consignment.id}`}
+                            >
+                              <Thermometer className="h-3 w-3 mr-1" />
+                              {analysis.metrics.temperatureCompliant ? "Temp OK" : "Temp issue"}
+                            </Badge>
+
+                            <Badge 
+                              variant={analysis.metrics.hasReceiverName ? "default" : "destructive"}
+                              className="text-xs"
+                              data-testid={`badge-receiver-${analysis.consignment.id}`}
+                            >
+                              <User className="h-3 w-3 mr-1" />
+                              {analysis.metrics.hasReceiverName ? "Named" : "No name"}
+                            </Badge>
+                          </div>
+
+                          {/* View Photos Button */}
+                          <Button
+                            onClick={() => {
+                              setSelectedConsignment(analysis.consignment);
+                              setPhotoModalOpen(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            data-testid={`button-view-photos-${analysis.consignment.id}`}
+                            disabled={!analysis.consignment.deliveryLiveTrackLink && !analysis.consignment.pickupLiveTrackLink}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Photos
+                          </Button>
                         </div>
 
-                        {/* Status Chips */}
-                        <div className="flex flex-wrap gap-2">
-                          <Badge 
-                            variant={analysis.photoCount >= 3 ? "default" : analysis.photoCount > 0 ? "secondary" : "destructive"}
-                            className="text-xs"
-                            data-testid={`badge-photos-${analysis.consignment.id}`}
-                          >
-                            <Camera className="h-3 w-3 mr-1" />
-                            {analysis.photoCount} photos
-                          </Badge>
-
-                          <Badge 
-                            variant={analysis.hasSignature ? "default" : "destructive"}
-                            className="text-xs"
-                            data-testid={`badge-signature-${analysis.consignment.id}`}
-                          >
-                            <FileSignature className="h-3 w-3 mr-1" />
-                            {analysis.hasSignature ? "Signed" : "No signature"}
-                          </Badge>
-
-                          <Badge 
-                            variant={analysis.tempCompliant ? "default" : "destructive"}
-                            className="text-xs"
-                            data-testid={`badge-temp-${analysis.consignment.id}`}
-                          >
-                            <Thermometer className="h-3 w-3 mr-1" />
-                            {analysis.tempCompliant ? "Temp OK" : "Temp issue"}
-                          </Badge>
-
-                          <Badge 
-                            variant={analysis.hasReceiver ? "default" : "destructive"}
-                            className="text-xs"
-                            data-testid={`badge-receiver-${analysis.consignment.id}`}
-                          >
-                            <User className="h-3 w-3 mr-1" />
-                            {analysis.hasReceiver ? "Named" : "No name"}
-                          </Badge>
-                        </div>
-
-                        {/* View Photos Button */}
-                        <Button
-                          onClick={() => {
-                            setSelectedConsignment(analysis.consignment);
-                            setPhotoModalOpen(true);
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0"
-                          data-testid={`button-view-photos-${analysis.consignment.id}`}
-                          disabled={!analysis.consignment.deliveryLiveTrackLink && !analysis.consignment.pickupLiveTrackLink}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Photos
-                        </Button>
+                        {/* Failed Gates List */}
+                        {!analysis.metrics.gatesPassed && analysis.metrics.missingGates.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-red-100">
+                            <div className="flex flex-wrap gap-1">
+                              {analysis.metrics.missingGates.map((gate, idx) => (
+                                <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  {gate}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Issues List */}
-                      {analysis.hasIssues && (
-                        <div className="mt-3 pt-3 border-t border-red-100">
-                          <div className="flex flex-wrap gap-1">
-                            {analysis.issues.map((issue, idx) => (
-                              <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                {issue}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {filteredAnalyses.length === 0 && (
                     <div className="text-center py-12 text-gray-500" data-testid="text-no-results">
