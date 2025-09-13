@@ -591,8 +591,10 @@ export default function PODQuality() {
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   
-  // Filter states (keep original simple ones)
-  const [dateRange, setDateRange] = useState<string>("all");
+  // Filter states - restored original filters
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [selectedDriver, setSelectedDriver] = useState<string>("all");
   const [deliveryState, setDeliveryState] = useState<string>("all");
 
@@ -609,7 +611,7 @@ export default function PODQuality() {
     .filter(c => c.delivery_StateLabel === 'Delivered')
     .map(analyzePODCompliance);
 
-  // Get unique drivers and delivery states for filters
+  // Get unique values for filters
   const uniqueDrivers = [...new Set(consignments
     .filter(c => c.driverName)
     .map(c => c.driverName!)
@@ -618,6 +620,11 @@ export default function PODQuality() {
   const uniqueDeliveryStates = [...new Set(consignments
     .filter(c => c.delivery_StateLabel)
     .map(c => c.delivery_StateLabel!)
+  )].sort();
+
+  const uniqueWarehouses = [...new Set(consignments
+    .filter(c => c.warehouseCompanyName)
+    .map(c => c.warehouseCompanyName!)
   )].sort();
 
   // Calculate simple summary metrics
@@ -635,21 +642,28 @@ export default function PODQuality() {
     .filter(analysis => {
       const consignment = analysis.consignment;
       
-      // Date range filter
-      if (dateRange !== "all") {
-        const deliveryDate = consignment.delivery_OutcomeDateTime;
+      // Date range filter (From/To)
+      const deliveryDate = consignment.delivery_OutcomeDateTime;
+      if (fromDate || toDate) {
         if (!deliveryDate) return false; // Skip if no actual delivery date
-        switch (dateRange) {
-          case "today":
-            if (!isToday(deliveryDate)) return false;
-            break;
-          case "week":
-            if (!isThisWeek(deliveryDate)) return false;
-            break;
-          case "month":
-            if (!isThisMonth(deliveryDate)) return false;
-            break;
+        const deliveryDateObj = new Date(deliveryDate);
+        
+        if (fromDate) {
+          const fromDateObj = new Date(fromDate);
+          if (deliveryDateObj < fromDateObj) return false;
         }
+        
+        if (toDate) {
+          const toDateObj = new Date(toDate);
+          // Set to end of day for inclusive filtering
+          toDateObj.setHours(23, 59, 59, 999);
+          if (deliveryDateObj > toDateObj) return false;
+        }
+      }
+      
+      // Warehouse filter
+      if (selectedWarehouse !== "all" && consignment.warehouseCompanyName !== selectedWarehouse) {
+        return false;
       }
       
       // Driver filter
@@ -842,16 +856,36 @@ export default function PODQuality() {
                   />
                 </div>
 
-                {/* Date Range */}
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-date-range">
-                    <SelectValue placeholder="Date range" />
+                {/* Date From/To Range */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">From:</span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-[140px]"
+                    data-testid="input-from-date"
+                  />
+                  <span className="text-sm text-gray-600">To:</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-[140px]"
+                    data-testid="input-to-date"
+                  />
+                </div>
+
+                {/* Warehouse Filter */}
+                <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-warehouse">
+                    <SelectValue placeholder="All warehouses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All dates</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">This week</SelectItem>
-                    <SelectItem value="month">This month</SelectItem>
+                    <SelectItem value="all">All warehouses</SelectItem>
+                    {uniqueWarehouses.map(warehouse => (
+                      <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
