@@ -77,148 +77,22 @@ interface ConsignmentThumbnailsProps {
 }
 
 function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbnailsProps) {
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [signatures, setSignatures] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    let isMounted = true;
-    
-    const loadThumbnails = async () => {
-      if (!consignment.deliveryLiveTrackLink && !consignment.pickupLiveTrackLink) return;
-      
-      const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-      if (!trackingLink) return;
-      
-      // Extract token from URL (e.g., https://live.axylog.com/TOKEN -> TOKEN)
-      const trackingToken = trackingLink.split('/').pop();
-      if (!trackingToken || !isMounted) return;
-      
-      // Check cache first
-      const cached = photoCache.get(trackingToken);
-      if (cached && isMounted) {
-        setPhotos(cached.photos);
-        setSignatures(cached.signaturePhotos);
-        return;
-      }
-
-      try {
-        if (!isMounted) return;
-        setLoading(true);
-        
-        const token = getToken();
-        if (!token || !isAuthenticated() || !isMounted) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=low`, {
-          headers: { 
-            'Authorization': `Bearer ${token}`
-          },
-          signal: abortController.signal
-        });
-        
-        if (!isMounted) return;
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && isMounted) {
-            const regularPhotos = data.photos || [];
-            const signaturePhotos = data.signaturePhotos || [];
-            setPhotos(regularPhotos);
-            setSignatures(signaturePhotos);
-            photoCache.set(trackingToken, {photos: regularPhotos, signaturePhotos});
-          }
-        }
-      } catch (err: any) {
-        // Ignore all errors silently - thumbnails are not critical
-        if (err.name !== 'AbortError') {
-          // Only log non-abort errors in development
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('Thumbnail loading failed (non-critical):', err.message);
-          }
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    // Start loading thumbnails
-    loadThumbnails();
-    
-    // Cleanup: abort the request if component unmounts
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
-  }, [consignment.deliveryLiveTrackLink, consignment.pickupLiveTrackLink]);
-
-  if (loading) {
-    return (
-      <div className="flex gap-2">
-        <div className="w-12 h-12 bg-gray-200 rounded animate-pulse"></div>
-        <div className="w-12 h-12 bg-gray-200 rounded animate-pulse"></div>
-      </div>
-    );
-  }
-
-  if (photos.length === 0 && signatures.length === 0) {
+  // Simplified placeholder to avoid fetch errors - photos will load when "View Photos" is clicked
+  const hasTrackingLink = !!(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
+  
+  if (!hasTrackingLink) {
     return (
       <div className="flex items-center gap-2 text-gray-400">
         <Camera className="h-4 w-4" />
-        <span className="text-xs">No photos</span>
+        <span className="text-xs">No tracking</span>
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2 flex-wrap">
-      {/* Photo thumbnails */}
-      {photos.slice(0, 3).map((photo, index) => (
-        <button
-          key={index}
-          onClick={() => onPhotoClick(index)}
-          className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-colors group"
-          data-testid={`photo-thumb-${index}`}
-        >
-          <img
-            src={`/api/image?src=${encodeURIComponent(photo)}&w=100&q=70&fmt=webp`}
-            alt={`Photo ${index + 1}`}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-          />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
-        </button>
-      ))}
-      
-      {/* Show count if more photos */}
-      {photos.length > 3 && (
-        <button
-          onClick={() => onPhotoClick(0)}
-          className="w-12 h-12 rounded-lg border-2 border-gray-300 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center justify-center"
-        >
-          <span className="text-xs font-medium text-gray-600">+{photos.length - 3}</span>
-        </button>
-      )}
-      
-      {/* Signature thumbnails */}
-      {signatures.slice(0, 2).map((signature, index) => (
-        <button
-          key={`sig-${index}`}
-          onClick={() => onPhotoClick(photos.length + index)}
-          className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-400 transition-colors group"
-          data-testid={`signature-thumb-${index}`}
-        >
-          <img
-            src={`/api/image?src=${encodeURIComponent(signature)}&w=100&q=70&fmt=webp`}
-            alt={`Signature ${index + 1}`}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-          />
-          <div className="absolute top-0 right-0 w-3 h-3 bg-green-500 rounded-full border border-white"></div>
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
-        </button>
-      ))}
+    <div className="flex items-center gap-2 text-gray-600">
+      <Camera className="h-4 w-4" />
+      <span className="text-xs">Photos available</span>
     </div>
   );
 }
