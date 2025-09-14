@@ -27,7 +27,8 @@ import {
   EyeOff,
   TrendingUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Globe
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
@@ -901,6 +902,40 @@ export default function PODQuality() {
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [selectedShipper, setSelectedShipper] = useState("all");
   const [selectedDriver, setSelectedDriver] = useState("all");
+  const [regionalComparisonMode, setRegionalComparisonMode] = useState(false);
+
+  // Regional stats calculation
+  const calculateRegionalStats = (consignments: Consignment[]) => {
+    const regions = ['NSW', 'QLD', 'WA', 'VIC'];
+    const regionalData = regions.map(region => {
+      // Filter consignments for this region based on warehouse company name
+      const regionConsignments = consignments.filter(c => 
+        c.warehouseCompanyName?.toUpperCase().includes(region)
+      );
+      
+      const totalDeliveries = regionConsignments.length;
+      const signaturesReceived = regionConsignments.filter(c => c.deliverySignatureName).length;
+      const signatureRate = totalDeliveries > 0 ? signaturesReceived / totalDeliveries : 0;
+      
+      // Get unique drivers in this region
+      const uniqueDrivers = new Set(
+        regionConsignments
+          .map(c => c.driverName)
+          .filter(Boolean)
+      ).size;
+      
+      return {
+        region: `Chill ${region}`,
+        totalDeliveries,
+        signaturesReceived,
+        signatureRate,
+        uniqueDrivers,
+        avgDeliveriesPerDriver: uniqueDrivers > 0 ? totalDeliveries / uniqueDrivers : 0
+      };
+    });
+    
+    return regionalData.filter(r => r.totalDeliveries > 0); // Only show regions with data
+  };
   const [selectedTempZone, setSelectedTempZone] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -925,8 +960,7 @@ export default function PODQuality() {
   // Summary state
   const [showSummary, setShowSummary] = useState(false);
   
-  // Driver cohort comparison state
-  const [selectedCohort, setSelectedCohort] = useState<'regular' | 'high-volume' | 'new-casual'>('regular');
+  // Driver comparison state  
   const [timeWindowWeeks, setTimeWindowWeeks] = useState(4);
   
   // Track loaded photos for instant modal opening
@@ -1074,6 +1108,129 @@ export default function PODQuality() {
   const temperatureZones = Array.from(
     new Set(deliveredConsignments.map(c => getTemperatureZone(c)).filter(Boolean))
   ).sort();
+  
+  // Create filtered consignments based on all filters
+  const filteredConsignments = (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+    // Text search filter
+    const matchesSearch = !searchTerm || 
+      Object.values(consignment).some(value => 
+        value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    
+    // Warehouse filter
+    const matchesWarehouse = selectedWarehouse === "all" || 
+      consignment.warehouseCompanyName === selectedWarehouse;
+    
+    // Shipper filter
+    const matchesShipper = selectedShipper === "all" || 
+      (consignment as any).shipperCompanyName === selectedShipper;
+    
+    // Driver filter
+    const matchesDriver = selectedDriver === "all" || 
+      consignment.driverName === selectedDriver;
+    
+    // Temperature zone filter
+    const matchesTempZone = selectedTempZone === "all" || 
+      getTemperatureZone(consignment)?.toLowerCase() === selectedTempZone.toLowerCase();
+    
+    // Status filter
+    const matchesStatus = selectedFilter === "all" || 
+      (() => {
+        const metrics = calculatePODMetrics(consignment);
+        if (selectedFilter === "compliant") {
+          return metrics.qualityScore >= 60;
+        } else if (selectedFilter === "non-compliant") {
+          return metrics.qualityScore < 60;
+        }
+        return true;
+      })();
+    
+    // Date range filter
+    const matchesDateRange = (() => {
+      if (!fromDate && !toDate) return true;
+      
+      const consignmentDate = consignment.delivery_OutcomeDateTime;
+      if (!consignmentDate) return false;
+      
+      const utcDate = new Date(consignmentDate);
+      const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000));
+      const dateString = aestDate.toISOString().split('T')[0];
+      
+      if (fromDate && toDate) {
+        return dateString >= fromDate && dateString <= toDate;
+      } else if (fromDate) {
+        return dateString >= fromDate;
+      } else if (toDate) {
+        return dateString <= toDate;
+      }
+      return true;
+    })();
+    
+    return matchesSearch && matchesWarehouse && matchesShipper && matchesDriver && matchesTempZone && matchesStatus && matchesDateRange;
+  });
+  
+  // For regional comparison, get delivered consignments with all filters except warehouse
+  const deliveredConsignmentsForRegional = regionalComparisonMode 
+    ? (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+        const status = getStatusDisplay(consignment);
+        const isDelivered = status === 'Delivered';
+        const isInternalTx = isInternalTransfer(consignment);
+        const isReturnOrder = isReturn(consignment);
+        
+        if (!isDelivered || isInternalTx || isReturnOrder) return false;
+        
+        // Apply all filters except warehouse filter
+        const matchesSearch = !searchTerm || 
+          Object.values(consignment).some(value => 
+            value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        
+        const matchesTempZone = selectedTempZone === "all" || 
+          getTemperatureZone(consignment)?.toLowerCase() === selectedTempZone.toLowerCase();
+        
+        const matchesShipper = selectedShipper === "all" || 
+          (consignment as any).shipperCompanyName === selectedShipper;
+        
+        const matchesDriver = selectedDriver === "all" || 
+          consignment.driverName === selectedDriver;
+        
+        const matchesStatus = selectedFilter === "all" || 
+          (() => {
+            const metrics = calculatePODMetrics(consignment);
+            if (selectedFilter === "compliant") {
+              return metrics.qualityScore >= 60;
+            } else if (selectedFilter === "non-compliant") {
+              return metrics.qualityScore < 60;
+            }
+            return true;
+          })();
+        
+        const matchesDateRange = (() => {
+          if (!fromDate && !toDate) return true;
+          
+          const consignmentDate = consignment.delivery_OutcomeDateTime;
+          if (!consignmentDate) return false;
+          
+          const utcDate = new Date(consignmentDate);
+          const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000));
+          const dateString = aestDate.toISOString().split('T')[0];
+          
+          if (fromDate && toDate) {
+            return dateString >= fromDate && dateString <= toDate;
+          } else if (fromDate) {
+            return dateString >= fromDate;
+          } else if (toDate) {
+            return dateString <= toDate;
+          }
+          return true;
+        })();
+        
+        return matchesSearch && matchesTempZone && matchesShipper && matchesDriver && matchesStatus && matchesDateRange;
+      })
+    : filteredConsignments.filter(consignment => {
+        const status = getStatusDisplay(consignment);
+        return status === 'Delivered';
+      });
 
   // Helper function to parse temperature band from label strings like "-18C to -20C" or "0 to 5 C"
   const parseBandFromLabel = (label: string): { min: number; max: number } | null => {
@@ -2145,16 +2302,6 @@ export default function PODQuality() {
               )}
             </div>
           </Button>
-          <Button
-            onClick={() => window.location.href = '/analytics'}
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 px-6 py-3 text-lg font-semibold shadow-lg"
-            data-testid="button-pod-analytics"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              POD Analytics
-            </div>
-          </Button>
         </div>
 
         {/* Summary Display */}
@@ -2250,8 +2397,40 @@ export default function PODQuality() {
               </div>
             </div>
 
-            {/* Fair Driver Comparison System */}
-            {(() => {
+            {/* Performance Comparison Toggle */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-gray-600" />
+                  Performance Analysis
+                </h4>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={!regionalComparisonMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setRegionalComparisonMode(false)}
+                      data-testid="button-driver-comparison"
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Driver Comparison
+                    </Button>
+                    <Button
+                      variant={regionalComparisonMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setRegionalComparisonMode(true)}
+                      data-testid="button-regional-comparison"
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      Regional Comparison
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Driver Performance Comparison */}
+            {!regionalComparisonMode && (() => {
               // Calculate driver statistics using the fair comparison system
               const cohortConfig: DriverCohortConfig = {
                 ...DEFAULT_COHORT_CONFIG,
@@ -2259,24 +2438,23 @@ export default function PODQuality() {
               };
               
               const allDriverStats = calculateDriverStats(deliveredConsignments, cohortConfig);
-              const regularDrivers = getDriversByCohort(allDriverStats, 'regular');
-              const highVolumeDrivers = getDriversByCohort(allDriverStats, 'high-volume');
-              const newCasualDrivers = getDriversByCohort(allDriverStats, 'new-casual');
               
-              const currentCohortDrivers = selectedCohort === 'regular' ? regularDrivers : 
-                                         selectedCohort === 'high-volume' ? highVolumeDrivers : 
-                                         newCasualDrivers;
+              // Apply delivery count filtering based on time window
+              // If time window >= 1 week (5 days): only drivers with 10+ deliveries  
+              // If time window < 1 week (5 days): all drivers regardless of delivery count
+              const minDeliveries = timeWindowWeeks >= 1 ? 10 : 0;
+              const qualifiedDrivers = allDriverStats.filter(driver => driver.totalDeliveries >= minDeliveries);
               
-              const cohortSummary = getCohortSummary(currentCohortDrivers);
+              const driverSummary = getCohortSummary(qualifiedDrivers);
               
-              if (allDriverStats.length === 0) return null;
+              if (qualifiedDrivers.length === 0) return null;
               
               return (
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mt-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <h4 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
                       <BarChart3 className="h-5 w-5 text-purple-600" />
-                      Fair Driver Comparison System
+                      Driver Performance Comparison
                     </h4>
                     
                     {/* Time Window Selector */}
@@ -2296,77 +2474,42 @@ export default function PODQuality() {
                     </div>
                   </div>
                   
-                  {/* Cohort Tabs */}
-                  <div className="flex border-b border-purple-200 mb-6">
-                    <button
-                      onClick={() => setSelectedCohort('regular')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'regular'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-regular-drivers"
-                    >
-                      Regular Drivers ({regularDrivers.length})
-                    </button>
-                    <button
-                      onClick={() => setSelectedCohort('high-volume')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'high-volume'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-high-volume-drivers"
-                    >
-                      High-Volume Drivers ({highVolumeDrivers.length})
-                    </button>
-                    <button
-                      onClick={() => setSelectedCohort('new-casual')}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                        selectedCohort === 'new-casual'
-                          ? 'border-purple-500 text-purple-700 bg-purple-100/50'
-                          : 'border-transparent text-purple-600 hover:text-purple-700 hover:border-purple-300'
-                      }`}
-                      data-testid="tab-new-casual-drivers"
-                    >
-                      New/Casual Drivers ({newCasualDrivers.length})
-                    </button>
-                  </div>
-                  
-                  {/* Cohort Summary */}
+                  {/* Driver Summary */}
                   <div className="bg-white/60 rounded-lg p-4 mb-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                       <div>
-                        <div className="text-lg font-bold text-purple-800">{cohortSummary.totalDrivers}</div>
+                        <div className="text-lg font-bold text-purple-800">{driverSummary.totalDrivers}</div>
                         <div className="text-xs text-purple-600">Total Drivers</div>
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-purple-800">{cohortSummary.averageDeliveries}</div>
+                        <div className="text-lg font-bold text-purple-800">{driverSummary.averageDeliveries}</div>
                         <div className="text-xs text-purple-600">Avg Deliveries</div>
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-purple-800">{(cohortSummary.averageValidPodRate * 100).toFixed(1)}%</div>
+                        <div className="text-lg font-bold text-purple-800">{(driverSummary.averageValidPodRate * 100).toFixed(1)}%</div>
                         <div className="text-xs text-purple-600">Avg POD Rate</div>
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-purple-800">{(cohortSummary.averageSignatureRate * 100).toFixed(1)}%</div>
+                        <div className="text-lg font-bold text-purple-800">{(driverSummary.averageSignatureRate * 100).toFixed(1)}%</div>
                         <div className="text-xs text-purple-600">Avg Signature Rate</div>
                       </div>
                     </div>
+                    {timeWindowWeeks >= 1 && (
+                      <div className="mt-2 text-xs text-purple-600 text-center">
+                        Showing drivers with {minDeliveries}+ deliveries
+                      </div>
+                    )}
                   </div>
                   
-                  {currentCohortDrivers.length > 0 ? (
+                  {qualifiedDrivers.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Top Performers */}
                       <div>
                         <h5 className="text-md font-semibold text-green-800 mb-3 flex items-center gap-2">
-                          🏆 Top Performers 
-                          {selectedCohort === 'new-casual' && (
-                            <span className="text-xs text-gray-500">(need {cohortConfig.regularDriverMinDeliveries}+ deliveries to compare fairly)</span>
-                          )}
+                          🏆 Top Performers
                         </h5>
                         <div className="space-y-2">
-                          {currentCohortDrivers.slice(0, 5).map((driver, index) => (
+                          {qualifiedDrivers.slice(0, 5).map((driver, index) => (
                             <div 
                               key={`${driver.driverId}-${driver.driverName}`}
                               className="bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 hover:border-green-300 transition-colors duration-200"
@@ -2381,8 +2524,7 @@ export default function PODQuality() {
                                 <div className="font-medium text-green-900 flex items-center gap-2">
                                   #{index + 1} {driver.driverName}
                                   <Badge variant="outline" className="text-xs bg-green-100 border-green-300">
-                                    {driver.cohort === 'high-volume' ? 'High Vol' : 
-                                     driver.cohort === 'regular' ? 'Regular' : 'New'}
+                                    {driver.totalDeliveries}
                                   </Badge>
                                   <ExternalLink className="h-3 w-3 text-green-600" />
                                 </div>
@@ -2391,7 +2533,6 @@ export default function PODQuality() {
                                 </div>
                               </div>
                               <div className="text-xs text-green-600 mt-1 flex items-center gap-4">
-                                <span>N={driver.totalDeliveries}</span>
                                 <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
                                 <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
                                 <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
@@ -2405,7 +2546,7 @@ export default function PODQuality() {
                       <div>
                         <h5 className="text-md font-semibold text-red-800 mb-3">📉 Needs Improvement</h5>
                         <div className="space-y-2">
-                          {currentCohortDrivers.slice(-5).reverse().map((driver, index) => (
+                          {qualifiedDrivers.slice(-5).reverse().map((driver, index) => (
                             <div 
                               key={`${driver.driverId}-${driver.driverName}`}
                               className="bg-red-50 border border-red-200 rounded-lg p-3 cursor-pointer hover:bg-red-100 hover:border-red-300 transition-colors duration-200"
@@ -2418,10 +2559,9 @@ export default function PODQuality() {
                             >
                               <div className="flex justify-between items-center">
                                 <div className="font-medium text-red-900 flex items-center gap-2">
-                                  #{currentCohortDrivers.length - index} {driver.driverName}
+                                  #{qualifiedDrivers.length - index} {driver.driverName}
                                   <Badge variant="outline" className="text-xs bg-red-100 border-red-300">
-                                    {driver.cohort === 'high-volume' ? 'High Vol' : 
-                                     driver.cohort === 'regular' ? 'Regular' : 'New'}
+                                    {driver.totalDeliveries}
                                   </Badge>
                                   <ExternalLink className="h-3 w-3 text-red-600" />
                                 </div>
@@ -2430,7 +2570,6 @@ export default function PODQuality() {
                                 </div>
                               </div>
                               <div className="text-xs text-red-600 mt-1 flex items-center gap-4">
-                                <span>N={driver.totalDeliveries}</span>
                                 <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
                                 <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
                                 <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
@@ -2442,7 +2581,7 @@ export default function PODQuality() {
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
-                      No drivers found in this cohort for the selected time window.
+                      No drivers found for the selected time window.
                     </div>
                   )}
                   
@@ -2452,10 +2591,133 @@ export default function PODQuality() {
                       <Info className="h-4 w-4 inline mr-1" />
                       Rankings use Wilson 95% confidence intervals for statistical fairness. 
                       "N=" shows sample size. Lower bounds prevent small samples from appearing artificially high.
-                      {selectedCohort === 'regular' && ` Regular drivers: ≥${cohortConfig.regularDriverMinDeliveries} deliveries + ≥${cohortConfig.regularDriverMinActiveDays} active days.`}
-                      {selectedCohort === 'high-volume' && ` High-volume drivers: top 25% by delivery count within regular drivers.`}
-                      {selectedCohort === 'new-casual' && ` New/casual drivers: <${cohortConfig.regularDriverMinDeliveries} deliveries or <${cohortConfig.regularDriverMinActiveDays} active days.`}
+                      {timeWindowWeeks >= 1 && ` Showing drivers with ${minDeliveries}+ deliveries to ensure fair comparisons.`}
                     </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Regional Performance Comparison */}
+            {regionalComparisonMode && (() => {
+              const regionalStats = calculateRegionalStats(deliveredConsignmentsForRegional);
+              
+              if (regionalStats.length === 0) {
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
+                    <div className="text-center py-8 text-blue-600">
+                      No regional data available for the selected time period.
+                    </div>
+                  </div>
+                );
+              }
+              
+              const totalRegionalDeliveries = regionalStats.reduce((sum, r) => sum + r.totalDeliveries, 0);
+              const avgSignatureRate = regionalStats.reduce((sum, r) => sum + r.signatureRate, 0) / regionalStats.length;
+              
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <h4 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-blue-600" />
+                      Regional Performance Comparison
+                    </h4>
+                    
+                    {/* Time Window Selector */}
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-blue-700">Time Window:</label>
+                      <select
+                        value={timeWindowWeeks}
+                        onChange={(e) => setTimeWindowWeeks(Number(e.target.value))}
+                        className="px-3 py-1 border border-blue-300 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500/20 focus:outline-none"
+                        data-testid="select-regional-time-window"
+                      >
+                        <option value={1}>1 week</option>
+                        <option value={2}>2 weeks</option>
+                        <option value={4}>4 weeks</option>
+                        <option value={8}>8 weeks</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Regional Summary */}
+                  <div className="bg-white/60 rounded-lg p-4 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-lg font-bold text-blue-800">{regionalStats.length}</div>
+                        <div className="text-xs text-blue-600">Active Regions</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-blue-800">{totalRegionalDeliveries}</div>
+                        <div className="text-xs text-blue-600">Total Deliveries</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-blue-800">{(avgSignatureRate * 100).toFixed(1)}%</div>
+                        <div className="text-xs text-blue-600">Avg Signature Rate</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-blue-600 text-center">
+                      Warehouse filter ignored in regional comparison
+                    </div>
+                  </div>
+                  
+                  {/* Regional Stats Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    {regionalStats.map((region, index) => (
+                      <div 
+                        key={region.region}
+                        className={`bg-white rounded-lg p-4 border-2 ${
+                          region.signatureRate >= 0.9 ? 'border-green-200 bg-green-50' :
+                          region.signatureRate >= 0.8 ? 'border-blue-200 bg-blue-50' :
+                          region.signatureRate >= 0.7 ? 'border-yellow-200 bg-yellow-50' :
+                          'border-red-200 bg-red-50'
+                        }`}
+                        data-testid={`region-${region.region.replace(/\s+/g, '-').toLowerCase()}`}
+                      >
+                        <div className="text-center">
+                          <h5 className="font-semibold text-gray-900 mb-2">{region.region}</h5>
+                          
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Deliveries:</span>
+                              <span className="font-medium">{region.totalDeliveries}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Drivers:</span>
+                              <span className="font-medium">{region.uniqueDrivers}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Avg/Driver:</span>
+                              <span className="font-medium">{region.avgDeliveriesPerDriver.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t">
+                              <span className="text-gray-600">Signatures:</span>
+                              <span className={`font-medium ${
+                                region.signatureRate >= 0.9 ? 'text-green-600' :
+                                region.signatureRate >= 0.8 ? 'text-blue-600' :
+                                region.signatureRate >= 0.7 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {(region.signatureRate * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3">
+                            <div className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                              region.signatureRate >= 0.9 ? 'bg-green-100 text-green-800' :
+                              region.signatureRate >= 0.8 ? 'bg-blue-100 text-blue-800' :
+                              region.signatureRate >= 0.7 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {region.signatureRate >= 0.9 ? 'Excellent' :
+                               region.signatureRate >= 0.8 ? 'Good' :
+                               region.signatureRate >= 0.7 ? 'Fair' : 'Needs Improvement'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

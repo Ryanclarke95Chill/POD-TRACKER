@@ -330,12 +330,6 @@ export default function Dashboard() {
             <p className="text-gray-600 mt-1">Monitor and track your temperature-controlled shipments</p>
           </div>
           <div className="flex gap-2">
-            <Link href="/analytics">
-              <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Analytics
-              </Button>
-            </Link>
             <SyncDataButton />
           </div>
         </div>
@@ -373,8 +367,8 @@ export default function Dashboard() {
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
                   {warehouseCompanies.map((warehouse) => (
-                    <SelectItem key={warehouse} value={warehouse}>
-                      {warehouse}
+                    <SelectItem key={warehouse || 'unknown'} value={warehouse || 'unknown'}>
+                      {warehouse || 'Unknown'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -503,7 +497,6 @@ export default function Dashboard() {
             <DashboardTable
               consignments={filteredConsignments}
               onViewDetails={handleViewDetails}
-              getStatusDisplay={getStatusDisplay}
             />
           ) : (
             /* No consignments found */

@@ -95,12 +95,10 @@ export function calculateDriverStats(
     
     // Basic counts
     const totalDeliveries = deliveries.length;
-    const validPods = deliveries.filter((d: Consignment) => d.podScore && d.podScore > 0).length;
+    // Note: qualityScore and expectedTemperature fields are not available in current data
+    const validPods = 0; // qualityScore field not available in current dataset
     const signaturesReceived = deliveries.filter((d: Consignment) => d.deliverySignatureName).length;
-    const temperatureCompliant = deliveries.filter((d: Consignment) => {
-      // Check if temperature is compliant (simplified logic)
-      return d.actualTemperature !== null && d.expectedTemperature !== null;
-    }).length;
+    const temperatureCompliant = 0; // expectedTemperature field not available in current dataset
     
     // Calculate unique active days
     const activeDays = new Set(
@@ -119,11 +117,8 @@ export function calculateDriverStats(
     const signatureLowerBound = wilsonLowerBound(signaturesReceived, totalDeliveries);
     const temperatureLowerBound = wilsonLowerBound(temperatureCompliant, totalDeliveries);
     
-    // Composite score (weighted combination of lower bounds)
-    const compositeScore = 
-      validPodLowerBound * 0.5 +       // POD quality is most important
-      temperatureLowerBound * 0.25 +   // Temperature compliance
-      signatureLowerBound * 0.25;      // Signature collection
+    // Composite score - currently based only on signatures since POD and temp data unavailable
+    const compositeScore = signatureLowerBound; // Only signature data is available
     
     driverStats.push({
       driverId,
