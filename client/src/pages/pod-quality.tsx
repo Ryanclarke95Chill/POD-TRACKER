@@ -83,6 +83,7 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
 
   useEffect(() => {
     const abortController = new AbortController();
+    let isMounted = true;
     
     const loadThumbnails = async () => {
       if (!consignment.deliveryLiveTrackLink && !consignment.pickupLiveTrackLink) return;
@@ -92,21 +93,23 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
       
       // Extract token from URL (e.g., https://live.axylog.com/TOKEN -> TOKEN)
       const trackingToken = trackingLink.split('/').pop();
-      if (!trackingToken) return;
+      if (!trackingToken || !isMounted) return;
       
       // Check cache first
       const cached = photoCache.get(trackingToken);
-      if (cached) {
+      if (cached && isMounted) {
         setPhotos(cached.photos);
         setSignatures(cached.signaturePhotos);
         return;
       }
 
       try {
+        if (!isMounted) return;
         setLoading(true);
+        
         const token = getToken();
-        if (!token || !isAuthenticated()) {
-          setLoading(false);
+        if (!token || !isAuthenticated() || !isMounted) {
+          if (isMounted) setLoading(false);
           return;
         }
         
@@ -117,35 +120,37 @@ function ConsignmentThumbnails({ consignment, onPhotoClick }: ConsignmentThumbna
           signal: abortController.signal
         });
         
+        if (!isMounted) return;
+        
         if (response.ok) {
           const data = await response.json();
-          if (data.success) {
+          if (data.success && isMounted) {
             const regularPhotos = data.photos || [];
             const signaturePhotos = data.signaturePhotos || [];
             setPhotos(regularPhotos);
             setSignatures(signaturePhotos);
             photoCache.set(trackingToken, {photos: regularPhotos, signaturePhotos});
           }
-        } else {
-          console.warn(`Failed to load thumbnails: ${response.status} ${response.statusText}`);
         }
       } catch (err: any) {
-        // Ignore aborted requests - they're not errors
-        if (err.name === 'AbortError') return;
-        // Silently handle other fetch errors - they're not critical for thumbnails
-        console.debug('Thumbnail loading failed (non-critical):', err);
+        // Ignore all errors silently - thumbnails are not critical
+        if (err.name !== 'AbortError') {
+          // Only log non-abort errors in development
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('Thumbnail loading failed (non-critical):', err.message);
+          }
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    loadThumbnails().catch(() => {
-      // Catch any remaining async errors to prevent unhandled rejections
-      setLoading(false);
-    });
+    // Start loading thumbnails
+    loadThumbnails();
     
     // Cleanup: abort the request if component unmounts
     return () => {
+      isMounted = false;
       abortController.abort();
     };
   }, [consignment.deliveryLiveTrackLink, consignment.pickupLiveTrackLink]);
@@ -648,20 +653,20 @@ export default function PODQuality() {
     .map(analyzePODCompliance);
 
   // Get unique values for filters
-  const uniqueDrivers = [...new Set(consignments
+  const uniqueDrivers = Array.from(new Set(consignments
     .filter(c => c.driverName)
     .map(c => c.driverName!)
-  )].sort();
+  )).sort();
 
-  const uniqueDeliveryStates = [...new Set(consignments
+  const uniqueDeliveryStates = Array.from(new Set(consignments
     .filter(c => c.delivery_OutcomeEnum)
     .map(c => c.delivery_OutcomeEnum!)
-  )].sort();
+  )).sort();
 
-  const uniqueWarehouses = [...new Set(consignments
+  const uniqueWarehouses = Array.from(new Set(consignments
     .filter(c => c.warehouseCompanyName)
     .map(c => c.warehouseCompanyName!)
-  )].sort();
+  )).sort();
 
   // Calculate simple summary metrics
   const summary: PODSummary = {
@@ -1093,7 +1098,10 @@ export default function PODQuality() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(analysis.consignment.deliveryLiveTrackLink || analysis.consignment.pickupLiveTrackLink, '_blank')}
+                          onClick={() => {
+                            const trackingLink = analysis.consignment.deliveryLiveTrackLink || analysis.consignment.pickupLiveTrackLink;
+                            if (trackingLink) window.open(trackingLink, '_blank');
+                          }}
                           className="flex items-center gap-2"
                           data-testid={`button-tracking-${analysis.consignment.consignmentNo}`}
                         >
