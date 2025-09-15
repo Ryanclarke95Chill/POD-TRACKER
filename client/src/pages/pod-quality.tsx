@@ -914,8 +914,21 @@ export default function PODQuality() {
       );
       
       const totalDeliveries = regionConsignments.length;
+      
+      // Calculate overall POD scores for this region
+      const podAnalyses = regionConsignments.map(c => analyzePOD(c));
+      const totalPodScore = podAnalyses.reduce((sum, analysis) => sum + analysis.metrics.qualityScore, 0);
+      const avgPodScore = totalDeliveries > 0 ? totalPodScore / totalDeliveries : 0;
+      
+      // Additional metrics
       const signaturesReceived = regionConsignments.filter(c => c.deliverySignatureName).length;
       const signatureRate = totalDeliveries > 0 ? signaturesReceived / totalDeliveries : 0;
+      
+      const photosCount = podAnalyses.reduce((sum, analysis) => sum + analysis.metrics.photoCount, 0);
+      const avgPhotosPerDelivery = totalDeliveries > 0 ? photosCount / totalDeliveries : 0;
+      
+      const temperatureCompliant = podAnalyses.filter(analysis => analysis.metrics.temperatureCompliant).length;
+      const tempComplianceRate = totalDeliveries > 0 ? temperatureCompliant / totalDeliveries : 0;
       
       // Get unique drivers in this region
       const uniqueDrivers = new Set(
@@ -927,8 +940,11 @@ export default function PODQuality() {
       return {
         region: `Chill ${region}`,
         totalDeliveries,
+        avgPodScore,
         signaturesReceived,
         signatureRate,
+        avgPhotosPerDelivery,
+        tempComplianceRate,
         uniqueDrivers,
         avgDeliveriesPerDriver: uniqueDrivers > 0 ? totalDeliveries / uniqueDrivers : 0
       };
@@ -1133,14 +1149,59 @@ export default function PODQuality() {
     const matchesTempZone = selectedTempZone === "all" || 
       getTemperatureZone(consignment)?.toLowerCase() === selectedTempZone.toLowerCase();
     
-    // Status filter
+    // Status filter - simplified scoring for filter performance
     const matchesStatus = selectedFilter === "all" || 
       (() => {
-        const metrics = calculatePODMetrics(consignment);
+        if (selectedFilter === "no-photos") {
+          return countPhotos(consignment) === 0;
+        } else if (selectedFilter === "no-signature") {
+          return !consignment.deliverySignatureName;
+        }
+        
+        // For compliant/non-compliant, use simplified POD scoring
+        let simpleScore = 0;
+        
+        // Simplified photo count for filter performance (avoiding function initialization issues)
+        let photoCount = 0;
+        const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+        const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+        if (deliveryFileCount > 0 || pickupFileCount > 0) {
+          photoCount = Number(deliveryFileCount) + Number(pickupFileCount);
+          // Subtract signatures
+          if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+          if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+        } else {
+          // Fallback: check file paths
+          if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
+          if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
+        }
+        const hasSignature = Boolean(consignment.deliverySignatureName);
+        const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
+        const tempCompliant = checkTemperatureCompliance(consignment);
+        
+        // Photos (40 points) - simplified
+        if (photoCount >= 2) simpleScore += 40;
+        else if (photoCount >= 1) simpleScore += 20;
+        
+        // Signature (20 points)
+        if (hasSignature) simpleScore += 20;
+        
+        // Receiver name (15 points)
+        if (hasReceiverName) simpleScore += 15;
+        
+        // Temperature (25 points)
+        if (tempCompliant) simpleScore += 25;
+        
         if (selectedFilter === "compliant") {
-          return metrics.qualityScore >= 60;
+          return simpleScore >= 60;
         } else if (selectedFilter === "non-compliant") {
-          return metrics.qualityScore < 60;
+          return simpleScore < 60;
+        } else if (selectedFilter === "gold") {
+          return simpleScore >= 90;
+        } else if (selectedFilter === "silver") {
+          return simpleScore >= 75 && simpleScore < 90;
+        } else if (selectedFilter === "bronze") {
+          return simpleScore >= 60 && simpleScore < 75;
         }
         return true;
       })();
@@ -1196,11 +1257,56 @@ export default function PODQuality() {
         
         const matchesStatus = selectedFilter === "all" || 
           (() => {
-            const metrics = calculatePODMetrics(consignment);
+            if (selectedFilter === "no-photos") {
+              return countPhotos(consignment) === 0;
+            } else if (selectedFilter === "no-signature") {
+              return !consignment.deliverySignatureName;
+            }
+            
+            // For compliant/non-compliant, use simplified POD scoring
+            let simpleScore = 0;
+            
+            // Simplified photo count for filter performance (avoiding function initialization issues)
+            let photoCount = 0;
+            const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+            const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+            if (deliveryFileCount > 0 || pickupFileCount > 0) {
+              photoCount = Number(deliveryFileCount) + Number(pickupFileCount);
+              // Subtract signatures
+              if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+              if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+            } else {
+              // Fallback: check file paths
+              if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
+              if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
+            }
+            const hasSignature = Boolean(consignment.deliverySignatureName);
+            const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
+            const tempCompliant = checkTemperatureCompliance(consignment);
+            
+            // Photos (40 points) - simplified
+            if (photoCount >= 2) simpleScore += 40;
+            else if (photoCount >= 1) simpleScore += 20;
+            
+            // Signature (20 points)
+            if (hasSignature) simpleScore += 20;
+            
+            // Receiver name (15 points)
+            if (hasReceiverName) simpleScore += 15;
+            
+            // Temperature (25 points)
+            if (tempCompliant) simpleScore += 25;
+            
             if (selectedFilter === "compliant") {
-              return metrics.qualityScore >= 60;
+              return simpleScore >= 60;
             } else if (selectedFilter === "non-compliant") {
-              return metrics.qualityScore < 60;
+              return simpleScore < 60;
+            } else if (selectedFilter === "gold") {
+              return simpleScore >= 90;
+            } else if (selectedFilter === "silver") {
+              return simpleScore >= 75 && simpleScore < 90;
+            } else if (selectedFilter === "bronze") {
+              return simpleScore >= 60 && simpleScore < 75;
             }
             return true;
           })();
@@ -2533,7 +2639,7 @@ export default function PODQuality() {
                                 </div>
                               </div>
                               <div className="text-xs text-green-600 mt-1 flex items-center gap-4">
-                                <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
+                                <span>POD: {driver.avgPodScore.toFixed(1)}</span>
                                 <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
                                 <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
                               </div>
@@ -2570,7 +2676,7 @@ export default function PODQuality() {
                                 </div>
                               </div>
                               <div className="text-xs text-red-600 mt-1 flex items-center gap-4">
-                                <span>POD: {(driver.validPodLowerBound * 100).toFixed(1)}%</span>
+                                <span>POD: {driver.avgPodScore.toFixed(1)}</span>
                                 <span>Sig: {(driver.signatureLowerBound * 100).toFixed(1)}%</span>
                                 <span>Temp: {(driver.temperatureLowerBound * 100).toFixed(1)}%</span>
                               </div>
@@ -2613,6 +2719,7 @@ export default function PODQuality() {
               }
               
               const totalRegionalDeliveries = regionalStats.reduce((sum, r) => sum + r.totalDeliveries, 0);
+              const avgPodScore = regionalStats.reduce((sum, r) => sum + r.avgPodScore, 0) / regionalStats.length;
               const avgSignatureRate = regionalStats.reduce((sum, r) => sum + r.signatureRate, 0) / regionalStats.length;
               
               return (
@@ -2642,7 +2749,7 @@ export default function PODQuality() {
                   
                   {/* Regional Summary */}
                   <div className="bg-white/60 rounded-lg p-4 mb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                       <div>
                         <div className="text-lg font-bold text-blue-800">{regionalStats.length}</div>
                         <div className="text-xs text-blue-600">Active Regions</div>
@@ -2650,6 +2757,10 @@ export default function PODQuality() {
                       <div>
                         <div className="text-lg font-bold text-blue-800">{totalRegionalDeliveries}</div>
                         <div className="text-xs text-blue-600">Total Deliveries</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-blue-800">{avgPodScore.toFixed(1)}</div>
+                        <div className="text-xs text-blue-600">Avg POD Score</div>
                       </div>
                       <div>
                         <div className="text-lg font-bold text-blue-800">{(avgSignatureRate * 100).toFixed(1)}%</div>
@@ -2667,9 +2778,9 @@ export default function PODQuality() {
                       <div 
                         key={region.region}
                         className={`bg-white rounded-lg p-4 border-2 ${
-                          region.signatureRate >= 0.9 ? 'border-green-200 bg-green-50' :
-                          region.signatureRate >= 0.8 ? 'border-blue-200 bg-blue-50' :
-                          region.signatureRate >= 0.7 ? 'border-yellow-200 bg-yellow-50' :
+                          region.avgPodScore >= 90 ? 'border-green-200 bg-green-50' :
+                          region.avgPodScore >= 75 ? 'border-blue-200 bg-blue-50' :
+                          region.avgPodScore >= 60 ? 'border-yellow-200 bg-yellow-50' :
                           'border-red-200 bg-red-50'
                         }`}
                         data-testid={`region-${region.region.replace(/\s+/g, '-').toLowerCase()}`}
@@ -2691,28 +2802,36 @@ export default function PODQuality() {
                               <span className="font-medium">{region.avgDeliveriesPerDriver.toFixed(1)}</span>
                             </div>
                             <div className="flex justify-between items-center pt-2 border-t">
-                              <span className="text-gray-600">Signatures:</span>
-                              <span className={`font-medium ${
-                                region.signatureRate >= 0.9 ? 'text-green-600' :
-                                region.signatureRate >= 0.8 ? 'text-blue-600' :
-                                region.signatureRate >= 0.7 ? 'text-yellow-600' :
+                              <span className="text-gray-600">POD Score:</span>
+                              <span className={`font-bold text-lg ${
+                                region.avgPodScore >= 90 ? 'text-green-600' :
+                                region.avgPodScore >= 75 ? 'text-blue-600' :
+                                region.avgPodScore >= 60 ? 'text-yellow-600' :
                                 'text-red-600'
                               }`}>
-                                {(region.signatureRate * 100).toFixed(1)}%
+                                {region.avgPodScore.toFixed(1)}
                               </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                              <span>Signatures:</span>
+                              <span>{(region.signatureRate * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Avg Photos:</span>
+                              <span>{region.avgPhotosPerDelivery.toFixed(1)}</span>
                             </div>
                           </div>
                           
                           <div className="mt-3">
                             <div className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                              region.signatureRate >= 0.9 ? 'bg-green-100 text-green-800' :
-                              region.signatureRate >= 0.8 ? 'bg-blue-100 text-blue-800' :
-                              region.signatureRate >= 0.7 ? 'bg-yellow-100 text-yellow-800' :
+                              region.avgPodScore >= 90 ? 'bg-green-100 text-green-800' :
+                              region.avgPodScore >= 75 ? 'bg-blue-100 text-blue-800' :
+                              region.avgPodScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
                               'bg-red-100 text-red-800'
                             }`}>
-                              {region.signatureRate >= 0.9 ? 'Excellent' :
-                               region.signatureRate >= 0.8 ? 'Good' :
-                               region.signatureRate >= 0.7 ? 'Fair' : 'Needs Improvement'}
+                              {region.avgPodScore >= 90 ? 'Gold' :
+                               region.avgPodScore >= 75 ? 'Silver' :
+                               region.avgPodScore >= 60 ? 'Bronze' : 'Non-Compliant'}
                             </div>
                           </div>
                         </div>
