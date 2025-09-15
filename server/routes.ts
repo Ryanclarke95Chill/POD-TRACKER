@@ -100,9 +100,21 @@ class PhotoScrapingQueue {
     let photos: string[] = [];
     let signaturePhotos: string[] = [];
 
-    // Reuse browser instance for better performance
-    if (!browserInstance) {
-      console.log('Launching new browser instance...');
+    // Reuse browser instance for better performance, but check if it's still connected
+    const needsNewBrowser = !browserInstance || !browserInstance.isConnected();
+    
+    if (needsNewBrowser) {
+      console.log(browserInstance ? 'Browser disconnected, launching new instance...' : 'Launching new browser instance...');
+      
+      // Clean up old browser if it exists
+      if (browserInstance && !browserInstance.isConnected()) {
+        try {
+          await browserInstance.close();
+        } catch (error) {
+          // Ignore errors when closing dead browser
+        }
+      }
+      
       browserInstance = await puppeteer.launch({
         headless: true,
         executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
@@ -243,10 +255,26 @@ class PhotoScrapingQueue {
       
     } catch (error: any) {
       console.error(`Error scraping photos: ${error.message}`);
+      
+      // If it's a connection error, invalidate browser instance to force recreation on next request
+      if (error.message && (
+          error.message.includes('Connection closed') ||
+          error.message.includes('Browser closed') ||
+          error.message.includes('Target closed')
+      )) {
+        console.log('Browser connection lost, clearing browser instance for next request');
+        browserInstance = null;
+      }
+      
       throw error;
     } finally {
       if (page) {
-        await page.close();
+        try {
+          await page.close();
+        } catch (pageCloseError) {
+          // Ignore page close errors if connection is already closed
+          console.warn('Error closing page (connection may be closed):', pageCloseError);
+        }
       }
     }
     
