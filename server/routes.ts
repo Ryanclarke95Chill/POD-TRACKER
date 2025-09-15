@@ -16,7 +16,7 @@ import { photoWorker } from "./photoIngestionWorker";
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
-const CACHE_DURATION = 0; // Disable cache for testing signature detection
+const CACHE_DURATION = 900000; // 15 minutes cache duration for faster responses
 
 // Photo scraping queue system with concurrency control
 interface PhotoRequest {
@@ -755,15 +755,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Extracting photos for tracking token: ${token}`);
       
-      // Use the photo queue for controlled concurrency and prioritization
-      const photoResult = await photoQueue.addRequest(token, priority as 'high' | 'low');
+      // Check cache first for instant response
+      const cached = photoCache.get(token);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`Cache hit for token ${token} - returning cached photos instantly`);
+        return res.json({
+          success: true,
+          photos: cached.photos,
+          signaturePhotos: cached.signaturePhotos,
+          count: cached.photos.length,
+          signatureCount: cached.signaturePhotos.length,
+          status: 'ready',
+          cached: true
+        });
+      }
       
-      res.json({
+      // Cache miss - return preparing status to avoid inline scraping delay
+      console.log(`Cache miss for token ${token} - returning preparing status`);
+      
+      // Trigger background scraping for future requests (don't await)
+      photoQueue.addRequest(token, priority as 'high' | 'low').catch(error => {
+        console.error(`Background photo scraping failed for token ${token}:`, error);
+      });
+      
+      return res.json({
         success: true,
-        photos: photoResult.photos,
-        signaturePhotos: photoResult.signaturePhotos,
-        count: photoResult.photos.length,
-        signatureCount: photoResult.signaturePhotos.length
+        photos: [],
+        signaturePhotos: [],
+        count: 0,
+        signatureCount: 0,
+        status: 'preparing',
+        message: 'Photos are being prepared, please try again in a moment'
       });
       
     } catch (error: any) {
