@@ -34,6 +34,7 @@ import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
 import { Consignment, ScoreBreakdown } from "@shared/schema";
 import { calculateDriverStats, getDriversByCohort, getCohortSummary, DriverStats, DriverCohortConfig, DEFAULT_COHORT_CONFIG } from "@/utils/driverStats";
+import { useToast } from "@/hooks/use-toast";
 
 interface PODMetrics {
   photoCount: number;
@@ -998,6 +999,11 @@ export default function PODQuality() {
     setSelectedSignatureConsignment(consignmentNo);
     setSignatureModalOpen(true);
   }, []);
+  
+  // PDF Download state and functionality
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const { toast } = useToast();
+  
   const user = getUser();
 
   // Fetch all consignments and filter for delivered ones
@@ -2630,6 +2636,100 @@ export default function PODQuality() {
     }
   };
 
+  // Handle PDF download with current filters
+  const handleDownloadPDF = async () => {
+    if (isDownloadingPDF) return; // Prevent multiple simultaneous downloads
+    
+    setIsDownloadingPDF(true);
+    
+    try {
+      // Collect current filter parameters
+      const filterParams = new URLSearchParams();
+      
+      // Add filters if they are not default values
+      if (searchTerm) filterParams.append('search', searchTerm);
+      if (selectedFilter !== 'all') filterParams.append('filter', selectedFilter);
+      if (selectedWarehouse !== 'all') filterParams.append('warehouse', selectedWarehouse);
+      if (selectedShipper !== 'all') filterParams.append('shipper', selectedShipper);
+      if (selectedDriver !== 'all') filterParams.append('driver', selectedDriver);
+      if (selectedTempZone !== 'all') filterParams.append('tempZone', selectedTempZone);
+      if (fromDate) filterParams.append('fromDate', fromDate);
+      if (toDate) filterParams.append('toDate', toDate);
+      
+      // Add additional report parameters
+      filterParams.append('reportType', 'warehouse-insights');
+      filterParams.append('includePhotos', 'true');
+      filterParams.append('includeAnalytics', 'true');
+      
+      const token = getToken();
+      if (!token || !isAuthenticated()) {
+        throw new Error('Authentication required');
+      }
+      
+      const response = await fetch(`/api/generate-warehouse-report?${filterParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf',
+        },
+      });
+      
+      if (response.status === 401) {
+        logout();
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again to download the report.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP ${response.status}: Failed to generate report`);
+      }
+      
+      // Handle PDF download
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate descriptive filename with current date
+      const today = new Date().toISOString().split('T')[0];
+      const warehouseFilter = selectedWarehouse !== 'all' ? `_${selectedWarehouse.replace(/\s+/g, '_')}` : '';
+      const driverFilter = selectedDriver !== 'all' ? `_${selectedDriver.replace(/\s+/g, '_')}` : '';
+      link.download = `ChillTrack_POD_Quality_Report_${today}${warehouseFilter}${driverFilter}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Complete",
+        description: "Warehouse insights report has been downloaded successfully.",
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error('PDF download error:', error);
+      
+      toast({
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : "Failed to generate warehouse report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
@@ -2655,6 +2755,25 @@ export default function PODQuality() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               {isSyncing ? 'Syncing...' : 'Sync Axylog'}
+            </Button>
+            
+            <Button 
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPDF || isLoading}
+              className="bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white border-0 shadow-lg transition-all duration-200 hover:shadow-xl"
+              data-testid="button-download-pdf"
+            >
+              {isDownloadingPDF ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </>
+              )}
             </Button>
             
             <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">

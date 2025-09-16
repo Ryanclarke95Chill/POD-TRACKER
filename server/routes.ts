@@ -38,16 +38,41 @@ interface PooledPage {
 class PhotoScrapingQueue {
   private queue: PhotoRequest[] = [];
   private activeRequests = new Set<string>();
-  private readonly maxConcurrency = 6; // Increased from 3 to 6 for better throughput
-  private readonly pagePoolSize = 8; // Pool of 8 pre-initialized pages
+  private readonly maxConcurrency = 2; // Reduced from 6 to 2 for resource management
+  private readonly pagePoolSize = 3; // Reduced from 8 to 3 for resource management
   private pagePool: PooledPage[] = [];
   private pagePoolInitialized = false;
+  private pagePoolInitializing = false; // Prevent concurrent initialization
   private readonly maxPageAge = 300000; // 5 minutes max age for pages
+  private browserFailures = 0; // Track browser launch failures
+  private readonly maxBrowserFailures = 3; // Circuit breaker threshold
+  private lastBrowserFailure = 0; // Track when last failure occurred
+  private readonly backoffDuration = 60000; // 1 minute backoff after failures
 
   async addRequest(token: string, priority: 'high' | 'low'): Promise<{photos: string[], signaturePhotos: string[]}> {
-    // Initialize page pool on first request
+    // Initialize page pool on first request with proper synchronization
+    if (!this.pagePoolInitialized && !this.pagePoolInitializing) {
+      this.pagePoolInitializing = true;
+      try {
+        await this.initializePagePool();
+      } catch (error) {
+        this.pagePoolInitializing = false;
+        console.error('❌ Failed to initialize page pool:', error);
+        // Return fallback response instead of crashing
+        return { photos: [], signaturePhotos: [] };
+      }
+      this.pagePoolInitializing = false;
+    }
+    
+    // Wait for initialization if it's in progress
+    while (this.pagePoolInitializing) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // If page pool failed to initialize, return empty result
     if (!this.pagePoolInitialized) {
-      await this.initializePagePool();
+      console.log(`⚠️ [PHOTO QUEUE] Page pool not available, returning empty result for token: ${token}`);
+      return { photos: [], signaturePhotos: [] };
     }
     
     // If already processing this token, wait for existing request
@@ -226,10 +251,25 @@ class PhotoScrapingQueue {
 
   // Ensure browser instance exists and is connected
   private async ensureBrowser() {
+    // Circuit breaker - check if we should attempt browser launch
+    const now = Date.now();
+    if (this.browserFailures >= this.maxBrowserFailures) {
+      const timeSinceLastFailure = now - this.lastBrowserFailure;
+      if (timeSinceLastFailure < this.backoffDuration) {
+        const remainingTime = Math.ceil((this.backoffDuration - timeSinceLastFailure) / 1000);
+        throw new Error(`Circuit breaker active: Browser launch blocked for ${remainingTime}s due to repeated failures`);
+      } else {
+        // Reset failure count after backoff period
+        console.log('🔄 [CIRCUIT BREAKER] Backoff period expired, resetting failure count');
+        this.browserFailures = 0;
+      }
+    }
+    
     const needsNewBrowser = !browserInstance || !browserInstance.isConnected();
     
     if (needsNewBrowser) {
       console.log(browserInstance ? '🔄 Browser disconnected, launching new instance...' : '🚀 Launching new browser instance...');
+      console.log(`🔍 [BROWSER DEBUG] Current failure count: ${this.browserFailures}/${this.maxBrowserFailures}`);
       
       // Clean up old browser if it exists
       if (browserInstance && !browserInstance.isConnected()) {
@@ -240,27 +280,44 @@ class PhotoScrapingQueue {
         }
       }
       
-      browserInstance = await puppeteer.launch({
-        headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-        protocolTimeout: 180000, // 3 minutes timeout to fix connection issues
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-plugins',
-          '--disable-sync',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding'
-        ]
-      });
-      
-      console.log('✅ Browser instance created successfully');
+      try {
+        browserInstance = await puppeteer.launch({
+          headless: true,
+          executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+          protocolTimeout: 30000, // Reduced from 180s to 30s to fail faster
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-plugins',
+            '--disable-sync',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--max_old_space_size=1024', // Limit memory usage
+            '--disable-background-networking'
+          ]
+        });
+        
+        // Reset failure count on successful launch
+        this.browserFailures = 0;
+        console.log('✅ Browser instance created successfully');
+        
+      } catch (error) {
+        this.browserFailures++;
+        this.lastBrowserFailure = now;
+        console.error(`❌ [BROWSER] Failed to launch browser (attempt ${this.browserFailures}/${this.maxBrowserFailures}):`, error.message);
+        
+        if (this.browserFailures >= this.maxBrowserFailures) {
+          console.error(`🚨 [CIRCUIT BREAKER] Maximum browser failures reached, entering ${this.backoffDuration/1000}s backoff period`);
+        }
+        
+        throw error;
+      }
     }
   }
 
@@ -484,11 +541,33 @@ class PhotoScrapingQueue {
     let pooledPage: PooledPage | null = null;
 
     try {
+      // Check circuit breaker before attempting Puppeteer
+      if (this.browserFailures >= this.maxBrowserFailures) {
+        const timeSinceLastFailure = Date.now() - this.lastBrowserFailure;
+        if (timeSinceLastFailure < this.backoffDuration) {
+          console.log(`🔴 [EMERGENCY FALLBACK] Circuit breaker active, returning empty result for token: ${token}`);
+          // Cache empty result to prevent repeated requests
+          photoCache.set(token, {
+            photos: [],
+            signaturePhotos: [],
+            timestamp: Date.now()
+          });
+          return { photos: [], signaturePhotos: [] };
+        }
+      }
+      
       // Get a page from the pool instead of creating a new one
       pooledPage = await this.getPageFromPool();
       
       if (!pooledPage) {
-        throw new Error('No available pages in pool');
+        console.log(`⚠️ [EMERGENCY FALLBACK] No available pages in pool for token: ${token}, returning empty result`);
+        // Cache empty result to prevent repeated requests
+        photoCache.set(token, {
+          photos: [],
+          signaturePhotos: [],
+          timestamp: Date.now()
+        });
+        return { photos: [], signaturePhotos: [] };
       }
       
       const page = pooledPage.page;
@@ -593,17 +672,20 @@ class PhotoScrapingQueue {
       signaturePhotos = tempSignaturePhotos; // Update the outer scope variable
       
     } catch (error: any) {
-      console.error(`❌ [PUPPETEER] Error scraping photos: ${error.message}`);
+      console.error(`❌ [PUPPETEER] Error scraping photos for token ${token}: ${error.message}`);
       
       // If it's a connection error, invalidate browser instance and page pool
       if (error.message && (
           error.message.includes('Connection closed') ||
           error.message.includes('Browser closed') ||
-          error.message.includes('Target closed')
+          error.message.includes('Target closed') ||
+          error.message.includes('TimeoutError') ||
+          error.message.includes('Circuit breaker active')
       )) {
-        console.log('❌ [PUPPETEER] Browser connection lost, clearing browser instance and reinitializing page pool');
+        console.log('🔄 [EMERGENCY FALLBACK] Browser connection lost or circuit breaker active, clearing browser instance');
         browserInstance = null;
         this.pagePoolInitialized = false;
+        this.pagePoolInitializing = false;
         // Clear the page pool to force recreation
         this.pagePool = [];
       }
@@ -614,12 +696,24 @@ class PhotoScrapingQueue {
           error.message.includes('Target closed') ||
           error.message.includes('Protocol error')
       )) {
-        console.log(`❌ [PUPPETEER] Page-specific error, will recreate page ${pooledPage.id}`);
+        console.log(`🔄 [EMERGENCY FALLBACK] Page-specific error, will recreate page ${pooledPage.id}`);
         // Don't return this page to pool - it will be recreated on next health check
         pooledPage = null;
       }
       
-      throw error;
+      // EMERGENCY FALLBACK: Return empty result instead of throwing error
+      console.log(`🚨 [EMERGENCY FALLBACK] Returning empty result for token ${token} due to Puppeteer failure`);
+      
+      // Cache empty result to prevent repeated failures
+      photoCache.set(token, {
+        photos: [],
+        signaturePhotos: [],
+        timestamp: Date.now()
+      });
+      
+      // Set empty arrays for the finally block
+      photos = [];
+      signaturePhotos = [];
     } finally {
       // Return page to pool instead of closing it
       if (pooledPage) {
