@@ -1854,6 +1854,302 @@ export default function PODQuality() {
     );
   };
 
+  // Interface for warehouse insights data structure
+  interface WarehouseRegionInsights {
+    region: string;
+    warehouseName: string;
+    totalDeliveries: number;
+    avgQualityScore: number;
+    qualityDistribution: {
+      gold: { count: number; percentage: number };
+      silver: { count: number; percentage: number };
+      bronze: { count: number; percentage: number };
+      nonCompliant: { count: number; percentage: number };
+    };
+    photoMetrics: {
+      avgPhotosPerDelivery: number;
+      missingPhotos: number;
+      onePhoto: number;
+      twoPhotos: number;
+      threeOrMorePhotos: number;
+    };
+    signatureRate: number;
+    temperatureComplianceRate: number;
+    receiverNameRate: number;
+    topIssues: string[];
+    driverPerformance: {
+      topPerformer: { name: string; avgScore: number; deliveries: number } | null;
+      bottomPerformer: { name: string; avgScore: number; deliveries: number } | null;
+      performanceGap: number;
+    };
+    formattedInsights: string[];
+  }
+
+  interface WarehouseInsightsResult {
+    overallSummary: {
+      totalDeliveries: number;
+      avgQualityScore: number;
+      bestPerformingRegion: string;
+      worstPerformingRegion: string;
+    };
+    regionInsights: WarehouseRegionInsights[];
+    consolidatedInsights: string[];
+  }
+
+  // Generate comprehensive warehouse insights by region
+  const generateWarehouseInsights = (consignments: Consignment[]): WarehouseInsightsResult => {
+    if (!consignments || consignments.length === 0) {
+      return {
+        overallSummary: {
+          totalDeliveries: 0,
+          avgQualityScore: 0,
+          bestPerformingRegion: 'N/A',
+          worstPerformingRegion: 'N/A'
+        },
+        regionInsights: [],
+        consolidatedInsights: ['No deliveries found for analysis.']
+      };
+    }
+
+    // Helper function to determine region from warehouse name
+    const getRegionFromWarehouse = (warehouseName: string): string => {
+      if (!warehouseName) return 'Unknown';
+      const name = warehouseName.toUpperCase();
+      if (name.includes('NSW')) return 'NSW';
+      if (name.includes('QLD')) return 'QLD';
+      if (name.includes('WA')) return 'WA';
+      if (name.includes('VIC')) return 'VIC';
+      if (name.includes('SA') || name.includes('SOUTH AUSTRALIA')) return 'SA';
+      if (name.includes('TAS') || name.includes('TASMANIA')) return 'TAS';
+      if (name.includes('NT') || name.includes('NORTHERN TERRITORY')) return 'NT';
+      if (name.includes('ACT') || name.includes('CAPITAL TERRITORY')) return 'ACT';
+      return 'Other';
+    };
+
+    // Group consignments by warehouse and region
+    const warehouseGroups = new Map<string, { region: string; consignments: Consignment[] }>();
+    
+    consignments.forEach(consignment => {
+      const warehouseName = consignment.warehouseCompanyName || 'Unknown Warehouse';
+      const region = getRegionFromWarehouse(warehouseName);
+      
+      const key = `${region}-${warehouseName}`;
+      if (!warehouseGroups.has(key)) {
+        warehouseGroups.set(key, { region, consignments: [] });
+      }
+      warehouseGroups.get(key)!.consignments.push(consignment);
+    });
+
+    const regionInsights: WarehouseRegionInsights[] = [];
+
+    // Analyze each warehouse/region
+    for (const [key, { region, consignments: warehouseConsignments }] of warehouseGroups) {
+      const [regionCode, warehouseName] = key.split('-', 2);
+      
+      // Analyze all consignments for this warehouse using existing analyzePOD function
+      const analyses = warehouseConsignments.map(analyzePOD);
+      const totalDeliveries = analyses.length;
+
+      if (totalDeliveries === 0) continue;
+
+      // Calculate performance metrics
+      const avgQualityScore = analyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
+      
+      // Quality distribution
+      const goldCount = analyses.filter(a => a.metrics.qualityScore >= 90).length;
+      const silverCount = analyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+      const bronzeCount = analyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+      const nonCompliantCount = analyses.filter(a => a.metrics.qualityScore === 0).length;
+
+      // Photo metrics
+      const avgPhotosPerDelivery = analyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries;
+      const missingPhotos = analyses.filter(a => a.metrics.photoCount === 0).length;
+      const onePhoto = analyses.filter(a => a.metrics.photoCount === 1).length;
+      const twoPhotos = analyses.filter(a => a.metrics.photoCount === 2).length;
+      const threeOrMorePhotos = analyses.filter(a => a.metrics.photoCount >= 3).length;
+
+      // Other metrics
+      const signatureRate = (analyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100;
+      const temperatureComplianceRate = (analyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
+      const receiverNameRate = (analyses.filter(a => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
+
+      // Driver performance analysis
+      const driverStats = new Map<string, { totalDeliveries: number; totalScore: number }>();
+      analyses.forEach(analysis => {
+        const driverName = analysis.consignment.driverName;
+        if (!driverName) return;
+
+        if (!driverStats.has(driverName)) {
+          driverStats.set(driverName, { totalDeliveries: 0, totalScore: 0 });
+        }
+        const stats = driverStats.get(driverName)!;
+        stats.totalDeliveries++;
+        stats.totalScore += analysis.metrics.qualityScore;
+      });
+
+      // Get qualified drivers (minimum 3 deliveries) and calculate averages
+      const qualifiedDrivers = Array.from(driverStats.entries())
+        .map(([name, stats]) => ({
+          name,
+          avgScore: stats.totalScore / stats.totalDeliveries,
+          deliveries: stats.totalDeliveries
+        }))
+        .filter(d => d.deliveries >= 3)
+        .sort((a, b) => b.avgScore - a.avgScore);
+
+      const topPerformer = qualifiedDrivers.length > 0 ? qualifiedDrivers[0] : null;
+      const bottomPerformer = qualifiedDrivers.length > 0 ? qualifiedDrivers[qualifiedDrivers.length - 1] : null;
+      const performanceGap = topPerformer && bottomPerformer ? topPerformer.avgScore - bottomPerformer.avgScore : 0;
+
+      // Identify top issues
+      const topIssues: string[] = [];
+      if (missingPhotos > 0) topIssues.push(`${missingPhotos} deliveries missing photos`);
+      if (analyses.filter(a => !a.metrics.hasSignature).length > 0) {
+        topIssues.push(`${analyses.filter(a => !a.metrics.hasSignature).length} deliveries missing signatures`);
+      }
+      if (analyses.filter(a => !a.metrics.temperatureCompliant).length > 0) {
+        topIssues.push(`${analyses.filter(a => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
+      }
+      if (analyses.filter(a => !a.metrics.hasReceiverName).length > 0) {
+        topIssues.push(`${analyses.filter(a => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
+      }
+
+      // Generate formatted insights for this region
+      const insights: string[] = [];
+
+      // Overall performance assessment
+      if (avgQualityScore >= 85) {
+        insights.push(`🎯 **Excellent overall performance** - ${region} maintaining high quality POD standards with ${avgQualityScore.toFixed(1)} average score.`);
+      } else if (avgQualityScore >= 70) {
+        insights.push(`✅ **Good performance** - ${region} POD quality is above average (${avgQualityScore.toFixed(1)}) with room for improvement.`);
+      } else if (avgQualityScore >= 50) {
+        insights.push(`⚠️ **Moderate performance** - ${region} needs attention to improve POD quality (${avgQualityScore.toFixed(1)} average score).`);
+      } else {
+        insights.push(`🚨 **Performance issues** - ${region} requires significant improvements in POD quality standards (${avgQualityScore.toFixed(1)} average score).`);
+      }
+
+      // Quality distribution insights
+      const goldPercentage = (goldCount / totalDeliveries) * 100;
+      const nonCompliantPercentage = (nonCompliantCount / totalDeliveries) * 100;
+      
+      if (goldPercentage >= 40) {
+        insights.push(`🏆 **Strong Gold tier performance** - ${goldCount} deliveries (${goldPercentage.toFixed(1)}%) achieving Gold standard in ${region}.`);
+      } else if (nonCompliantPercentage >= 30) {
+        insights.push(`📋 **High non-compliance rate** - ${nonCompliantCount} deliveries (${nonCompliantPercentage.toFixed(1)}%) failing to meet basic requirements in ${region}.`);
+      }
+
+      // Issues identification
+      if (topIssues.length > 0) {
+        insights.push(`🔍 **Key issues identified in ${region}** - ${topIssues.slice(0, 3).join(', ')}.`);
+      }
+
+      // Photo performance
+      if (avgPhotosPerDelivery >= 4) {
+        insights.push(`📸 **Strong photo documentation in ${region}** - Average of ${avgPhotosPerDelivery.toFixed(1)} photos per delivery.`);
+      } else if (avgPhotosPerDelivery < 3) {
+        insights.push(`📸 **Photo documentation needs improvement in ${region}** - Average of only ${avgPhotosPerDelivery.toFixed(1)} photos per delivery.`);
+      }
+
+      // Signature performance
+      if (signatureRate >= 90) {
+        insights.push(`✍️ **Excellent signature capture in ${region}** - ${signatureRate.toFixed(1)}% of deliveries have signatures.`);
+      } else if (signatureRate < 80) {
+        insights.push(`✍️ **Signature capture needs attention in ${region}** - Only ${signatureRate.toFixed(1)}% of deliveries have signatures.`);
+      }
+
+      // Temperature compliance
+      if (temperatureComplianceRate >= 95) {
+        insights.push(`🌡️ **Excellent temperature compliance in ${region}** - ${temperatureComplianceRate.toFixed(1)}% compliance rate.`);
+      } else if (temperatureComplianceRate < 90) {
+        insights.push(`🌡️ **Temperature compliance issues in ${region}** - Only ${temperatureComplianceRate.toFixed(1)}% compliance rate.`);
+      }
+
+      // Driver performance
+      if (qualifiedDrivers.length > 1 && performanceGap > 20) {
+        insights.push(`🚛 **Significant driver performance gap in ${region}** - Top performer (${topPerformer!.name}: ${topPerformer!.avgScore.toFixed(1)}) vs bottom performer (${bottomPerformer!.name}: ${bottomPerformer!.avgScore.toFixed(1)}).`);
+      } else if (topPerformer) {
+        insights.push(`🚛 **Driver performance in ${region}** - ${qualifiedDrivers.length} drivers analyzed, top performer: ${topPerformer.name} (${topPerformer.avgScore.toFixed(1)} avg score).`);
+      }
+
+      // Receiver name performance
+      if (receiverNameRate < 85) {
+        insights.push(`👤 **Receiver name capture needs improvement in ${region}** - Only ${receiverNameRate.toFixed(1)}% have receiver names recorded.`);
+      }
+
+      regionInsights.push({
+        region: regionCode,
+        warehouseName,
+        totalDeliveries,
+        avgQualityScore,
+        qualityDistribution: {
+          gold: { count: goldCount, percentage: goldPercentage },
+          silver: { count: silverCount, percentage: (silverCount / totalDeliveries) * 100 },
+          bronze: { count: bronzeCount, percentage: (bronzeCount / totalDeliveries) * 100 },
+          nonCompliant: { count: nonCompliantCount, percentage: nonCompliantPercentage }
+        },
+        photoMetrics: {
+          avgPhotosPerDelivery,
+          missingPhotos,
+          onePhoto,
+          twoPhotos,
+          threeOrMorePhotos
+        },
+        signatureRate,
+        temperatureComplianceRate,
+        receiverNameRate,
+        topIssues,
+        driverPerformance: {
+          topPerformer,
+          bottomPerformer,
+          performanceGap
+        },
+        formattedInsights: insights
+      });
+    }
+
+    // Calculate overall summary
+    const totalDeliveries = regionInsights.reduce((sum, r) => sum + r.totalDeliveries, 0);
+    const avgQualityScore = totalDeliveries > 0 ? 
+      regionInsights.reduce((sum, r) => sum + (r.avgQualityScore * r.totalDeliveries), 0) / totalDeliveries : 0;
+
+    // Find best and worst performing regions
+    const sortedRegions = [...regionInsights].sort((a, b) => b.avgQualityScore - a.avgQualityScore);
+    const bestPerformingRegion = sortedRegions.length > 0 ? sortedRegions[0].region : 'N/A';
+    const worstPerformingRegion = sortedRegions.length > 0 ? sortedRegions[sortedRegions.length - 1].region : 'N/A';
+
+    // Generate consolidated insights across all regions
+    const consolidatedInsights: string[] = [];
+    
+    if (regionInsights.length > 1) {
+      consolidatedInsights.push(`📊 **Multi-region analysis** - Analyzed ${totalDeliveries} deliveries across ${regionInsights.length} regions with ${avgQualityScore.toFixed(1)} overall average score.`);
+      
+      if (regionInsights.length > 1) {
+        const bestRegion = regionInsights.find(r => r.region === bestPerformingRegion);
+        const worstRegion = regionInsights.find(r => r.region === worstPerformingRegion);
+        if (bestRegion && worstRegion && bestRegion.avgQualityScore - worstRegion.avgQualityScore > 15) {
+          consolidatedInsights.push(`🏅 **Regional performance gap** - ${bestPerformingRegion} leads with ${bestRegion.avgQualityScore.toFixed(1)} average score vs ${worstPerformingRegion} at ${worstRegion.avgQualityScore.toFixed(1)}.`);
+        }
+      }
+    }
+
+    // Add insights from each region
+    regionInsights.forEach(region => {
+      consolidatedInsights.push(`\n**${region.region} Region Analysis:**`);
+      consolidatedInsights.push(...region.formattedInsights);
+    });
+
+    return {
+      overallSummary: {
+        totalDeliveries,
+        avgQualityScore,
+        bestPerformingRegion,
+        worstPerformingRegion
+      },
+      regionInsights,
+      consolidatedInsights
+    };
+  };
+
   // Process and filter consignments - ALL filtered data for stats
   const allFilteredAnalyses: PODAnalysis[] = deliveredConsignments
     .map(analyzePOD)
