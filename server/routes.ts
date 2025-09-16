@@ -15,6 +15,41 @@ import { photoWorker } from "./photoIngestionWorker";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+// Security-aware browser arguments based on environment
+function getSecureBrowserArgs(): string[] {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const baseArgs = [
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-extensions',
+    '--disable-default-apps',
+    '--disable-features=VizDisplayCompositor',
+    '--disable-plugins',
+    '--disable-sync',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--max_old_space_size=1024',
+    '--disable-background-networking'
+  ];
+  
+  // SECURITY: Only disable sandbox in development if absolutely necessary
+  if (isDevelopment && process.env.PUPPETEER_SKIP_SANDBOX === 'true') {
+    console.warn('⚠️ [SECURITY WARNING] Running Chromium without sandbox in development mode');
+    baseArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+  } else {
+    console.log('✅ [SECURITY] Running Chromium with sandbox enabled');
+    // Add additional security hardening for production
+    baseArgs.push(
+      '--disable-dev-shm-usage',
+      '--disable-web-security', // Only for internal PDF generation
+      '--disable-features=VizDisplayCompositor'
+    );
+  }
+  
+  return baseArgs;
+}
+
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
@@ -283,24 +318,9 @@ class PhotoScrapingQueue {
       try {
         browserInstance = await puppeteer.launch({
           headless: true,
-          executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
           protocolTimeout: 30000, // Reduced from 180s to 30s to fail faster
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-extensions',
-            '--disable-default-apps',
-            '--disable-features=VizDisplayCompositor',
-            '--disable-plugins',
-            '--disable-sync',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-            '--max_old_space_size=1024', // Limit memory usage
-            '--disable-background-networking'
-          ]
+          args: getSecureBrowserArgs()
         });
         
         // Reset failure count on successful launch
@@ -1200,21 +1220,10 @@ async function generateWarehousePDF(insights: WarehouseInsightsResult, filters: 
     console.log('🚀 Starting dedicated browser for PDF generation...');
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
       timeout: 60000, // 60 second timeout for browser launch
       protocolTimeout: 60000, // 60 second protocol timeout
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--single-process' // Use single process to reduce resource usage
-      ]
+      args: [...getSecureBrowserArgs(), '--single-process'] // Use single process to reduce resource usage
     });
 
     console.log('✅ Dedicated browser launched, creating page...');

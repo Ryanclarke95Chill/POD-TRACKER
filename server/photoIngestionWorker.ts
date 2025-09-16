@@ -2,6 +2,34 @@ import { Cluster } from 'puppeteer-cluster';
 import { storage } from './storage';
 import { createHash } from 'crypto';
 
+// Security-aware browser arguments based on environment
+function getSecureBrowserArgs(): string[] {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const baseArgs = [
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-extensions',
+    '--disable-default-apps',
+    '--disable-features=VizDisplayCompositor',
+    '--disable-plugins',
+    '--disable-sync',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--memory-pressure-off'
+  ];
+  
+  // SECURITY: Only disable sandbox in development if absolutely necessary
+  if (isDevelopment && process.env.PUPPETEER_SKIP_SANDBOX === 'true') {
+    console.warn('⚠️ [SECURITY WARNING] Running Chromium without sandbox in development mode');
+    baseArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+  } else {
+    console.log('✅ [SECURITY] Running Chromium with sandbox enabled');
+  }
+  
+  return baseArgs;
+}
+
 interface PhotoIngestionJob {
   token: string;
   priority: 'high' | 'low';
@@ -36,23 +64,9 @@ export class PhotoIngestionWorker {
       timeout: 30000, // 30 second timeout
       puppeteerOptions: {
         headless: true,
-        // Let Puppeteer use its bundled Chromium for better portability
-        ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-plugins',
-          '--disable-sync',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--memory-pressure-off'
-        ]
+        // Use system Chromium or fallback to bundled version
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        args: getSecureBrowserArgs()
       }
     });
 
