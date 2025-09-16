@@ -12,6 +12,8 @@ import sharp from "sharp";
 import { createHash } from "crypto";
 import { photoAnalysisService } from "./photoAnalysis";
 import { photoWorker } from "./photoIngestionWorker";
+import axios from "axios";
+import * as cheerio from "cheerio";
 
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
@@ -84,19 +86,181 @@ class PhotoScrapingQueue {
     }
   }
 
-  private async scrapePhotos(token: string): Promise<{photos: string[], signaturePhotos: string[]}> {
-    console.log(`Scraping photos from tracking URL: https://live.axylog.com/${token}`);
+  // Fast HTML parsing using axios + cheerio
+  private async extractPhotosWithHTMLParsing(token: string): Promise<{photos: string[], signaturePhotos: string[]} | null> {
+    const trackingUrl = `https://live.axylog.com/${token}`;
+    console.log(`🌐 [HTML PARSE] Starting fast HTML parsing for: ${trackingUrl}`);
     
-    // Check cache first
+    try {
+      console.log(`🌐 [HTML PARSE] Making HTTP request to ${trackingUrl}`);
+      // Fetch HTML with axios
+      const startTime = Date.now();
+      const response = await axios.get(trackingUrl, {
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+      const fetchTime = Date.now() - startTime;
+      console.log(`🌐 [HTML PARSE] HTTP request completed in ${fetchTime}ms`);
+      console.log(`🌐 [HTML PARSE] Response status: ${response.status}, content length: ${response.data?.length || 0}`);
+
+      const html = response.data;
+      console.log(`🌐 [HTML PARSE] Loading HTML with cheerio...`);
+      const $ = cheerio.load(html);
+      console.log(`🌐 [HTML PARSE] Cheerio loaded successfully`);
+
+      // Extract all img elements
+      const imageData: any[] = [];
+      
+      $('img').each((index, element) => {
+        const $img = $(element);
+        const src = $img.attr('src');
+        const alt = $img.attr('alt') || '';
+        const className = $img.attr('class') || '';
+        const width = parseInt($img.attr('width') || '0') || 0;
+        const height = parseInt($img.attr('height') || '0') || 0;
+        
+        // Get parent text for context
+        const parentText = $img.parent().text()?.substring(0, 100) || '';
+
+        if (src && src.startsWith('http')) {
+          imageData.push({
+            src,
+            alt,
+            className,
+            width,
+            height,
+            parentText
+          });
+        }
+      });
+
+      console.log(`🌐 [HTML PARSE] Found ${imageData.length} img elements total`);
+      console.log(`🌐 [HTML PARSE] Sample images:`, imageData.slice(0, 3).map(img => ({ 
+        src: img.src?.substring(0, 60) + '...', 
+        size: `${img.width}x${img.height}`,
+        alt: img.alt?.substring(0, 30) 
+      })));
+
+      // Filter images using the same logic as Puppeteer approach
+      console.log(`🌐 [HTML PARSE] Filtering images...`);
+      const filteredImages = imageData.filter(img => {
+        const isValidPhoto = img.src && 
+               img.src.startsWith('http') && 
+               img.width > 100 &&
+               img.height > 100;
+               
+        const isNotUIElement = !img.src.includes('logo') &&
+               !img.src.includes('icon') &&
+               !img.src.includes('avatar') &&
+               !img.className.includes('logo') &&
+               !img.className.includes('icon');
+               
+        const isNotMap = !img.src.toLowerCase().includes('map') &&
+               !img.src.toLowerCase().includes('tile') &&
+               !img.src.toLowerCase().includes('geographic') &&
+               !img.src.toLowerCase().includes('osm') &&
+               !img.src.toLowerCase().includes('openstreetmap') &&
+               !img.src.toLowerCase().includes('cartography') &&
+               !img.className.toLowerCase().includes('map') &&
+               !img.parentText.toLowerCase().includes('map') &&
+               !img.parentText.toLowerCase().includes('route') &&
+               !img.parentText.toLowerCase().includes('location');
+               
+        return isValidPhoto && isNotUIElement && isNotMap;
+      });
+
+      console.log(`After filtering: ${filteredImages.length} potential photos`);
+
+      if (filteredImages.length === 0) {
+        console.log('HTML parsing found no valid images, will fallback to Puppeteer');
+        return null;
+      }
+
+      // Apply signature detection logic (same as Puppeteer approach)
+      const signatureImages = filteredImages.filter((img: any) => {
+        const aspectRatio = img.width / Math.max(img.height, 1);
+        const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
+        
+        // Signature photos are typically wide and short (high aspect ratio)
+        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        
+        // Also check text content as backup
+        const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+        
+        console.log(`HTML Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
+        
+        return isDimensionSignature || isTextSignature;
+      });
+      
+      const regularImages = filteredImages.filter((img: any) => {
+        const aspectRatio = img.width / Math.max(img.height, 1);
+        const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
+        
+        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+        
+        return !(isDimensionSignature || isTextSignature);
+      });
+
+      const photos = Array.from(new Set(regularImages.map((img: any) => img.src)));
+      const signaturePhotos = Array.from(new Set(signatureImages.map((img: any) => img.src)));
+
+      console.log(`HTML parsing extracted ${photos.length} regular photos and ${signaturePhotos.length} signature photos`);
+
+      return { photos, signaturePhotos };
+      
+    } catch (error: any) {
+      console.log(`HTML parsing failed for token ${token}:`, error.message);
+      return null;
+    }
+  }
+
+  private async scrapePhotos(token: string): Promise<{photos: string[], signaturePhotos: string[]}> {
+    console.log(`📸 [SCRAPE DEBUG] Starting scrapePhotos for token: ${token}`);
+    console.log(`📸 [SCRAPE DEBUG] Tracking URL: https://live.axylog.com/${token}`);
+    
+    // Check in-memory cache first
     const cached = photoCache.get(token);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log(`Using cached photos for token: ${token}`);
+    const cacheValid = cached && Date.now() - cached.timestamp < CACHE_DURATION;
+    console.log(`📸 [SCRAPE DEBUG] In-memory cache check - exists: ${!!cached}, valid: ${cacheValid}`);
+    
+    if (cacheValid) {
+      console.log(`📸 [SCRAPE DEBUG] Using cached photos for token: ${token} (${cached!.photos.length} regular, ${cached!.signaturePhotos.length} signature)`);
       return {
-        photos: cached.photos,
-        signaturePhotos: cached.signaturePhotos
+        photos: cached!.photos,
+        signaturePhotos: cached!.signaturePhotos
       };
     }
 
+    // Try fast HTML parsing first
+    console.log(`📸 [SCRAPE DEBUG] About to attempt fast HTML parsing for token: ${token}`);
+    console.log('🚀 Attempting fast HTML parsing...');
+    const htmlResult = await this.extractPhotosWithHTMLParsing(token);
+    console.log(`📸 [SCRAPE DEBUG] HTML parsing completed. Result:`, htmlResult ? {
+      photoCount: htmlResult.photos.length,
+      signatureCount: htmlResult.signaturePhotos.length,
+      success: true
+    } : { success: false });
+    
+    if (htmlResult && (htmlResult.photos.length > 0 || htmlResult.signaturePhotos.length > 0)) {
+      console.log(`✅ Fast HTML parsing successful! Found ${htmlResult.photos.length} regular photos and ${htmlResult.signaturePhotos.length} signature photos`);
+      console.log('📸 [SCRAPE DEBUG] Caching HTML parsing results in memory');
+      
+      // Cache the results
+      photoCache.set(token, {
+        photos: htmlResult.photos,
+        signaturePhotos: htmlResult.signaturePhotos,
+        timestamp: Date.now()
+      });
+      
+      return htmlResult;
+    }
+
+    // Fallback to Puppeteer if HTML parsing fails or returns no results
+    console.log('HTML parsing failed or returned no results, falling back to Puppeteer...');
+    
     let photos: string[] = [];
     let signaturePhotos: string[] = [];
 
@@ -298,7 +462,28 @@ class PhotoScrapingQueue {
 }
 
 const photoQueue = new PhotoScrapingQueue();
-console.log('🔧 SIGNATURE DETECTION LOGIC LOADED - Version 6:41 AM with debug logging');
+
+// Clear cache on server restart to test new implementation
+photoCache.clear();
+
+// Clear database photo cache on startup to force fresh HTML parsing
+async function clearDatabasePhotoCache() {
+  try {
+    console.log('🗑️ CLEARING DATABASE PHOTO CACHE to force fresh HTML parsing...');
+    // Clear all photo assets to force fresh scraping with HTML parsing
+    await executeWithRetry(async () => {
+      await pool.query('DELETE FROM photo_assets WHERE fetched_at < NOW() - INTERVAL \'1 day\'');
+    });
+    console.log('✅ Database photo cache cleared successfully');
+  } catch (error) {
+    console.error('❌ Error clearing database photo cache:', error);
+  }
+}
+
+// Initialize cache clearing on startup
+clearDatabasePhotoCache();
+
+console.log('🔧 FAST HTML PARSING IMPLEMENTATION LOADED - Cache cleared for testing - Version 1.1 - HTML PARSING DEBUG');
 
 // Image processing cache
 const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();
@@ -568,12 +753,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const token = axylogMatch[1];
       
-      // Get photos from cache
-      const cachedPhotos = await storage.getPhotoAssetsByToken(token);
+      // Add comprehensive logging for debugging
+      console.log(`📸 [PHOTO DEBUG] Fetching photos for token: ${token}`);
+      console.log(`📸 [PHOTO DEBUG] Consignment ID: ${consignmentId}`);
+      console.log(`📸 [PHOTO DEBUG] Tracking link: ${trackingLink}`);
       
-      if (cachedPhotos.length === 0) {
-        // No photos in cache - try background worker first, fallback to direct scraping
-        const canUseWorker = photoWorker && typeof (photoWorker as any).enqueueJob === 'function';
+      // Get photos from database cache
+      console.log(`📸 [PHOTO DEBUG] Checking database cache for token: ${token}`);
+      const cachedPhotos = await storage.getPhotoAssetsByToken(token);
+      console.log(`📸 [PHOTO DEBUG] Database cache returned ${cachedPhotos.length} photos`);
+      
+      // FOR DEBUGGING: Force HTML parsing by temporarily ignoring cache
+      const FORCE_HTML_PARSING = true; // Set to true for debugging
+      
+      if (cachedPhotos.length === 0 || FORCE_HTML_PARSING) {
+        if (FORCE_HTML_PARSING && cachedPhotos.length > 0) {
+          console.log(`📸 [PHOTO DEBUG] FORCING HTML parsing (ignoring ${cachedPhotos.length} cached photos for debugging)`);
+        }
+        // No photos in cache - DISABLE background worker to force HTML parsing testing
+        console.log(`📸 [PHOTO DEBUG] Background worker DISABLED for HTML parsing testing`);
+        const canUseWorker = false; // Temporarily disable to force direct HTML parsing
         
         if (canUseWorker) {
           try {
@@ -585,9 +784,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Fallback to direct scraping when worker is unavailable
-        console.log(`Background worker unavailable for token ${token}, using direct scraping fallback`);
+        console.log(`📸 [PHOTO DEBUG] Background worker unavailable for token ${token}, using direct scraping fallback`);
+        console.log(`📸 [PHOTO DEBUG] About to call photoQueue.addRequest with token: ${token}`);
         try {
           const photoResult = await photoQueue.addRequest(token, 'high');
+          console.log(`📸 [PHOTO DEBUG] photoQueue.addRequest completed. Result:`, {
+            photoCount: photoResult.photos?.length || 0,
+            signatureCount: photoResult.signaturePhotos?.length || 0
+          });
           return res.json({ 
             success: true, 
             photos: photoResult.photos || [], 
