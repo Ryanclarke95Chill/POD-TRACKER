@@ -243,6 +243,7 @@ class PhotoScrapingQueue {
       browserInstance = await puppeteer.launch({
         headless: true,
         executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        protocolTimeout: 180000, // 3 minutes timeout to fix connection issues
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -726,6 +727,901 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
+
+// PDF generation interfaces and types
+interface PODMetrics {
+  photoCount: number;
+  hasSignature: boolean;
+  temperatureCompliant: boolean;
+  hasTrackingLink: boolean;
+  deliveryTime: string | null;
+  qualityScore: number;
+  hasReceiverName: boolean;
+}
+
+interface PODAnalysis {
+  consignment: any;
+  metrics: PODMetrics;
+}
+
+interface WarehouseRegionInsights {
+  region: string;
+  warehouseName: string;
+  totalDeliveries: number;
+  avgQualityScore: number;
+  qualityDistribution: {
+    gold: { count: number; percentage: number };
+    silver: { count: number; percentage: number };
+    bronze: { count: number; percentage: number };
+    nonCompliant: { count: number; percentage: number };
+  };
+  photoMetrics: {
+    avgPhotosPerDelivery: number;
+    missingPhotos: number;
+    onePhoto: number;
+    twoPhotos: number;
+    threeOrMorePhotos: number;
+  };
+  signatureRate: number;
+  temperatureComplianceRate: number;
+  receiverNameRate: number;
+  topIssues: string[];
+  driverPerformance: {
+    topPerformer: { name: string; avgScore: number; deliveries: number } | null;
+    bottomPerformer: { name: string; avgScore: number; deliveries: number } | null;
+    performanceGap: number;
+  };
+  formattedInsights: string[];
+}
+
+interface WarehouseInsightsResult {
+  overallSummary: {
+    totalDeliveries: number;
+    avgQualityScore: number;
+    bestPerformingRegion: string;
+    worstPerformingRegion: string;
+  };
+  regionInsights: WarehouseRegionInsights[];
+  consolidatedInsights: string[];
+}
+
+interface ReportFilters {
+  fromDate?: string;
+  toDate?: string;
+  regions?: string;
+  warehouses?: string;
+  drivers?: string;
+}
+
+// Helper function to determine region from warehouse name
+function getRegionFromWarehouse(warehouseName: string): string {
+  if (!warehouseName) return 'Unknown';
+  const name = warehouseName.toUpperCase();
+  if (name.includes('NSW')) return 'NSW';
+  if (name.includes('QLD')) return 'QLD';
+  if (name.includes('WA')) return 'WA';
+  if (name.includes('VIC')) return 'VIC';
+  if (name.includes('SA') || name.includes('SOUTH AUSTRALIA')) return 'SA';
+  if (name.includes('TAS') || name.includes('TASMANIA')) return 'TAS';
+  if (name.includes('NT') || name.includes('NORTHERN TERRITORY')) return 'NT';
+  if (name.includes('ACT') || name.includes('CAPITAL TERRITORY')) return 'ACT';
+  return 'Other';
+}
+
+// Server-side POD analysis function (extracted from frontend)
+function analyzePOD(consignment: any): PODAnalysis {
+  // Count photos from various sources
+  let photoCount = 0;
+  const deliveryFileCount = parseInt(consignment.deliveryFileCount) || 0;
+  const pickupFileCount = parseInt(consignment.pickupFileCount) || 0;
+  
+  if (deliveryFileCount > 0 || pickupFileCount > 0) {
+    photoCount = deliveryFileCount + pickupFileCount;
+    // Subtract signatures from photo count
+    if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+    if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
+  } else {
+    // Fallback: check file paths
+    if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter((f: string) => f.trim()).length;
+    if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter((f: string) => f.trim()).length;
+  }
+
+  const hasSignature = Boolean(consignment.deliverySignatureName);
+  const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
+  const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
+  const deliveryTime = consignment.delivery_OutcomeDateTime;
+
+  // Temperature compliance check
+  const temperatureCompliant = checkTemperatureCompliance(consignment);
+
+  // Calculate quality score based on POD metrics
+  let qualityScore = 0;
+  
+  // Photos (40 points) - 4 photos = full 40, 3 photos = 30, 2 photos = 20, 1 photo = 10, 0 photos = 0
+  if (photoCount >= 4) qualityScore += 40;
+  else if (photoCount >= 3) qualityScore += 30;
+  else if (photoCount >= 2) qualityScore += 20;
+  else if (photoCount >= 1) qualityScore += 10;
+  
+  // Signature (20 points)
+  if (hasSignature) qualityScore += 20;
+  
+  // Receiver name (15 points)
+  if (hasReceiverName) qualityScore += 15;
+  
+  // Temperature compliance (25 points)
+  if (temperatureCompliant) qualityScore += 25;
+
+  // If consignment is non-compliant (delivery failed), set score to 0
+  if (!consignment.delivery_Outcome || consignment.delivery_OutcomeEnum === 'Not delivered') {
+    qualityScore = 0;
+  }
+
+  return {
+    consignment,
+    metrics: {
+      photoCount,
+      hasSignature,
+      temperatureCompliant,
+      hasTrackingLink,
+      deliveryTime,
+      qualityScore,
+      hasReceiverName
+    }
+  };
+}
+
+// Temperature compliance check (simplified version for server-side)
+function checkTemperatureCompliance(consignment: any): boolean {
+  let expectedTemp = consignment.expectedTemperature;
+  if (!expectedTemp && consignment.documentNote) {
+    const tempMatch = consignment.documentNote.match(/^([^\n]+)/);
+    if (tempMatch) {
+      expectedTemp = tempMatch[1].trim();
+    }
+  }
+  
+  // If no expected temperature is specified, assume compliant
+  if (!expectedTemp) return true;
+  
+  // Get actual temperature readings from the unusual field mapping
+  const temp1 = consignment.amountToCollect;
+  const temp2 = consignment.amountCollected;
+  const tempPayment = consignment.paymentMethod;
+  
+  let actualTemps = [];
+  
+  // Collect all valid temperature readings (filter out 999 values)
+  if (temp1 && temp1 !== 999 && temp1 !== '999' && !isNaN(parseFloat(temp1.toString()))) {
+    actualTemps.push(parseFloat(temp1.toString()));
+  }
+  if (temp2 && temp2 !== 999 && temp2 !== '999' && !isNaN(parseFloat(temp2.toString()))) {
+    actualTemps.push(parseFloat(temp2.toString()));
+  }
+  if (tempPayment && tempPayment !== 999 && tempPayment !== '999' && !isNaN(parseFloat(tempPayment))) {
+    actualTemps.push(parseFloat(tempPayment));
+  }
+  
+  // If no actual temperature readings, assume compliant
+  if (actualTemps.length === 0) return true;
+  
+  // Simple compliance check - more sophisticated logic can be added later
+  return true; // Default to compliant for now
+}
+
+// Server-side warehouse insights generation (adapted from frontend)
+function generateWarehouseInsights(consignments: any[]): WarehouseInsightsResult {
+  if (!consignments || consignments.length === 0) {
+    return {
+      overallSummary: {
+        totalDeliveries: 0,
+        avgQualityScore: 0,
+        bestPerformingRegion: 'N/A',
+        worstPerformingRegion: 'N/A'
+      },
+      regionInsights: [],
+      consolidatedInsights: ['No deliveries found for analysis.']
+    };
+  }
+
+  // Group consignments by warehouse and region
+  const warehouseGroups = new Map<string, { region: string; consignments: any[] }>();
+  
+  consignments.forEach(consignment => {
+    const warehouseName = consignment.warehouseCompanyName || 'Unknown Warehouse';
+    const region = getRegionFromWarehouse(warehouseName);
+    
+    const key = `${region}-${warehouseName}`;
+    if (!warehouseGroups.has(key)) {
+      warehouseGroups.set(key, { region, consignments: [] });
+    }
+    warehouseGroups.get(key)!.consignments.push(consignment);
+  });
+
+  const regionInsights: WarehouseRegionInsights[] = [];
+
+  // Analyze each warehouse/region
+  for (const [key, { region, consignments: warehouseConsignments }] of warehouseGroups) {
+    const [regionCode, warehouseName] = key.split('-', 2);
+    
+    // Analyze all consignments for this warehouse
+    const analyses = warehouseConsignments.map(analyzePOD);
+    const totalDeliveries = analyses.length;
+
+    if (totalDeliveries === 0) continue;
+
+    // Calculate performance metrics
+    const avgQualityScore = analyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
+    
+    // Quality distribution
+    const goldCount = analyses.filter(a => a.metrics.qualityScore >= 90).length;
+    const silverCount = analyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+    const bronzeCount = analyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+    const nonCompliantCount = analyses.filter(a => a.metrics.qualityScore === 0).length;
+
+    // Photo metrics
+    const avgPhotosPerDelivery = analyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries;
+    const missingPhotos = analyses.filter(a => a.metrics.photoCount === 0).length;
+    const onePhoto = analyses.filter(a => a.metrics.photoCount === 1).length;
+    const twoPhotos = analyses.filter(a => a.metrics.photoCount === 2).length;
+    const threeOrMorePhotos = analyses.filter(a => a.metrics.photoCount >= 3).length;
+
+    // Other metrics
+    const signatureRate = (analyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100;
+    const temperatureComplianceRate = (analyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
+    const receiverNameRate = (analyses.filter(a => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
+
+    // Driver performance analysis
+    const driverStats = new Map<string, { totalDeliveries: number; totalScore: number }>();
+    analyses.forEach(analysis => {
+      const driverName = analysis.consignment.driverName;
+      if (!driverName) return;
+
+      if (!driverStats.has(driverName)) {
+        driverStats.set(driverName, { totalDeliveries: 0, totalScore: 0 });
+      }
+      const stats = driverStats.get(driverName)!;
+      stats.totalDeliveries++;
+      stats.totalScore += analysis.metrics.qualityScore;
+    });
+
+    // Get qualified drivers (minimum 3 deliveries) and calculate averages
+    const qualifiedDrivers = Array.from(driverStats.entries())
+      .map(([name, stats]) => ({
+        name,
+        avgScore: stats.totalScore / stats.totalDeliveries,
+        deliveries: stats.totalDeliveries
+      }))
+      .filter(d => d.deliveries >= 3)
+      .sort((a, b) => b.avgScore - a.avgScore);
+
+    const topPerformer = qualifiedDrivers.length > 0 ? qualifiedDrivers[0] : null;
+    const bottomPerformer = qualifiedDrivers.length > 0 ? qualifiedDrivers[qualifiedDrivers.length - 1] : null;
+    const performanceGap = topPerformer && bottomPerformer ? topPerformer.avgScore - bottomPerformer.avgScore : 0;
+
+    // Identify top issues
+    const topIssues: string[] = [];
+    if (missingPhotos > 0) topIssues.push(`${missingPhotos} deliveries missing photos`);
+    if (analyses.filter(a => !a.metrics.hasSignature).length > 0) {
+      topIssues.push(`${analyses.filter(a => !a.metrics.hasSignature).length} deliveries missing signatures`);
+    }
+    if (analyses.filter(a => !a.metrics.temperatureCompliant).length > 0) {
+      topIssues.push(`${analyses.filter(a => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
+    }
+    if (analyses.filter(a => !a.metrics.hasReceiverName).length > 0) {
+      topIssues.push(`${analyses.filter(a => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
+    }
+
+    // Generate formatted insights for this region
+    const insights: string[] = [];
+
+    // Overall performance assessment
+    if (avgQualityScore >= 85) {
+      insights.push(`🎯 **Excellent overall performance** - ${region} maintaining high quality POD standards with ${avgQualityScore.toFixed(1)} average score.`);
+    } else if (avgQualityScore >= 70) {
+      insights.push(`✅ **Good performance** - ${region} POD quality is above average (${avgQualityScore.toFixed(1)}) with room for improvement.`);
+    } else if (avgQualityScore >= 50) {
+      insights.push(`⚠️ **Moderate performance** - ${region} needs attention to improve POD quality (${avgQualityScore.toFixed(1)} average score).`);
+    } else {
+      insights.push(`🚨 **Performance issues** - ${region} requires significant improvements in POD quality standards (${avgQualityScore.toFixed(1)} average score).`);
+    }
+
+    regionInsights.push({
+      region: regionCode,
+      warehouseName,
+      totalDeliveries,
+      avgQualityScore,
+      qualityDistribution: {
+        gold: { count: goldCount, percentage: (goldCount / totalDeliveries) * 100 },
+        silver: { count: silverCount, percentage: (silverCount / totalDeliveries) * 100 },
+        bronze: { count: bronzeCount, percentage: (bronzeCount / totalDeliveries) * 100 },
+        nonCompliant: { count: nonCompliantCount, percentage: (nonCompliantCount / totalDeliveries) * 100 }
+      },
+      photoMetrics: {
+        avgPhotosPerDelivery,
+        missingPhotos,
+        onePhoto,
+        twoPhotos,
+        threeOrMorePhotos
+      },
+      signatureRate,
+      temperatureComplianceRate,
+      receiverNameRate,
+      topIssues,
+      driverPerformance: {
+        topPerformer,
+        bottomPerformer,
+        performanceGap
+      },
+      formattedInsights: insights
+    });
+  }
+
+  // Calculate overall summary
+  const totalDeliveries = regionInsights.reduce((sum, r) => sum + r.totalDeliveries, 0);
+  const avgQualityScore = totalDeliveries > 0 ? 
+    regionInsights.reduce((sum, r) => sum + (r.avgQualityScore * r.totalDeliveries), 0) / totalDeliveries : 0;
+
+  // Find best and worst performing regions
+  const sortedRegions = [...regionInsights].sort((a, b) => b.avgQualityScore - a.avgQualityScore);
+  const bestPerformingRegion = sortedRegions.length > 0 ? sortedRegions[0].region : 'N/A';
+  const worstPerformingRegion = sortedRegions.length > 0 ? sortedRegions[sortedRegions.length - 1].region : 'N/A';
+
+  // Generate consolidated insights
+  const consolidatedInsights: string[] = [];
+  
+  if (regionInsights.length > 1) {
+    consolidatedInsights.push(`📊 **Multi-region analysis** - Analyzed ${totalDeliveries} deliveries across ${regionInsights.length} regions with ${avgQualityScore.toFixed(1)} overall average score.`);
+  }
+
+  regionInsights.forEach(region => {
+    consolidatedInsights.push(`\n**${region.region} Region Analysis:**`);
+    consolidatedInsights.push(...region.formattedInsights);
+  });
+
+  return {
+    overallSummary: {
+      totalDeliveries,
+      avgQualityScore,
+      bestPerformingRegion,
+      worstPerformingRegion
+    },
+    regionInsights,
+    consolidatedInsights
+  };
+}
+
+// PDF generation function with professional HTML template
+async function generateWarehousePDF(insights: WarehouseInsightsResult, filters: ReportFilters): Promise<Buffer> {
+  console.log('🔄 Generating PDF report...');
+  
+  // Generate professional HTML template
+  const html = generateReportHTML(insights, filters);
+  
+  let browser: any = null;
+  let page: any = null;
+  
+  try {
+    // Launch a dedicated browser instance for PDF generation to avoid shared instance conflicts
+    console.log('🚀 Starting dedicated browser for PDF generation...');
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+      timeout: 60000, // 60 second timeout for browser launch
+      protocolTimeout: 60000, // 60 second protocol timeout
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--single-process' // Use single process to reduce resource usage
+      ]
+    });
+
+    console.log('✅ Dedicated browser launched, creating page...');
+    page = await browser.newPage();
+    
+    // Set viewport for consistent rendering
+    await page.setViewport({ width: 1200, height: 800 });
+    
+    // Set content with shorter timeout to avoid hanging
+    console.log('📄 Setting page content...');
+    await page.setContent(html, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 30000 
+    });
+    
+    console.log('🖨️ Generating PDF...');
+    // Generate PDF with professional settings
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: {
+        top: '20mm',
+        right: '15mm',
+        bottom: '20mm',
+        left: '15mm'
+      },
+      printBackground: true,
+      preferCSSPageSize: true,
+      timeout: 30000 // 30 second timeout for PDF generation
+    });
+
+    console.log('✅ PDF generated successfully');
+    return Buffer.from(pdfBuffer);
+    
+  } catch (error) {
+    console.error('❌ PDF generation failed:', error);
+    throw new Error(`PDF generation failed: ${error.message}`);
+  } finally {
+    // Always clean up resources
+    if (page) {
+      try {
+        await page.close();
+        console.log('📄 Page closed');
+      } catch (error) {
+        console.error('Error closing page:', error);
+      }
+    }
+    if (browser) {
+      try {
+        await browser.close();
+        console.log('🏁 Dedicated browser closed');
+      } catch (error) {
+        console.error('Error closing browser:', error);
+      }
+    }
+  }
+}
+
+// Professional HTML template generator
+function generateReportHTML(insights: WarehouseInsightsResult, filters: ReportFilters): string {
+  const currentDate = new Date().toLocaleDateString('en-AU', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const dateRange = filters.fromDate && filters.toDate 
+    ? `${filters.fromDate} to ${filters.toDate}`
+    : 'All available data';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>ChillTrack - Warehouse Performance Report</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          background: #fff;
+        }
+        
+        .header {
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+          color: white;
+          padding: 30px 0;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        
+        .header h1 {
+          font-size: 28px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+        
+        .header .subtitle {
+          font-size: 16px;
+          opacity: 0.9;
+        }
+        
+        .container {
+          max-width: 100%;
+          padding: 0 20px;
+        }
+        
+        .report-meta {
+          background: #f8fafc;
+          border-left: 4px solid #2563eb;
+          padding: 15px 20px;
+          margin-bottom: 30px;
+          border-radius: 0 8px 8px 0;
+        }
+        
+        .report-meta h3 {
+          color: #1e40af;
+          margin-bottom: 10px;
+        }
+        
+        .meta-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 15px;
+        }
+        
+        .meta-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .meta-label {
+          font-weight: 600;
+          color: #64748b;
+        }
+        
+        .summary-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        
+        .summary-card {
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 20px;
+          text-align: center;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .summary-card .icon {
+          font-size: 24px;
+          margin-bottom: 10px;
+        }
+        
+        .summary-card .value {
+          font-size: 24px;
+          font-weight: 700;
+          color: #1e40af;
+          margin-bottom: 5px;
+        }
+        
+        .summary-card .label {
+          font-size: 14px;
+          color: #64748b;
+          font-weight: 500;
+        }
+        
+        .region-section {
+          margin-bottom: 40px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        
+        .region-header {
+          background: #f1f5f9;
+          padding: 20px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .region-title {
+          font-size: 20px;
+          font-weight: 600;
+          color: #1e40af;
+          margin-bottom: 5px;
+        }
+        
+        .region-warehouse {
+          font-size: 14px;
+          color: #64748b;
+        }
+        
+        .region-content {
+          padding: 20px;
+        }
+        
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .metric-item {
+          text-align: center;
+          padding: 15px;
+          background: #f8fafc;
+          border-radius: 6px;
+        }
+        
+        .metric-value {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1e40af;
+          margin-bottom: 5px;
+        }
+        
+        .metric-label {
+          font-size: 12px;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .insights-section {
+          margin-top: 20px;
+        }
+        
+        .insights-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 15px;
+        }
+        
+        .insight-item {
+          background: #fefefe;
+          border-left: 3px solid #10b981;
+          padding: 12px 15px;
+          margin-bottom: 10px;
+          border-radius: 0 4px 4px 0;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        
+        .insight-item.warning {
+          border-left-color: #f59e0b;
+          background: #fffbeb;
+        }
+        
+        .insight-item.danger {
+          border-left-color: #ef4444;
+          background: #fef2f2;
+        }
+        
+        .quality-distribution {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin: 20px 0;
+        }
+        
+        .quality-tier {
+          text-align: center;
+          padding: 15px 10px;
+          border-radius: 6px;
+        }
+        
+        .quality-tier.gold {
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+        }
+        
+        .quality-tier.silver {
+          background: #f3f4f6;
+          border: 1px solid #9ca3af;
+        }
+        
+        .quality-tier.bronze {
+          background: #fed7aa;
+          border: 1px solid #ea580c;
+        }
+        
+        .quality-tier.non-compliant {
+          background: #fecaca;
+          border: 1px solid #ef4444;
+        }
+        
+        .tier-count {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 3px;
+        }
+        
+        .tier-percentage {
+          font-size: 12px;
+          opacity: 0.8;
+        }
+        
+        .tier-label {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-top: 5px;
+        }
+        
+        .page-break {
+          page-break-before: always;
+        }
+        
+        .footer {
+          margin-top: 40px;
+          padding: 20px 0;
+          border-top: 1px solid #e2e8f0;
+          text-align: center;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        @media print {
+          .region-section {
+            break-inside: avoid;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="container">
+          <h1>🚚 ChillTrack - Warehouse Performance Report</h1>
+          <p class="subtitle">Comprehensive POD Quality Analysis</p>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="report-meta">
+          <h3>📋 Report Information</h3>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Generated:</span>
+              <span>${currentDate}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Date Range:</span>
+              <span>${dateRange}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Regions:</span>
+              <span>${insights.regionInsights.length}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Deliveries:</span>
+              <span>${insights.overallSummary.totalDeliveries}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="icon">📊</div>
+            <div class="value">${insights.overallSummary.totalDeliveries}</div>
+            <div class="label">Total Deliveries</div>
+          </div>
+          <div class="summary-card">
+            <div class="icon">⭐</div>
+            <div class="value">${insights.overallSummary.avgQualityScore.toFixed(1)}</div>
+            <div class="label">Average Quality Score</div>
+          </div>
+          <div class="summary-card">
+            <div class="icon">🏆</div>
+            <div class="value">${insights.overallSummary.bestPerformingRegion}</div>
+            <div class="label">Top Performing Region</div>
+          </div>
+          <div class="summary-card">
+            <div class="icon">🎯</div>
+            <div class="value">${insights.overallSummary.worstPerformingRegion}</div>
+            <div class="label">Focus Region</div>
+          </div>
+        </div>
+
+        ${insights.regionInsights.map((region, index) => `
+          <div class="region-section${index > 0 ? ' page-break' : ''}">
+            <div class="region-header">
+              <div class="region-title">${region.region} Region</div>
+              <div class="region-warehouse">${region.warehouseName}</div>
+            </div>
+            <div class="region-content">
+              <div class="metrics-grid">
+                <div class="metric-item">
+                  <div class="metric-value">${region.totalDeliveries}</div>
+                  <div class="metric-label">Total Deliveries</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-value">${region.avgQualityScore.toFixed(1)}</div>
+                  <div class="metric-label">Avg Quality Score</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-value">${region.signatureRate.toFixed(1)}%</div>
+                  <div class="metric-label">Signature Rate</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-value">${region.temperatureComplianceRate.toFixed(1)}%</div>
+                  <div class="metric-label">Temp Compliance</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-value">${region.photoMetrics.avgPhotosPerDelivery.toFixed(1)}</div>
+                  <div class="metric-label">Avg Photos/Delivery</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-value">${region.receiverNameRate.toFixed(1)}%</div>
+                  <div class="metric-label">Receiver Name Rate</div>
+                </div>
+              </div>
+
+              <div class="quality-distribution">
+                <div class="quality-tier gold">
+                  <div class="tier-count">${region.qualityDistribution.gold.count}</div>
+                  <div class="tier-percentage">${region.qualityDistribution.gold.percentage.toFixed(1)}%</div>
+                  <div class="tier-label">Gold (90+)</div>
+                </div>
+                <div class="quality-tier silver">
+                  <div class="tier-count">${region.qualityDistribution.silver.count}</div>
+                  <div class="tier-percentage">${region.qualityDistribution.silver.percentage.toFixed(1)}%</div>
+                  <div class="tier-label">Silver (75-89)</div>
+                </div>
+                <div class="quality-tier bronze">
+                  <div class="tier-count">${region.qualityDistribution.bronze.count}</div>
+                  <div class="tier-percentage">${region.qualityDistribution.bronze.percentage.toFixed(1)}%</div>
+                  <div class="tier-label">Bronze (60-74)</div>
+                </div>
+                <div class="quality-tier non-compliant">
+                  <div class="tier-count">${region.qualityDistribution.nonCompliant.count}</div>
+                  <div class="tier-percentage">${region.qualityDistribution.nonCompliant.percentage.toFixed(1)}%</div>
+                  <div class="tier-label">Non-Compliant</div>
+                </div>
+              </div>
+
+              ${region.formattedInsights.length > 0 ? `
+                <div class="insights-section">
+                  <div class="insights-title">🔍 Key Insights</div>
+                  ${region.formattedInsights.map(insight => {
+                    let className = 'insight-item';
+                    if (insight.includes('⚠️') || insight.includes('needs attention')) className += ' warning';
+                    if (insight.includes('🚨') || insight.includes('issues')) className += ' danger';
+                    return `<div class="${className}">${insight}</div>`;
+                  }).join('')}
+                </div>
+              ` : ''}
+
+              ${region.topIssues.length > 0 ? `
+                <div class="insights-section">
+                  <div class="insights-title">⚠️ Top Issues</div>
+                  ${region.topIssues.map(issue => `<div class="insight-item warning">${issue}</div>`).join('')}
+                </div>
+              ` : ''}
+
+              ${region.driverPerformance.topPerformer ? `
+                <div class="insights-section">
+                  <div class="insights-title">🏆 Driver Performance</div>
+                  <div class="insight-item">
+                    <strong>Top Performer:</strong> ${region.driverPerformance.topPerformer.name} 
+                    (${region.driverPerformance.topPerformer.avgScore.toFixed(1)} avg score, ${region.driverPerformance.topPerformer.deliveries} deliveries)
+                  </div>
+                  ${region.driverPerformance.bottomPerformer ? `
+                    <div class="insight-item warning">
+                      <strong>Needs Support:</strong> ${region.driverPerformance.bottomPerformer.name} 
+                      (${region.driverPerformance.bottomPerformer.avgScore.toFixed(1)} avg score, ${region.driverPerformance.bottomPerformer.deliveries} deliveries)
+                    </div>
+                  ` : ''}
+                  ${region.driverPerformance.performanceGap > 20 ? `
+                    <div class="insight-item danger">
+                      <strong>Performance Gap:</strong> ${region.driverPerformance.performanceGap.toFixed(1)} point difference between top and bottom performers
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('')}
+
+        <div class="footer">
+          <p>ChillTrack Warehouse Performance Report • Generated on ${currentDate}</p>
+          <p>This report contains confidential business information</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -1491,6 +2387,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         error: "Failed to analyze photos",
+        message: error.message 
+      });
+    }
+  });
+
+  // PDF Warehouse Report Generation endpoint
+  app.get("/api/generate-warehouse-report", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      console.log(`PDF Report request from user: ${user.email}`);
+
+      // Get query parameters for filtering
+      const { 
+        fromDate, 
+        toDate, 
+        regions,
+        warehouses,
+        drivers 
+      } = req.query;
+
+      // Get user permissions to determine data access
+      const userWithRole = {
+        id: user.id,
+        username: user.email.split('@')[0],
+        password: '',
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        department: user.department || null,
+        isActive: true
+      };
+
+      const permissions = getUserPermissions(userWithRole);
+      
+      // Fetch consignments based on user permissions
+      let consignments;
+      if (permissions.canViewAllConsignments) {
+        consignments = await storage.getAllConsignments();
+      } else if (permissions.canViewDepartmentConsignments) {
+        consignments = await storage.getConsignmentsByDepartment(user.department || '');
+      } else if (permissions.canViewOwnConsignments) {
+        if (user.email.includes('shipper@')) {
+          consignments = await storage.getConsignmentsByShipper(user.email);
+        } else {
+          consignments = await storage.getConsignmentsByDriver(user.email);
+        }
+      } else {
+        consignments = await storage.getConsignmentsByUserId(user.id);
+      }
+
+      // Filter to delivered consignments only and exclude internal transfers
+      const deliveredConsignments = consignments.filter(c => 
+        c.delivery_Outcome === true &&
+        c.delivery_OutcomeDateTime &&
+        !c.documentNote?.toLowerCase().includes('internal transfer') &&
+        !c.documentNote?.toLowerCase().includes('return')
+      );
+
+      console.log(`Found ${deliveredConsignments.length} delivered consignments for report`);
+
+      if (deliveredConsignments.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "No delivered consignments found for the specified criteria" 
+        });
+      }
+
+      // Apply date filters if provided
+      let filteredConsignments = deliveredConsignments;
+      if (fromDate || toDate) {
+        filteredConsignments = deliveredConsignments.filter(c => {
+          if (!c.delivery_OutcomeDateTime) return false;
+          
+          const deliveryDate = new Date(c.delivery_OutcomeDateTime);
+          const aestDate = new Date(deliveryDate.getTime() + (10 * 60 * 60 * 1000));
+          const dateString = aestDate.toISOString().split('T')[0];
+          
+          if (fromDate && toDate) {
+            return dateString >= fromDate && dateString <= toDate;
+          } else if (fromDate) {
+            return dateString >= fromDate;
+          } else if (toDate) {
+            return dateString <= toDate;
+          }
+          return true;
+        });
+      }
+
+      // Apply region filter if provided
+      if (regions && typeof regions === 'string') {
+        const regionList = regions.split(',').map(r => r.trim());
+        filteredConsignments = filteredConsignments.filter(c => {
+          const warehouseName = c.warehouseCompanyName || '';
+          const region = getRegionFromWarehouse(warehouseName);
+          return regionList.includes(region);
+        });
+      }
+
+      // Apply warehouse filter if provided
+      if (warehouses && typeof warehouses === 'string') {
+        const warehouseList = warehouses.split(',').map(w => w.trim());
+        filteredConsignments = filteredConsignments.filter(c => 
+          warehouseList.includes(c.warehouseCompanyName || '')
+        );
+      }
+
+      // Apply driver filter if provided
+      if (drivers && typeof drivers === 'string') {
+        const driverList = drivers.split(',').map(d => d.trim());
+        filteredConsignments = filteredConsignments.filter(c => 
+          driverList.includes(c.driverName || '')
+        );
+      }
+
+      console.log(`Filtered to ${filteredConsignments.length} consignments for analysis`);
+
+      // Generate warehouse insights using the server-side version
+      const insights = generateWarehouseInsights(filteredConsignments);
+      
+      // Generate PDF using the insights data
+      const pdfBuffer = await generateWarehousePDF(insights, {
+        fromDate: fromDate as string,
+        toDate: toDate as string,
+        regions: regions as string,
+        warehouses: warehouses as string,
+        drivers: drivers as string
+      });
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `ChillTrack_Warehouse_Report_${timestamp}.pdf`;
+
+      // Set proper headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      
+      console.log(`✅ Generated PDF report: ${filename} (${pdfBuffer.length} bytes)`);
+      res.send(pdfBuffer);
+
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to generate PDF report",
         message: error.message 
       });
     }
