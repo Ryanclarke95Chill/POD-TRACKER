@@ -28,14 +28,12 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
-  Globe,
-  File
+  Globe
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
 import { Consignment, ScoreBreakdown } from "@shared/schema";
 import { calculateDriverStats, getDriversByCohort, getCohortSummary, DriverStats, DriverCohortConfig, DEFAULT_COHORT_CONFIG } from "@/utils/driverStats";
-import { useToast } from "@/hooks/use-toast";
 
 interface PODMetrics {
   photoCount: number;
@@ -970,12 +968,6 @@ export default function PODQuality() {
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
   const [selectedSignatures, setSelectedSignatures] = useState<string[]>([]);
   const [selectedSignatureConsignment, setSelectedSignatureConsignment] = useState<string>("");
-  
-  // PDF download state
-  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
-  
-  // Toast hook for notifications
-  const { toast } = useToast();
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -2638,121 +2630,6 @@ export default function PODQuality() {
     }
   };
 
-  // Handle PDF report download
-  const downloadPDFReport = async () => {
-    setIsPdfGenerating(true);
-    
-    try {
-      const token = getToken();
-      if (!token || !isAuthenticated()) {
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: "You must be logged in to download reports.",
-        });
-        return;
-      }
-
-      // Build query parameters from current filters
-      const params = new URLSearchParams();
-      
-      if (selectedWarehouse && selectedWarehouse !== "all") {
-        params.append('warehouse', selectedWarehouse);
-      }
-      if (selectedDriver && selectedDriver !== "all") {
-        params.append('driver', selectedDriver);
-      }
-      if (selectedShipper && selectedShipper !== "all") {
-        params.append('shipper', selectedShipper);
-      }
-      if (selectedTempZone && selectedTempZone !== "all") {
-        params.append('temperatureZone', selectedTempZone);
-      }
-      if (fromDate) {
-        params.append('fromDate', fromDate);
-      }
-      if (toDate) {
-        params.append('toDate', toDate);
-      }
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-      if (selectedFilter && selectedFilter !== "all") {
-        params.append('qualityFilter', selectedFilter);
-      }
-
-      const response = await fetch(`/api/generate-warehouse-report?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          logout();
-          return;
-        }
-        throw new Error(`Failed to generate report: ${response.statusText}`);
-      }
-
-      // Check if response is actually a PDF
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/pdf')) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Invalid response format');
-      }
-
-      // Get the blob and create download
-      const blob = await response.blob();
-      
-      if (blob.size === 0) {
-        throw new Error('Generated report is empty. Please check your filters and try again.');
-      }
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Generate filename with current date and filters
-      const dateStr = new Date().toISOString().split('T')[0];
-      let filename = `warehouse-insights-report-${dateStr}`;
-      
-      // Add filter info to filename if applicable
-      if (selectedWarehouse && selectedWarehouse !== "all") {
-        filename += `-${selectedWarehouse.replace(/\s+/g, '-')}`;
-      }
-      if (fromDate && toDate) {
-        filename += `-${fromDate}-to-${toDate}`;
-      }
-      
-      link.download = `${filename}.pdf`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Report Downloaded",
-        description: "Your warehouse insights report has been downloaded successfully.",
-      });
-
-    } catch (error) {
-      console.error('PDF download error:', error);
-      toast({
-        variant: "destructive",
-        title: "Download Failed",
-        description: error instanceof Error ? error.message : "Failed to generate report. Please try again.",
-      });
-    } finally {
-      setIsPdfGenerating(false);
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
@@ -2778,16 +2655,6 @@ export default function PODQuality() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               {isSyncing ? 'Syncing...' : 'Sync Axylog'}
-            </Button>
-            
-            <Button 
-              onClick={downloadPDFReport}
-              disabled={isPdfGenerating}
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              data-testid="button-download-pdf"
-            >
-              <File className={`h-4 w-4 mr-2 ${isPdfGenerating ? 'animate-pulse' : ''}`} />
-              {isPdfGenerating ? 'Generating Report...' : 'Download Report'}
             </Button>
             
             <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">

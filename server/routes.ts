@@ -12,7 +12,6 @@ import sharp from "sharp";
 import { createHash } from "crypto";
 import { photoAnalysisService } from "./photoAnalysis";
 import { photoWorker } from "./photoIngestionWorker";
-import { getChromePath, isChromeAvailable } from "./chrome";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
@@ -39,15 +38,11 @@ interface PooledPage {
 class PhotoScrapingQueue {
   private queue: PhotoRequest[] = [];
   private activeRequests = new Set<string>();
-  private readonly maxConcurrency = 1; // Reduced to 1 to prevent resource exhaustion
-  private readonly pagePoolSize = 2; // Reduced pool size to prevent resource exhaustion
+  private readonly maxConcurrency = 6; // Increased from 3 to 6 for better throughput
+  private readonly pagePoolSize = 8; // Pool of 8 pre-initialized pages
   private pagePool: PooledPage[] = [];
   private pagePoolInitialized = false;
   private readonly maxPageAge = 300000; // 5 minutes max age for pages
-
-  getActiveRequestCount(): number {
-    return this.activeRequests.size;
-  }
 
   async addRequest(token: string, priority: 'high' | 'low'): Promise<{photos: string[], signaturePhotos: string[]}> {
     // Initialize page pool on first request
@@ -134,18 +129,14 @@ class PhotoScrapingQueue {
         const urlObj = new URL(url);
         const hostname = urlObj.hostname;
         
-        // Allow document and image requests from axylog.com domains (match background worker logic)
+        // Only allow document requests from axylog.com domains
         const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
         const isDocumentRequest = resourceType === 'document';
-        const isImageRequest = resourceType === 'image';
         
-        if ((isDocumentRequest || isImageRequest) && isAxylogDomain) {
+        if (isDocumentRequest && isAxylogDomain) {
           req.continue();
-        } else if (['font', 'stylesheet'].includes(resourceType)) {
-          // Block unnecessary resources for performance (match background worker)
-          req.abort();
         } else {
-          // Block other non-essential resources
+          // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
           req.abort();
         }
       } catch (error) {
@@ -251,7 +242,7 @@ class PhotoScrapingQueue {
       
       browserInstance = await puppeteer.launch({
         headless: true,
-        executablePath: getChromePath(),
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         protocolTimeout: 180000, // 3 minutes timeout to fix connection issues
         args: [
           '--no-sandbox',
@@ -1115,7 +1106,7 @@ async function generateWarehousePDF(insights: WarehouseInsightsResult, filters: 
     console.log('🚀 Starting dedicated browser for PDF generation...');
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: getChromePath(),
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
       timeout: 60000, // 60 second timeout for browser launch
       protocolTimeout: 60000, // 60 second protocol timeout
       args: [
@@ -2068,16 +2059,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Cache miss - return preparing status to avoid inline scraping delay
       console.log(`Cache miss for token ${token} - returning preparing status`);
       
-      // Trigger background scraping only if Chrome is available and not too many active requests (resource protection)
-      if (!isChromeAvailable()) {
-        console.log(`⚠️ [RESOURCE PROTECTION] Chrome not available - skipping photo scraping for token ${token}`);
-      } else if (photoQueue.getActiveRequestCount() < 5) {
-        photoQueue.addRequest(token, priority as 'high' | 'low').catch(error => {
-          console.error(`Background photo scraping failed for token ${token}:`, error);
-        });
-      } else {
-        console.log(`⚠️ [RESOURCE PROTECTION] Too many active requests - skipping photo scraping for token ${token}`);
-      }
+      // Trigger background scraping for future requests (don't await)
+      photoQueue.addRequest(token, priority as 'high' | 'low').catch(error => {
+        console.error(`Background photo scraping failed for token ${token}:`, error);
+      });
       
       return res.json({
         success: true,
