@@ -305,14 +305,29 @@ class PhotoScrapingQueue {
     try {
       page = await browser.newPage();
       
-      // Block unnecessary resources for faster loading
+      // Block heavy resources for maximum performance - only allow document requests
       await page.setRequestInterception(true);
       page.on('request', (req: any) => {
         const resourceType = req.resourceType();
-        if (resourceType === 'font') {
+        const url = req.url();
+        
+        try {
+          const urlObj = new URL(url);
+          const hostname = urlObj.hostname;
+          
+          // Only allow document requests from axylog.com domains
+          const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
+          const isDocumentRequest = resourceType === 'document';
+          
+          if (isDocumentRequest && isAxylogDomain) {
+            req.continue();
+          } else {
+            // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
+            req.abort();
+          }
+        } catch (error) {
+          // If URL parsing fails, abort the request
           req.abort();
-        } else {
-          req.continue();
         }
       });
       
@@ -323,17 +338,17 @@ class PhotoScrapingQueue {
       console.log(`Navigating to: ${trackingUrl}`);
       
       await page.goto(trackingUrl, { 
-        waitUntil: 'networkidle0',
-        timeout: 20000
+        waitUntil: 'domcontentloaded',
+        timeout: 10000
       });
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Removed artificial 2-second delay for faster performance
       
       try {
-        await page.waitForSelector('img', { timeout: 8000 });
+        await page.waitForSelector('img', { timeout: 750 });
         console.log('Images found, proceeding with extraction...');
       } catch (e) {
-        console.log('No images found or timeout, but proceeding anyway...');
+        console.log('No images found within 750ms timeout, but proceeding anyway...');
       }
       
       const imageData = await page.evaluate(() => {
