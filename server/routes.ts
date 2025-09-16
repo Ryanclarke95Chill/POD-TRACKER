@@ -20,7 +20,7 @@ let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
 const CACHE_DURATION = 900000; // 15 minutes cache duration for faster responses
 
-// Photo scraping queue system with concurrency control
+// Photo scraping queue system with concurrency control and page pooling
 interface PhotoRequest {
   token: string;
   priority: 'high' | 'low'; // high = user clicks, low = background loading
@@ -28,12 +28,28 @@ interface PhotoRequest {
   reject: (error: Error) => void;
 }
 
+interface PooledPage {
+  page: any;
+  inUse: boolean;
+  lastUsed: number;
+  id: string;
+}
+
 class PhotoScrapingQueue {
   private queue: PhotoRequest[] = [];
   private activeRequests = new Set<string>();
-  private readonly maxConcurrency = 3; // Limit concurrent scraping operations
+  private readonly maxConcurrency = 6; // Increased from 3 to 6 for better throughput
+  private readonly pagePoolSize = 8; // Pool of 8 pre-initialized pages
+  private pagePool: PooledPage[] = [];
+  private pagePoolInitialized = false;
+  private readonly maxPageAge = 300000; // 5 minutes max age for pages
 
   async addRequest(token: string, priority: 'high' | 'low'): Promise<{photos: string[], signaturePhotos: string[]}> {
+    // Initialize page pool on first request
+    if (!this.pagePoolInitialized) {
+      await this.initializePagePool();
+    }
+    
     // If already processing this token, wait for existing request
     if (this.activeRequests.has(token)) {
       // Return cached result if available
@@ -62,6 +78,207 @@ class PhotoScrapingQueue {
       
       this.processQueue();
     });
+  }
+
+  // Initialize page pool with pre-configured pages
+  private async initializePagePool() {
+    if (this.pagePoolInitialized) return;
+    
+    console.log(`🏊 [PAGE POOL] Initializing page pool with ${this.pagePoolSize} pages...`);
+    
+    try {
+      // Ensure browser instance exists
+      await this.ensureBrowser();
+      
+      // Create pool of pages
+      for (let i = 0; i < this.pagePoolSize; i++) {
+        const page = await this.createConfiguredPage(browserInstance);
+        const pooledPage: PooledPage = {
+          page,
+          inUse: false,
+          lastUsed: Date.now(),
+          id: `pool-page-${i}`
+        };
+        this.pagePool.push(pooledPage);
+        console.log(`🏊 [PAGE POOL] Created page ${i + 1}/${this.pagePoolSize}`);
+      }
+      
+      this.pagePoolInitialized = true;
+      console.log(`✅ [PAGE POOL] Page pool initialized with ${this.pagePool.length} pages`);
+      
+      // Start page health check interval
+      this.startPageHealthCheck();
+      
+    } catch (error) {
+      console.error('❌ [PAGE POOL] Failed to initialize page pool:', error);
+      throw error;
+    }
+  }
+
+  // Create a pre-configured page with all settings
+  private async createConfiguredPage(browser: any) {
+    const page = await browser.newPage();
+    
+    // Block heavy resources for maximum performance
+    await page.setRequestInterception(true);
+    page.on('request', (req: any) => {
+      const resourceType = req.resourceType();
+      const url = req.url();
+      
+      try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname;
+        
+        // Only allow document requests from axylog.com domains
+        const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
+        const isDocumentRequest = resourceType === 'document';
+        
+        if (isDocumentRequest && isAxylogDomain) {
+          req.continue();
+        } else {
+          // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
+          req.abort();
+        }
+      } catch (error) {
+        // If URL parsing fails, abort the request
+        req.abort();
+      }
+    });
+    
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
+    
+    return page;
+  }
+
+  // Get an available page from the pool
+  private async getPageFromPool(): Promise<PooledPage | null> {
+    // Find first available page
+    for (const pooledPage of this.pagePool) {
+      if (!pooledPage.inUse) {
+        // Check if page is still healthy
+        if (await this.isPageHealthy(pooledPage.page)) {
+          pooledPage.inUse = true;
+          pooledPage.lastUsed = Date.now();
+          console.log(`🏊 [PAGE POOL] Acquired page ${pooledPage.id}`);
+          return pooledPage;
+        } else {
+          // Page is unhealthy, recreate it
+          console.log(`🔄 [PAGE POOL] Recreating unhealthy page ${pooledPage.id}`);
+          await this.recreatePage(pooledPage);
+          if (await this.isPageHealthy(pooledPage.page)) {
+            pooledPage.inUse = true;
+            pooledPage.lastUsed = Date.now();
+            return pooledPage;
+          }
+        }
+      }
+    }
+    
+    console.log('⚠️ [PAGE POOL] No available pages in pool');
+    return null;
+  }
+
+  // Return page to pool after use
+  private returnPageToPool(pooledPage: PooledPage) {
+    pooledPage.inUse = false;
+    pooledPage.lastUsed = Date.now();
+    console.log(`🏊 [PAGE POOL] Returned page ${pooledPage.id} to pool`);
+  }
+
+  // Check if a page is still healthy and responsive
+  private async isPageHealthy(page: any): Promise<boolean> {
+    try {
+      if (!page || page.isClosed()) {
+        return false;
+      }
+      
+      // Quick evaluation to test if page is responsive
+      await page.evaluate(() => document.title);
+      return true;
+    } catch (error) {
+      console.log('🔍 [PAGE POOL] Page health check failed:', error.message);
+      return false;
+    }
+  }
+
+  // Recreate a page in the pool
+  private async recreatePage(pooledPage: PooledPage) {
+    try {
+      // Close old page if it exists and is not closed
+      if (pooledPage.page && !pooledPage.page.isClosed()) {
+        await pooledPage.page.close();
+      }
+    } catch (error) {
+      // Ignore errors when closing
+    }
+    
+    try {
+      await this.ensureBrowser();
+      pooledPage.page = await this.createConfiguredPage(browserInstance);
+      pooledPage.lastUsed = Date.now();
+      console.log(`✅ [PAGE POOL] Recreated page ${pooledPage.id}`);
+    } catch (error) {
+      console.error(`❌ [PAGE POOL] Failed to recreate page ${pooledPage.id}:`, error);
+      throw error;
+    }
+  }
+
+  // Ensure browser instance exists and is connected
+  private async ensureBrowser() {
+    const needsNewBrowser = !browserInstance || !browserInstance.isConnected();
+    
+    if (needsNewBrowser) {
+      console.log(browserInstance ? '🔄 Browser disconnected, launching new instance...' : '🚀 Launching new browser instance...');
+      
+      // Clean up old browser if it exists
+      if (browserInstance && !browserInstance.isConnected()) {
+        try {
+          await browserInstance.close();
+        } catch (error) {
+          // Ignore errors when closing dead browser
+        }
+      }
+      
+      browserInstance = await puppeteer.launch({
+        headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-plugins',
+          '--disable-sync',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
+        ]
+      });
+      
+      console.log('✅ Browser instance created successfully');
+    }
+  }
+
+  // Start periodic health check for pages
+  private startPageHealthCheck() {
+    setInterval(async () => {
+      console.log('🔍 [PAGE POOL] Running periodic health check...');
+      
+      for (const pooledPage of this.pagePool) {
+        if (!pooledPage.inUse) {
+          // Check if page is too old or unhealthy
+          const pageAge = Date.now() - pooledPage.lastUsed;
+          if (pageAge > this.maxPageAge || !(await this.isPageHealthy(pooledPage.page))) {
+            console.log(`🔄 [PAGE POOL] Refreshing page ${pooledPage.id} (age: ${Math.round(pageAge / 1000)}s)`);
+            await this.recreatePage(pooledPage);
+          }
+        }
+      }
+    }, 60000); // Check every minute
   }
 
   private async processQueue() {
@@ -259,83 +476,25 @@ class PhotoScrapingQueue {
     }
 
     // Fallback to Puppeteer if HTML parsing fails or returns no results
-    console.log('HTML parsing failed or returned no results, falling back to Puppeteer...');
+    console.log('🤖 [PUPPETEER] HTML parsing failed or returned no results, falling back to Puppeteer with page pool...');
     
     let photos: string[] = [];
     let signaturePhotos: string[] = [];
-
-    // Reuse browser instance for better performance, but check if it's still connected
-    const needsNewBrowser = !browserInstance || !browserInstance.isConnected();
-    
-    if (needsNewBrowser) {
-      console.log(browserInstance ? 'Browser disconnected, launching new instance...' : 'Launching new browser instance...');
-      
-      // Clean up old browser if it exists
-      if (browserInstance && !browserInstance.isConnected()) {
-        try {
-          await browserInstance.close();
-        } catch (error) {
-          // Ignore errors when closing dead browser
-        }
-      }
-      
-      browserInstance = await puppeteer.launch({
-        headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-plugins',
-          '--disable-sync',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding'
-        ]
-      });
-    }
-
-    const browser = browserInstance;
-    let page;
+    let pooledPage: PooledPage | null = null;
 
     try {
-      page = await browser.newPage();
+      // Get a page from the pool instead of creating a new one
+      pooledPage = await this.getPageFromPool();
       
-      // Block heavy resources for maximum performance - only allow document requests
-      await page.setRequestInterception(true);
-      page.on('request', (req: any) => {
-        const resourceType = req.resourceType();
-        const url = req.url();
-        
-        try {
-          const urlObj = new URL(url);
-          const hostname = urlObj.hostname;
-          
-          // Only allow document requests from axylog.com domains
-          const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
-          const isDocumentRequest = resourceType === 'document';
-          
-          if (isDocumentRequest && isAxylogDomain) {
-            req.continue();
-          } else {
-            // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
-            req.abort();
-          }
-        } catch (error) {
-          // If URL parsing fails, abort the request
-          req.abort();
-        }
-      });
+      if (!pooledPage) {
+        throw new Error('No available pages in pool');
+      }
       
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-      await page.setViewport({ width: 1280, height: 720 });
+      const page = pooledPage.page;
+      console.log(`📝 [PUPPETEER] Using pooled page ${pooledPage.id} for token: ${token}`);
       
       const trackingUrl = `https://live.axylog.com/${token}`;
-      console.log(`Navigating to: ${trackingUrl}`);
+      console.log(`🌍 [PUPPETEER] Navigating to: ${trackingUrl}`);
       
       await page.goto(trackingUrl, { 
         waitUntil: 'domcontentloaded',
@@ -346,9 +505,9 @@ class PhotoScrapingQueue {
       
       try {
         await page.waitForSelector('img', { timeout: 750 });
-        console.log('Images found, proceeding with extraction...');
+        console.log('🖼️ [PUPPETEER] Images found, proceeding with extraction...');
       } catch (e) {
-        console.log('No images found within 750ms timeout, but proceeding anyway...');
+        console.log('⏰ [PUPPETEER] No images found within 750ms timeout, but proceeding anyway...');
       }
       
       const imageData = await page.evaluate(() => {
@@ -392,10 +551,10 @@ class PhotoScrapingQueue {
         });
       });
       
-      console.log(`Found ${imageData.length} potential photos on page`);
+      console.log(`📊 [PUPPETEER] Found ${imageData.length} potential photos on page`);
       
       imageData.forEach((img: any, index: number) => {
-        console.log(`Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
+        console.log(`🖼️ [PUPPETEER] Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
       });
       
       // Separate signature photos from regular photos using dimensions and text
@@ -409,7 +568,7 @@ class PhotoScrapingQueue {
         // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        console.log(`Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
+        console.log(`🔍 [PUPPETEER] Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
         
         return isDimensionSignature || isTextSignature;
       });
@@ -433,27 +592,38 @@ class PhotoScrapingQueue {
       signaturePhotos = tempSignaturePhotos; // Update the outer scope variable
       
     } catch (error: any) {
-      console.error(`Error scraping photos: ${error.message}`);
+      console.error(`❌ [PUPPETEER] Error scraping photos: ${error.message}`);
       
-      // If it's a connection error, invalidate browser instance to force recreation on next request
+      // If it's a connection error, invalidate browser instance and page pool
       if (error.message && (
           error.message.includes('Connection closed') ||
           error.message.includes('Browser closed') ||
           error.message.includes('Target closed')
       )) {
-        console.log('Browser connection lost, clearing browser instance for next request');
+        console.log('❌ [PUPPETEER] Browser connection lost, clearing browser instance and reinitializing page pool');
         browserInstance = null;
+        this.pagePoolInitialized = false;
+        // Clear the page pool to force recreation
+        this.pagePool = [];
+      }
+      
+      // If we have a pooled page and error was page-specific, mark page for recreation
+      if (pooledPage && error.message && (
+          error.message.includes('Page closed') ||
+          error.message.includes('Target closed') ||
+          error.message.includes('Protocol error')
+      )) {
+        console.log(`❌ [PUPPETEER] Page-specific error, will recreate page ${pooledPage.id}`);
+        // Don't return this page to pool - it will be recreated on next health check
+        pooledPage = null;
       }
       
       throw error;
     } finally {
-      if (page) {
-        try {
-          await page.close();
-        } catch (pageCloseError) {
-          // Ignore page close errors if connection is already closed
-          console.warn('Error closing page (connection may be closed):', pageCloseError);
-        }
+      // Return page to pool instead of closing it
+      if (pooledPage) {
+        this.returnPageToPool(pooledPage);
+        console.log(`🔄 [PUPPETEER] Returned page ${pooledPage.id} to pool`);
       }
     }
     
@@ -467,7 +637,7 @@ class PhotoScrapingQueue {
       timestamp: Date.now()
     });
     
-    console.log(`Found ${uniqueRegularPhotos.length} regular photos and ${uniqueSignaturePhotos.length} signature photos for token ${token}`);
+    console.log(`✅ [PUPPETEER] Found ${uniqueRegularPhotos.length} regular photos and ${uniqueSignaturePhotos.length} signature photos for token ${token}`);
     
     return {
       photos: uniqueRegularPhotos,
@@ -478,8 +648,9 @@ class PhotoScrapingQueue {
 
 const photoQueue = new PhotoScrapingQueue();
 
-// Clear cache on server restart to test new implementation
+// Clear cache on server restart to test new page pool implementation
 photoCache.clear();
+console.log('🗑️ [PAGE POOL] Cleared photo cache to test page pool implementation');
 
 // Clear database photo cache on startup to force fresh HTML parsing
 async function clearDatabasePhotoCache() {
