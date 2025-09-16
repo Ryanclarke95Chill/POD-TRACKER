@@ -134,14 +134,18 @@ class PhotoScrapingQueue {
         const urlObj = new URL(url);
         const hostname = urlObj.hostname;
         
-        // Only allow document requests from axylog.com domains
+        // Allow document and image requests from axylog.com domains (match background worker logic)
         const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
         const isDocumentRequest = resourceType === 'document';
+        const isImageRequest = resourceType === 'image';
         
-        if (isDocumentRequest && isAxylogDomain) {
+        if ((isDocumentRequest || isImageRequest) && isAxylogDomain) {
           req.continue();
+        } else if (['font', 'stylesheet'].includes(resourceType)) {
+          // Block unnecessary resources for performance (match background worker)
+          req.abort();
         } else {
-          // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
+          // Block other non-essential resources
           req.abort();
         }
       } catch (error) {
