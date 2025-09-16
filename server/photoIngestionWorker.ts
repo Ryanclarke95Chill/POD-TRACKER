@@ -1,6 +1,7 @@
 import { Cluster } from 'puppeteer-cluster';
 import { storage } from './storage';
 import { createHash } from 'crypto';
+import { getChromePath, isChromeAvailable } from './chrome';
 
 interface PhotoIngestionJob {
   token: string;
@@ -36,8 +37,7 @@ export class PhotoIngestionWorker {
       timeout: 30000, // 30 second timeout
       puppeteerOptions: {
         headless: true,
-        // Let Puppeteer use its bundled Chromium for better portability
-        ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
+        executablePath: getChromePath(),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
