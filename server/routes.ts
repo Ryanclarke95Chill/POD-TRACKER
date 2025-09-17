@@ -57,8 +57,8 @@ function getSecureBrowserArgs(): string[] {
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
-// Temporarily shortened cache duration for testing fixes
-const CACHE_DURATION = 60000; // 1 minute cache duration for testing photo fixes
+// Configurable cache duration with production-ready default
+const CACHE_DURATION = parseInt(process.env.PHOTO_CACHE_TTL_MS || '86400000'); // Default 24 hours (86400000ms)
 const DEBUG_SCREENSHOT_PATH = '/tmp/photo-debug-screenshots/';
 
 // Photo scraping queue system with concurrency control and page pooling
@@ -193,7 +193,9 @@ class PhotoScrapingQueue {
       
       // CRITICAL FIX: Allow data: URI images (base64 images - often signatures)
       if (url.startsWith('data:image/')) {
-        console.log(`🔓 [REQUEST] Allowing data URI image: ${url.substring(0, 50)}...`);
+        if (process.env.PHOTO_WORKER_DEBUG === 'true') {
+          console.log(`🔓 [REQUEST] Allowing data URI image: ${url.substring(0, 50)}...`);
+        }
         req.continue();
         return;
       }
@@ -207,7 +209,9 @@ class PhotoScrapingQueue {
         
         // Allow ALL resources for axylog domains and blob storage - no blocking
         if (isAxylogDomain || isBlobStorage) {
-          console.log(`🔓 [REQUEST] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
+          if (process.env.PHOTO_WORKER_DEBUG === 'true') {
+            console.log(`🔓 [REQUEST] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
+          }
           req.continue();
           return;
         }
@@ -230,22 +234,28 @@ class PhotoScrapingQueue {
         );
         
         if (isEssentialExternal) {
-          console.log(`🔓 [REQUEST] Allowing external: ${url.substring(0, 80)}...`);
+          if (process.env.PHOTO_WORKER_DEBUG === 'true') {
+            console.log(`🔓 [REQUEST] Allowing external: ${url.substring(0, 80)}...`);
+          }
           req.continue();
         } else if (resourceType === 'image') {
           // Be more permissive with images - they might be POD photos
-          console.log(`🔓 [REQUEST] Allowing image (permissive): ${url.substring(0, 80)}...`);
+          if (process.env.PHOTO_WORKER_DEBUG === 'true') {
+            console.log(`🔓 [REQUEST] Allowing image (permissive): ${url.substring(0, 80)}...`);
+          }
           req.continue();
         } else {
           // Block non-essential resources - only log if not a known noisy domain
           const isKnownNoisyDomain = url.includes('signalr.net') || url.includes('openstreetmap.org') || url.includes('tile.openstreetmap.org');
-          if (!isKnownNoisyDomain) {
+          if (!isKnownNoisyDomain && process.env.PHOTO_WORKER_DEBUG === 'true') {
             console.log(`🚫 [REQUEST] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
           }
           req.abort();
         }
       } catch (error) {
-        console.log(`❌ [REQUEST] URL parsing failed for: ${url}, allowing request`);
+        if (process.env.PHOTO_WORKER_DEBUG === 'true') {
+          console.log(`❌ [REQUEST] URL parsing failed for: ${url}, allowing request`);
+        }
         req.continue(); // Allow on parsing error to avoid breaking the page
       }
     });
@@ -1125,28 +1135,11 @@ class PhotoScrapingQueue {
 
 const photoQueue = new PhotoScrapingQueue();
 
-// Clear cache on server restart to test new page pool implementation
-photoCache.clear();
-console.log('🗑️ [PAGE POOL] Cleared photo cache to test page pool implementation');
+// Production caching: Preserve cache between restarts for cost optimization
+// Only clear cache older than configured TTL during natural cleanup
+console.log(`📸 [PHOTO CACHE] Production caching enabled with ${CACHE_DURATION/1000}s TTL`);
 
-// Clear database photo cache on startup to force fresh HTML parsing
-async function clearDatabasePhotoCache() {
-  try {
-    console.log('🗑️ CLEARING DATABASE PHOTO CACHE to force fresh HTML parsing...');
-    // Clear all photo assets to force fresh scraping with HTML parsing
-    await executeWithRetry(async () => {
-      await pool.query('DELETE FROM photo_assets WHERE fetched_at < NOW() - INTERVAL \'1 day\'');
-    });
-    console.log('✅ Database photo cache cleared successfully');
-  } catch (error) {
-    console.error('❌ Error clearing database photo cache:', error);
-  }
-}
-
-// Initialize cache clearing on startup
-clearDatabasePhotoCache();
-
-console.log('🔧 FAST HTML PARSING IMPLEMENTATION LOADED - Cache cleared for testing - Version 1.1 - HTML PARSING DEBUG');
+console.log('🔧 PRODUCTION HTML PARSING IMPLEMENTATION LOADED - Cache preservation enabled for cost optimization - Version 1.2');
 
 // Image processing cache
 const imageCache = new Map<string, { buffer: Buffer, contentType: string, timestamp: number }>();
