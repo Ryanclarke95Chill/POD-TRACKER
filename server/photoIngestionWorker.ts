@@ -5,6 +5,8 @@ import { createHash } from 'crypto';
 // Security-aware browser arguments based on environment
 function getSecureBrowserArgs(): string[] {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const isNixOS = process.env.NIX_PATH || process.env.nixPkgs || process.env.REPLIT_ENVIRONMENT;
+  
   const baseArgs = [
     '--disable-dev-shm-usage',
     '--disable-gpu',
@@ -19,8 +21,12 @@ function getSecureBrowserArgs(): string[] {
     '--memory-pressure-off'
   ];
   
-  // SECURITY: Only disable sandbox in development if absolutely necessary
-  if (isDevelopment && process.env.PUPPETEER_SKIP_SANDBOX === 'true') {
+  // Handle sandbox configuration based on environment
+  if (isNixOS) {
+    // NixOS/Replit environment - sandbox permissions can't be fixed by user
+    console.log('🔧 [ENVIRONMENT] NixOS detected - using --no-sandbox due to SUID sandbox configuration restrictions');
+    baseArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+  } else if (isDevelopment && process.env.PUPPETEER_SKIP_SANDBOX === 'true') {
     console.warn('⚠️ [SECURITY WARNING] Running Chromium without sandbox in development mode');
     baseArgs.push('--no-sandbox', '--disable-setuid-sandbox');
   } else {
