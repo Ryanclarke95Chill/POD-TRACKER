@@ -2310,16 +2310,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cachedPhotos = await storage.getPhotoAssetsByToken(token);
       console.log(`📸 [PHOTO DEBUG] Database cache returned ${cachedPhotos.length} photos`);
       
-      // FOR DEBUGGING: Force HTML parsing by temporarily ignoring cache
-      const FORCE_HTML_PARSING = true; // Set to true for debugging
-      
-      if (cachedPhotos.length === 0 || FORCE_HTML_PARSING) {
-        if (FORCE_HTML_PARSING && cachedPhotos.length > 0) {
-          console.log(`📸 [PHOTO DEBUG] FORCING HTML parsing (ignoring ${cachedPhotos.length} cached photos for debugging)`);
-        }
-        // No photos in cache - DISABLE background worker to force HTML parsing testing
-        console.log(`📸 [PHOTO DEBUG] Background worker DISABLED for HTML parsing testing`);
-        const canUseWorker = false; // Temporarily disable to force direct HTML parsing
+      // Serve cached photos if available, otherwise queue for background processing
+      if (cachedPhotos.length === 0) {
+        // No photos in cache - use background worker to fetch them
+        console.log(`📸 [PHOTO DEBUG] No cached photos found, using background worker`);
+        const canUseWorker = true; // Enable background worker for optimal performance
         
         if (canUseWorker) {
           try {
