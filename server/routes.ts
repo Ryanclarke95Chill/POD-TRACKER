@@ -533,32 +533,11 @@ class PhotoScrapingQueue {
       };
     }
 
-    // Try fast HTML parsing first
-    console.log(`📸 [SCRAPE DEBUG] About to attempt fast HTML parsing for token: ${token}`);
-    console.log('🚀 Attempting fast HTML parsing...');
-    const htmlResult = await this.extractPhotosWithHTMLParsing(token);
-    console.log(`📸 [SCRAPE DEBUG] HTML parsing completed. Result:`, htmlResult ? {
-      photoCount: htmlResult.photos.length,
-      signatureCount: htmlResult.signaturePhotos.length,
-      success: true
-    } : { success: false });
+    // Skip HTML parsing for Angular SPA - go directly to Puppeteer
+    console.log(`📸 [SCRAPE DEBUG] Skipping HTML parsing for Angular SPA - using Puppeteer directly`);
     
-    if (htmlResult && (htmlResult.photos.length > 0 || htmlResult.signaturePhotos.length > 0)) {
-      console.log(`✅ Fast HTML parsing successful! Found ${htmlResult.photos.length} regular photos and ${htmlResult.signaturePhotos.length} signature photos`);
-      console.log('📸 [SCRAPE DEBUG] Caching HTML parsing results in memory');
-      
-      // Cache the results
-      photoCache.set(token, {
-        photos: htmlResult.photos,
-        signaturePhotos: htmlResult.signaturePhotos,
-        timestamp: Date.now()
-      });
-      
-      return htmlResult;
-    }
-
-    // Fallback to Puppeteer if HTML parsing fails or returns no results
-    console.log('🤖 [PUPPETEER] HTML parsing failed or returned no results, falling back to Puppeteer with page pool...');
+    // Use Puppeteer for Angular SPA that loads content dynamically
+    console.log('🤖 [PUPPETEER] Using Puppeteer with page pool for Angular SPA...');
     
     let photos: string[] = [];
     let signaturePhotos: string[] = [];
@@ -601,23 +580,41 @@ class PhotoScrapingQueue {
       console.log(`🌍 [PUPPETEER] Navigating to: ${trackingUrl}`);
       
       await page.goto(trackingUrl, { 
-        waitUntil: 'domcontentloaded',
-        timeout: 10000
+        waitUntil: 'networkidle0',
+        timeout: 15000
       });
       
-      // Removed artificial 2-second delay for faster performance
+      // Wait for Angular app to load and render content
+      console.log('⏳ [PUPPETEER] Waiting for Angular app to load...');
       
       try {
-        await page.waitForSelector('img', { timeout: 750 });
-        console.log('🖼️ [PUPPETEER] Images found, proceeding with extraction...');
+        // Wait for the main content container to appear (Angular app loaded)
+        await page.waitForSelector('body', { timeout: 5000 });
+        
+        // Additional wait for API calls to complete and images to load
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Try to wait for images from axylogdata.blob.core.windows.net specifically
+        await page.waitForFunction(() => {
+          const images = Array.from(document.querySelectorAll('img'));
+          return images.some(img => 
+            img.src.includes('axylogdata.blob.core.windows.net') || 
+            img.src.startsWith('data:image')
+          );
+        }, { timeout: 8000 });
+        
+        console.log('🖼️ [PUPPETEER] Content loaded, proceeding with extraction...');
       } catch (e) {
-        console.log('⏰ [PUPPETEER] No images found within 750ms timeout, but proceeding anyway...');
+        console.log('⏰ [PUPPETEER] No specific content found within timeout, but proceeding anyway...');
+        // Give it one more chance with a short wait
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       const imageData = await page.evaluate(() => {
         const images = Array.from(document.querySelectorAll('img'));
+        console.log(`Found ${images.length} total img elements on page`);
         
-        return images.map(img => {
+        const processedImages = images.map(img => {
           const rect = img.getBoundingClientRect();
           return {
             src: img.src,
@@ -628,7 +625,25 @@ class PhotoScrapingQueue {
             isVisible: rect.width > 0 && rect.height > 0,
             parentText: img.parentElement?.textContent?.substring(0, 100) || ''
           };
-        }).filter(img => {
+        });
+        
+        console.log('Sample images found:', processedImages.slice(0, 3).map(img => ({
+          src: img.src?.substring(0, 60) + '...', 
+          size: `${img.width}x${img.height}`,
+          visible: img.isVisible
+        })));
+        
+        return processedImages.filter(img => {
+          // More inclusive filtering for axylogdata images
+          const isAxylogImage = img.src && img.src.includes('axylogdata.blob.core.windows.net');
+          const isBase64Image = img.src && img.src.startsWith('data:image');
+          
+          // Keep axylog and base64 images regardless of size
+          if (isAxylogImage || isBase64Image) {
+            return true;
+          }
+          
+          // For other images, apply normal filtering
           const isValidPhoto = img.src && 
                  img.src.startsWith('http') && 
                  img.width > 100 &&
@@ -661,33 +676,39 @@ class PhotoScrapingQueue {
         console.log(`🖼️ [PUPPETEER] Image ${index + 1}: ${img.src.substring(0, 80)}... (${img.width}x${img.height})`);
       });
       
-      // Separate signature photos from regular photos using dimensions and text
+      // Separate signature photos from regular photos using improved detection
       const signatureImages = imageData.filter((img: any) => {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
         
+        // Base64 images are typically signatures in Axylog
+        const isBase64Signature = img.src && img.src.startsWith('data:image');
+        
         // Signature photos are typically wide and short (high aspect ratio)
-        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        const isDimensionSignature = img.width >= 300 && img.height <= 200 && aspectRatio >= 2.0;
         
         // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        console.log(`🔍 [PUPPETEER] Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
+        console.log(`🔍 [PUPPETEER] Image ${img.src.substring(0, 50)}... - ${img.width}x${img.height} - AR:${aspectRatio.toFixed(2)} - Base64:${isBase64Signature} - DimSig:${isDimensionSignature} - TextSig:${isTextSignature}`);
         
-        return isDimensionSignature || isTextSignature;
+        return isBase64Signature || isDimensionSignature || isTextSignature;
       });
       
       const regularImages = imageData.filter((img: any) => {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
         
-        // Signature photos are typically wide and short (high aspect ratio)
-        const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
+        // Base64 images are typically signatures in Axylog
+        const isBase64Signature = img.src && img.src.startsWith('data:image');
+        
+        // Signature photos are typically wide and short (high aspect ratio)  
+        const isDimensionSignature = img.width >= 300 && img.height <= 200 && aspectRatio >= 2.0;
         
         // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        return !(isDimensionSignature || isTextSignature);
+        return !(isBase64Signature || isDimensionSignature || isTextSignature);
       });
       
       const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
