@@ -260,7 +260,7 @@ class PhotoScrapingQueue {
       // Quick evaluation to test if page is responsive
       await page.evaluate(() => document.title);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.log('🔍 [PAGE POOL] Page health check failed:', error.message);
       return false;
     }
@@ -331,7 +331,7 @@ class PhotoScrapingQueue {
         this.browserFailures = 0;
         console.log('✅ Browser instance created successfully');
         
-      } catch (error) {
+      } catch (error: any) {
         this.browserFailures++;
         this.lastBrowserFailure = now;
         console.error(`❌ [BROWSER] Failed to launch browser (attempt ${this.browserFailures}/${this.maxBrowserFailures}):`, error.message);
@@ -1080,7 +1080,7 @@ function generateWarehouseInsights(consignments: any[]): WarehouseInsightsResult
   const regionInsights: WarehouseRegionInsights[] = [];
 
   // Analyze each warehouse/region
-  for (const [key, { region, consignments: warehouseConsignments }] of warehouseGroups) {
+  for (const [key, { region, consignments: warehouseConsignments }] of Array.from(warehouseGroups.entries())) {
     const [regionCode, warehouseName] = key.split('-', 2);
     
     // Analyze all consignments for this warehouse
@@ -1090,29 +1090,29 @@ function generateWarehouseInsights(consignments: any[]): WarehouseInsightsResult
     if (totalDeliveries === 0) continue;
 
     // Calculate performance metrics
-    const avgQualityScore = analyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
+    const avgQualityScore = analyses.reduce((sum: number, a: any) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
     
     // Quality distribution
-    const goldCount = analyses.filter(a => a.metrics.qualityScore >= 90).length;
-    const silverCount = analyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
-    const bronzeCount = analyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
-    const nonCompliantCount = analyses.filter(a => a.metrics.qualityScore === 0).length;
+    const goldCount = analyses.filter((a: any) => a.metrics.qualityScore >= 90).length;
+    const silverCount = analyses.filter((a: any) => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+    const bronzeCount = analyses.filter((a: any) => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+    const nonCompliantCount = analyses.filter((a: any) => a.metrics.qualityScore === 0).length;
 
     // Photo metrics
-    const avgPhotosPerDelivery = analyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries;
-    const missingPhotos = analyses.filter(a => a.metrics.photoCount === 0).length;
-    const onePhoto = analyses.filter(a => a.metrics.photoCount === 1).length;
-    const twoPhotos = analyses.filter(a => a.metrics.photoCount === 2).length;
-    const threeOrMorePhotos = analyses.filter(a => a.metrics.photoCount >= 3).length;
+    const avgPhotosPerDelivery = analyses.reduce((sum: number, a: any) => sum + a.metrics.photoCount, 0) / totalDeliveries;
+    const missingPhotos = analyses.filter((a: any) => a.metrics.photoCount === 0).length;
+    const onePhoto = analyses.filter((a: any) => a.metrics.photoCount === 1).length;
+    const twoPhotos = analyses.filter((a: any) => a.metrics.photoCount === 2).length;
+    const threeOrMorePhotos = analyses.filter((a: any) => a.metrics.photoCount >= 3).length;
 
     // Other metrics
-    const signatureRate = (analyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100;
-    const temperatureComplianceRate = (analyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
-    const receiverNameRate = (analyses.filter(a => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
+    const signatureRate = (analyses.filter((a: any) => a.metrics.hasSignature).length / totalDeliveries) * 100;
+    const temperatureComplianceRate = (analyses.filter((a: any) => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
+    const receiverNameRate = (analyses.filter((a: any) => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
 
     // Driver performance analysis
     const driverStats = new Map<string, { totalDeliveries: number; totalScore: number }>();
-    analyses.forEach(analysis => {
+    analyses.forEach((analysis: any) => {
       const driverName = analysis.consignment.driverName;
       if (!driverName) return;
 
@@ -1141,14 +1141,14 @@ function generateWarehouseInsights(consignments: any[]): WarehouseInsightsResult
     // Identify top issues
     const topIssues: string[] = [];
     if (missingPhotos > 0) topIssues.push(`${missingPhotos} deliveries missing photos`);
-    if (analyses.filter(a => !a.metrics.hasSignature).length > 0) {
-      topIssues.push(`${analyses.filter(a => !a.metrics.hasSignature).length} deliveries missing signatures`);
+    if (analyses.filter((a: any) => !a.metrics.hasSignature).length > 0) {
+      topIssues.push(`${analyses.filter((a: any) => !a.metrics.hasSignature).length} deliveries missing signatures`);
     }
-    if (analyses.filter(a => !a.metrics.temperatureCompliant).length > 0) {
-      topIssues.push(`${analyses.filter(a => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
+    if (analyses.filter((a: any) => !a.metrics.temperatureCompliant).length > 0) {
+      topIssues.push(`${analyses.filter((a: any) => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
     }
-    if (analyses.filter(a => !a.metrics.hasReceiverName).length > 0) {
-      topIssues.push(`${analyses.filter(a => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
+    if (analyses.filter((a: any) => !a.metrics.hasReceiverName).length > 0) {
+      topIssues.push(`${analyses.filter((a: any) => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
     }
 
     // Generate formatted insights for this region
@@ -1282,7 +1282,7 @@ async function generateWarehousePDF(insights: WarehouseInsightsResult, filters: 
     console.log('✅ PDF generated successfully');
     return Buffer.from(pdfBuffer);
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ PDF generation failed:', error);
     throw new Error(`PDF generation failed: ${error.message}`);
   } finally {
