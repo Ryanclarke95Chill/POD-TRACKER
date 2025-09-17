@@ -58,8 +58,46 @@ export class PhotoIngestionWorker {
   private readonly batchSize = 5;
   
   // Rate limiting to respect Axylog servers
-  private readonly concurrency = 8; // Increased from 3 to 8
+  private readonly concurrency = this.parseConcurrencyConfig(); // Configurable, default 3
   private readonly rateLimitDelay = 500; // 500ms between requests
+  
+  /**
+   * Safely parse PHOTO_WORKER_CONCURRENCY environment variable with validation and fallback
+   * @returns Valid concurrency value between 1-6, defaulting to 3
+   */
+  private parseConcurrencyConfig(): number {
+    const DEFAULT_CONCURRENCY = 3;
+    const MIN_CONCURRENCY = 1;
+    const MAX_CONCURRENCY = 6;
+    
+    const envValue = process.env.PHOTO_WORKER_CONCURRENCY;
+    
+    // Handle undefined, null, empty string, or whitespace-only values
+    if (!envValue || typeof envValue !== 'string' || envValue.trim().length === 0) {
+      console.log(`[Worker Config] PHOTO_WORKER_CONCURRENCY not set or empty, using default: ${DEFAULT_CONCURRENCY}`);
+      return DEFAULT_CONCURRENCY;
+    }
+    
+    // Parse the trimmed value
+    const parsed = parseInt(envValue.trim(), 10);
+    
+    // Handle NaN or non-finite numbers
+    if (isNaN(parsed) || !isFinite(parsed)) {
+      console.warn(`[Worker Config] Invalid PHOTO_WORKER_CONCURRENCY value "${envValue}", using default: ${DEFAULT_CONCURRENCY}`);
+      return DEFAULT_CONCURRENCY;
+    }
+    
+    // Clamp to reasonable range
+    const clamped = Math.max(MIN_CONCURRENCY, Math.min(MAX_CONCURRENCY, parsed));
+    
+    if (clamped !== parsed) {
+      console.warn(`[Worker Config] PHOTO_WORKER_CONCURRENCY value ${parsed} out of range [${MIN_CONCURRENCY}-${MAX_CONCURRENCY}], clamped to: ${clamped}`);
+    } else {
+      console.log(`[Worker Config] Using PHOTO_WORKER_CONCURRENCY: ${clamped}`);
+    }
+    
+    return clamped;
+  }
   
   async initialize(): Promise<void> {
     console.log('Initializing photo ingestion worker with puppeteer-cluster...');
@@ -87,10 +125,11 @@ export class PhotoIngestionWorker {
         page.on('request', (req: any) => {
           const resourceType = req.resourceType();
           const url = req.url();
+          const isDebugMode = process.env.PHOTO_WORKER_DEBUG === 'true';
           
           // CRITICAL FIX: Allow data: URI images (base64 images - often signatures)
           if (url.startsWith('data:image/')) {
-            console.log(`🔓 [WORKER] Allowing data URI image: ${url.substring(0, 50)}...`);
+            if (isDebugMode) console.log(`🔓 [WORKER] Allowing data URI image: ${url.substring(0, 50)}...`);
             req.continue();
             return;
           }
@@ -104,42 +143,50 @@ export class PhotoIngestionWorker {
             
             // Allow ALL resources for axylog domains and blob storage - no blocking
             if (isAxylogDomain || isBlobStorage) {
-              console.log(`🔓 [WORKER] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
+              if (isDebugMode) console.log(`🔓 [WORKER] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
               req.continue();
               return;
             }
             
-            // Allow essential external resources including images for maps, etc.
+            // Allow stylesheets for trusted CDNs and scripts
+            const isTrustedCDN = url.includes('cdnjs.cloudflare.com') || url.includes('unpkg.com');
+            const isGoogleResource = url.includes('googleapis.com') || url.includes('gstatic.com');
+            
+            // Allow essential external resources but be more selective
             const isEssentialExternal = (
-              resourceType === 'script' && (
-                url.includes('googleapis.com') ||
-                url.includes('gstatic.com') ||
-                url.includes('cdnjs.cloudflare.com') ||
-                url.includes('unpkg.com')
-              )
-            ) || (
-              resourceType === 'image' && (
-                url.includes('googleapis.com') ||
-                url.includes('gstatic.com') ||
-                url.includes('openstreetmap.org') ||
-                url.includes('tile.openstreetmap.org')
-              )
+              (resourceType === 'script' || resourceType === 'stylesheet') && (isTrustedCDN || isGoogleResource)
             );
             
+            // Block OpenStreetMap tiles entirely - not needed for photo extraction
+            const isOpenStreetMap = url.includes('openstreetmap.org') || url.includes('tile.openstreetmap.org');
+            
+            // Block SignalR and other real-time connections that cause noise
+            const isSignalR = url.includes('signalr.net') || url.includes('signalr');
+            const isWebSocket = resourceType === 'websocket' || url.includes('ws:/') || url.includes('wss:/');
+            
+            if (isOpenStreetMap || isSignalR || isWebSocket) {
+              // Silently block these - they're expected to fail and cause log noise
+              req.abort();
+              return;
+            }
+            
             if (isEssentialExternal) {
-              console.log(`🔓 [WORKER] Allowing external: ${url.substring(0, 80)}...`);
+              if (isDebugMode) console.log(`🔓 [WORKER] Allowing external: ${url.substring(0, 80)}...`);
               req.continue();
             } else if (resourceType === 'image') {
               // Be more permissive with images - they might be POD photos
-              console.log(`🔓 [WORKER] Allowing image (permissive): ${url.substring(0, 80)}...`);
+              if (isDebugMode) console.log(`🔓 [WORKER] Allowing image (permissive): ${url.substring(0, 80)}...`);
               req.continue();
             } else {
-              // Block only truly non-essential resources
-              console.log(`🚫 [WORKER] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
+              // Block non-essential resources silently to reduce log noise
+              if (isDebugMode) console.log(`🚫 [WORKER] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
               req.abort();
             }
           } catch (error) {
-            console.log(`❌ [WORKER] URL parsing failed for: ${url}, allowing request`);
+            // Only log URL parsing errors for axylog domains - others are expected
+            if (url.includes('axylog.com') || url.includes('blob.core.windows.net')) {
+              console.log(`❌ [WORKER] URL parsing failed for: ${url}, allowing request`);
+            }
             req.continue(); // Allow on parsing error to avoid breaking the page
           }
         });
@@ -148,8 +195,8 @@ export class PhotoIngestionWorker {
         await page.setViewport({ width: 1280, height: 720 });
         
         await page.goto(trackingUrl, { 
-          waitUntil: 'networkidle0',
-          timeout: 20000
+          waitUntil: 'domcontentloaded', // Faster loading, avoids waiting for blocked connections
+          timeout: 15000 // Reduced timeout since we're not waiting for network idle
         });
         
         await new Promise(resolve => setTimeout(resolve, 2000));

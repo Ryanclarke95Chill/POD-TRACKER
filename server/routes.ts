@@ -237,8 +237,11 @@ class PhotoScrapingQueue {
           console.log(`🔓 [REQUEST] Allowing image (permissive): ${url.substring(0, 80)}...`);
           req.continue();
         } else {
-          // Block only truly non-essential resources
-          console.log(`🚫 [REQUEST] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
+          // Block non-essential resources - only log if not a known noisy domain
+          const isKnownNoisyDomain = url.includes('signalr.net') || url.includes('openstreetmap.org') || url.includes('tile.openstreetmap.org');
+          if (!isKnownNoisyDomain) {
+            console.log(`🚫 [REQUEST] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
+          }
           req.abort();
         }
       } catch (error) {
@@ -247,9 +250,15 @@ class PhotoScrapingQueue {
       }
     });
     
-    // Log network failures for debugging
+    // Log network failures for debugging, but ignore expected failures from blocked domains
     page.on('requestfailed', (req: any) => {
-      console.log(`❌ [NETWORK FAILED] ${req.resourceType()}: ${req.url().substring(0, 80)}... - ${req.failure()?.errorText}`);
+      const url = req.url();
+      const isKnownBlockedDomain = url.includes('signalr.net') || url.includes('openstreetmap.org') || url.includes('tile.openstreetmap.org');
+      
+      // Only log failures that are unexpected (not from domains we intentionally block)
+      if (!isKnownBlockedDomain) {
+        console.log(`❌ [NETWORK FAILED] ${req.resourceType()}: ${url.substring(0, 80)}... - ${req.failure()?.errorText}`);
+      }
     });
     
     page.on('response', (res: any) => {
