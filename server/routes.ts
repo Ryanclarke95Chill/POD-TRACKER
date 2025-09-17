@@ -57,7 +57,9 @@ function getSecureBrowserArgs(): string[] {
 // Browser instance cache for faster subsequent requests
 let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
-const CACHE_DURATION = 900000; // 15 minutes cache duration for faster responses
+// Temporarily shortened cache duration for testing fixes
+const CACHE_DURATION = 60000; // 1 minute cache duration for testing photo fixes
+const DEBUG_SCREENSHOT_PATH = '/tmp/photo-debug-screenshots/';
 
 // Photo scraping queue system with concurrency control and page pooling
 interface PhotoRequest {
@@ -183,29 +185,76 @@ class PhotoScrapingQueue {
   private async createConfiguredPage(browser: any) {
     const page = await browser.newPage();
     
-    // Block heavy resources for maximum performance
+    // Enable request interception for debugging only - allow ALL resources for axylog domains
     await page.setRequestInterception(true);
     page.on('request', (req: any) => {
       const resourceType = req.resourceType();
       const url = req.url();
       
+      // CRITICAL FIX: Allow data: URI images (base64 images - often signatures)
+      if (url.startsWith('data:image/')) {
+        console.log(`🔓 [REQUEST] Allowing data URI image: ${url.substring(0, 50)}...`);
+        req.continue();
+        return;
+      }
+      
       try {
         const urlObj = new URL(url);
         const hostname = urlObj.hostname;
         
-        // Only allow document requests from axylog.com domains
         const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
-        const isDocumentRequest = resourceType === 'document';
+        const isBlobStorage = hostname.includes('blob.core.windows.net') || hostname === 'axylogdata.blob.core.windows.net';
         
-        if (isDocumentRequest && isAxylogDomain) {
+        // Allow ALL resources for axylog domains and blob storage - no blocking
+        if (isAxylogDomain || isBlobStorage) {
+          console.log(`🔓 [REQUEST] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
+          req.continue();
+          return;
+        }
+        
+        // Allow essential external resources including images for maps, etc.
+        const isEssentialExternal = (
+          resourceType === 'script' && (
+            url.includes('googleapis.com') ||
+            url.includes('gstatic.com') ||
+            url.includes('cdnjs.cloudflare.com') ||
+            url.includes('unpkg.com')
+          )
+        ) || (
+          resourceType === 'image' && (
+            url.includes('googleapis.com') ||
+            url.includes('gstatic.com') ||
+            url.includes('openstreetmap.org') ||
+            url.includes('tile.openstreetmap.org')
+          )
+        );
+        
+        if (isEssentialExternal) {
+          console.log(`🔓 [REQUEST] Allowing external: ${url.substring(0, 80)}...`);
+          req.continue();
+        } else if (resourceType === 'image') {
+          // Be more permissive with images - they might be POD photos
+          console.log(`🔓 [REQUEST] Allowing image (permissive): ${url.substring(0, 80)}...`);
           req.continue();
         } else {
-          // Block all other resources: images, media, stylesheet, script, xhr, fetch, websocket, font
+          // Block only truly non-essential resources
+          console.log(`🚫 [REQUEST] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
           req.abort();
         }
       } catch (error) {
-        // If URL parsing fails, abort the request
-        req.abort();
+        console.log(`❌ [REQUEST] URL parsing failed for: ${url}, allowing request`);
+        req.continue(); // Allow on parsing error to avoid breaking the page
+      }
+    });
+    
+    // Log network failures for debugging
+    page.on('requestfailed', (req: any) => {
+      console.log(`❌ [NETWORK FAILED] ${req.resourceType()}: ${req.url().substring(0, 80)}... - ${req.failure()?.errorText}`);
+    });
+    
+    page.on('response', (res: any) => {
+      if (res.status() >= 400) {
+        console.log(`⚠️ [HTTP ERROR] ${res.status()} for ${res.url().substring(0, 80)}...`);
       }
     });
     
@@ -580,7 +629,7 @@ class PhotoScrapingQueue {
       console.log(`🌍 [PUPPETEER] Navigating to: ${trackingUrl}`);
       
       await page.goto(trackingUrl, { 
-        waitUntil: 'networkidle0',
+        waitUntil: 'domcontentloaded', // Changed from networkidle0 for better performance
         timeout: 15000
       });
       
@@ -591,17 +640,24 @@ class PhotoScrapingQueue {
         // Wait for the main content container to appear (Angular app loaded)
         await page.waitForSelector('body', { timeout: 5000 });
         
-        // Additional wait for API calls to complete and images to load
+        // Extended wait for Angular to load and make API calls to fetch photo data
+        console.log('🔄 [PUPPETEER] Waiting for initial Angular load...');
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Try to wait for images from axylogdata.blob.core.windows.net specifically
-        await page.waitForFunction(() => {
-          const images = Array.from(document.querySelectorAll('img'));
-          return images.some(img => 
-            img.src.includes('axylogdata.blob.core.windows.net') || 
-            img.src.startsWith('data:image')
-          );
-        }, { timeout: 8000 });
+        // Try to interact with POD/attachment tabs to trigger photo loading
+        console.log('🎯 [UI INTERACTION] Attempting to click POD/attachment tabs...');
+        await this.interactWithPhotoTabs(page);
+        
+        // Scroll to trigger lazy loading
+        console.log('📜 [UI INTERACTION] Scrolling to trigger lazy loading...');
+        await page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Frame-aware waiting for images
+        console.log('🖼️ [FRAME AWARE] Waiting for images in all frames...');
+        await this.waitForImagesInAllFrames(page);
         
         console.log('🖼️ [PUPPETEER] Content loaded, proceeding with extraction...');
       } catch (e) {
@@ -610,65 +666,8 @@ class PhotoScrapingQueue {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      const imageData = await page.evaluate(() => {
-        const images = Array.from(document.querySelectorAll('img'));
-        console.log(`Found ${images.length} total img elements on page`);
-        
-        const processedImages = images.map(img => {
-          const rect = img.getBoundingClientRect();
-          return {
-            src: img.src,
-            alt: img.alt || '',
-            width: img.naturalWidth || img.width,
-            height: img.naturalHeight || img.height,
-            className: img.className,
-            isVisible: rect.width > 0 && rect.height > 0,
-            parentText: img.parentElement?.textContent?.substring(0, 100) || ''
-          };
-        });
-        
-        console.log('Sample images found:', processedImages.slice(0, 3).map(img => ({
-          src: img.src?.substring(0, 60) + '...', 
-          size: `${img.width}x${img.height}`,
-          visible: img.isVisible
-        })));
-        
-        return processedImages.filter(img => {
-          // More inclusive filtering for axylogdata images
-          const isAxylogImage = img.src && img.src.includes('axylogdata.blob.core.windows.net');
-          const isBase64Image = img.src && img.src.startsWith('data:image');
-          
-          // Keep axylog and base64 images regardless of size
-          if (isAxylogImage || isBase64Image) {
-            return true;
-          }
-          
-          // For other images, apply normal filtering
-          const isValidPhoto = img.src && 
-                 img.src.startsWith('http') && 
-                 img.width > 100 &&
-                 img.height > 100;
-                 
-          const isNotUIElement = !img.src.includes('logo') &&
-                 !img.src.includes('icon') &&
-                 !img.src.includes('avatar') &&
-                 !img.className.includes('logo') &&
-                 !img.className.includes('icon');
-                 
-          const isNotMap = !img.src.toLowerCase().includes('map') &&
-                 !img.src.toLowerCase().includes('tile') &&
-                 !img.src.toLowerCase().includes('geographic') &&
-                 !img.src.toLowerCase().includes('osm') &&
-                 !img.src.toLowerCase().includes('openstreetmap') &&
-                 !img.src.toLowerCase().includes('cartography') &&
-                 !img.className.toLowerCase().includes('map') &&
-                 !img.parentText.toLowerCase().includes('map') &&
-                 !img.parentText.toLowerCase().includes('route') &&
-                 !img.parentText.toLowerCase().includes('location');
-                 
-          return isValidPhoto && isNotUIElement && isNotMap;
-        });
-      });
+      // Frame-aware image extraction
+      const imageData = await this.extractImagesFromAllFrames(page);
       
       console.log(`📊 [PUPPETEER] Found ${imageData.length} potential photos on page`);
       
@@ -719,6 +718,9 @@ class PhotoScrapingQueue {
     } catch (error: any) {
       console.error(`❌ [PUPPETEER] Error scraping photos for token ${token}: ${error.message}`);
       
+      // Save debugging information on failure
+      await this.saveDebugInfo(pooledPage ? pooledPage.page : null, token, error);
+      
       // If it's a connection error, invalidate browser instance and page pool
       if (error.message && (
           error.message.includes('Connection closed') ||
@@ -749,12 +751,8 @@ class PhotoScrapingQueue {
       // EMERGENCY FALLBACK: Return empty result instead of throwing error
       console.log(`🚨 [EMERGENCY FALLBACK] Returning empty result for token ${token} due to Puppeteer failure`);
       
-      // Cache empty result to prevent repeated failures
-      photoCache.set(token, {
-        photos: [],
-        signaturePhotos: [],
-        timestamp: Date.now()
-      });
+      // Don't cache empty results during debugging to allow retries
+      console.log(`🔄 [DEBUG MODE] Not caching empty result for token ${token} to allow retries`);
       
       // Set empty arrays for the finally block
       photos = [];
@@ -783,6 +781,336 @@ class PhotoScrapingQueue {
       photos: uniqueRegularPhotos,
       signaturePhotos: uniqueSignaturePhotos
     };
+  }
+
+  // Interact with POD/attachment tabs to trigger photo loading
+  private async interactWithPhotoTabs(page: any): Promise<void> {
+    try {
+      // Common selectors for POD/attachment tabs
+      const tabSelectors = [
+        'button:contains("POD")', 'button:contains("PoD")',
+        'button:contains("Proof of Delivery")', 'button:contains("Attachments")',
+        'button:contains("Foto")','button:contains("Photos")', 'button:contains("Images")',
+        'a:contains("POD")', 'a:contains("PoD")',
+        'a:contains("Proof of Delivery")', 'a:contains("Attachments")',
+        'a:contains("Foto")', 'a:contains("Photos")', 'a:contains("Images")',
+        '.tab:contains("POD")', '.tab:contains("PoD")',
+        '.tab:contains("Attachments")', '.tab:contains("Foto")',
+        '[data-tab*="pod"]', '[data-tab*="attachment"]', '[data-tab*="photo"]'
+      ];
+      
+      // Try to click each potential tab
+      for (const selector of tabSelectors) {
+        try {
+          const elements = await page.evaluateHandle((sel: string) => {
+            // Custom selector that works with text content
+            if (sel.includes(':contains')) {
+              const [tag, text] = sel.split(':contains(');
+              const searchText = text.replace(/[")']/g, '').toLowerCase();
+              const elements = Array.from(document.querySelectorAll(tag || '*'));
+              return elements.filter((el: any) => 
+                el.textContent && el.textContent.toLowerCase().includes(searchText)
+              );
+            } else {
+              return Array.from(document.querySelectorAll(sel));
+            }
+          }, selector);
+          
+          const elementsArray = await elements.jsonValue();
+          if (elementsArray.length > 0) {
+            console.log(`🎯 [UI INTERACTION] Found ${elementsArray.length} elements for selector: ${selector}`);
+            // Click the first matching element
+            await page.evaluate((sel: string) => {
+              if (sel.includes(':contains')) {
+                const [tag, text] = sel.split(':contains(');
+                const searchText = text.replace(/[")']/g, '').toLowerCase();
+                const elements = Array.from(document.querySelectorAll(tag || '*'));
+                const element = elements.find((el: any) => 
+                  el.textContent && el.textContent.toLowerCase().includes(searchText)
+                ) as HTMLElement;
+                if (element) element.click();
+              } else {
+                const element = document.querySelector(sel) as HTMLElement;
+                if (element) element.click();
+              }
+            }, selector);
+            
+            // Wait for potential content to load after click
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(`✅ [UI INTERACTION] Clicked element for selector: ${selector}`);
+            break; // Stop after first successful click
+          }
+        } catch (e) {
+          // Continue to next selector
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️ [UI INTERACTION] Failed to interact with tabs:`, error);
+    }
+  }
+
+  // Wait for images to appear in all frames
+  private async waitForImagesInAllFrames(page: any): Promise<void> {
+    try {
+      // Wait for images in main frame and all child frames
+      await page.waitForFunction(() => {
+        // Check main frame
+        const mainFrameImages = Array.from(document.querySelectorAll('img'));
+        const hasMainFrameImages = mainFrameImages.some((img: any) => 
+          img.src.includes('axylogdata.blob.core.windows.net') || 
+          img.src.includes('blob.core.windows.net') ||
+          img.src.startsWith('data:image')
+        );
+        
+        // Check all iframes
+        const frames = Array.from(document.querySelectorAll('iframe'));
+        const hasFrameImages = frames.some(frame => {
+          try {
+            const frameDoc = frame.contentDocument || frame.contentWindow?.document;
+            if (frameDoc) {
+              const frameImages = Array.from(frameDoc.querySelectorAll('img'));
+              return frameImages.some((img: any) => 
+                img.src.includes('axylogdata.blob.core.windows.net') || 
+                img.src.includes('blob.core.windows.net') ||
+                img.src.startsWith('data:image')
+              );
+            }
+          } catch (e) {
+            // Cross-origin frame, skip
+          }
+          return false;
+        });
+        
+        return hasMainFrameImages || hasFrameImages;
+      }, { timeout: 8000 });
+      
+      console.log('🖼️ [FRAME AWARE] Images found in frames');
+    } catch (e) {
+      console.log('⏰ [FRAME AWARE] No images found within timeout, continuing...');
+    }
+  }
+
+  // Extract images from all frames (main frame + iframes)
+  private async extractImagesFromAllFrames(page: any): Promise<any[]> {
+    console.log('🔍 [FRAME AWARE] Starting frame-aware image extraction...');
+    
+    let allImages: any[] = [];
+    
+    // Extract from main frame
+    console.log('🔍 [MAIN FRAME] Extracting images from main frame...');
+    const mainFrameImages = await page.evaluate(() => {
+      const images = Array.from(document.querySelectorAll('img'));
+      console.log(`Found ${images.length} total img elements in main frame`);
+      
+      const processedImages = images.map(img => {
+        const rect = img.getBoundingClientRect();
+        return {
+          src: img.src,
+          alt: img.alt || '',
+          width: img.naturalWidth || img.width,
+          height: img.naturalHeight || img.height,
+          className: img.className,
+          isVisible: rect.width > 0 && rect.height > 0,
+          parentText: img.parentElement?.textContent?.substring(0, 100) || '',
+          frameType: 'main'
+        };
+      });
+      
+      console.log('Sample main frame images:', processedImages.slice(0, 3).map(img => ({
+        src: img.src?.substring(0, 60) + '...', 
+        size: `${img.width}x${img.height}`,
+        visible: img.isVisible
+      })));
+      
+      return processedImages;
+    });
+    
+    allImages = [...allImages, ...mainFrameImages];
+    
+    // Extract from all accessible iframes
+    console.log('🔍 [IFRAMES] Extracting images from iframes...');
+    try {
+      const frameImages = await page.evaluate(() => {
+        const frames = Array.from(document.querySelectorAll('iframe'));
+        console.log(`Found ${frames.length} iframes to check`);
+        
+        let frameImages: any[] = [];
+        
+        frames.forEach((frame, index) => {
+          try {
+            const frameDoc = frame.contentDocument || frame.contentWindow?.document;
+            if (frameDoc) {
+              const images = Array.from(frameDoc.querySelectorAll('img'));
+              console.log(`Frame ${index}: Found ${images.length} images`);
+              
+              const processedFrameImages = images.map(img => {
+                const rect = img.getBoundingClientRect();
+                return {
+                  src: img.src,
+                  alt: img.alt || '',
+                  width: img.naturalWidth || img.width,
+                  height: img.naturalHeight || img.height,
+                  className: img.className,
+                  isVisible: rect.width > 0 && rect.height > 0,
+                  parentText: img.parentElement?.textContent?.substring(0, 100) || '',
+                  frameType: `iframe-${index}`
+                };
+              });
+              
+              frameImages = [...frameImages, ...processedFrameImages];
+            }
+          } catch (e) {
+            console.log(`Frame ${index}: Cross-origin or inaccessible`);
+          }
+        });
+        
+        return frameImages;
+      });
+      
+      allImages = [...allImages, ...frameImages];
+      console.log(`🔍 [IFRAMES] Found ${frameImages.length} images in iframes`);
+    } catch (error) {
+      console.log('⚠️ [IFRAMES] Error extracting from iframes:', error);
+    }
+    
+    // Filter all images using the same logic
+    const filteredImages = allImages.filter(img => {
+      // More inclusive filtering for axylogdata images
+      const isAxylogImage = img.src && img.src.includes('axylogdata.blob.core.windows.net');
+      const isBlobImage = img.src && img.src.includes('blob.core.windows.net');
+      const isBase64Image = img.src && img.src.startsWith('data:image');
+      
+      // Keep axylog, blob, and base64 images regardless of size
+      if (isAxylogImage || isBlobImage || isBase64Image) {
+        console.log(`✅ [FILTER] Keeping ${img.frameType} image: ${img.src.substring(0, 60)}... (${img.width}x${img.height})`);
+        return true;
+      }
+      
+      // For other images, apply normal filtering
+      const isValidPhoto = img.src && 
+             img.src.startsWith('http') && 
+             img.width > 100 &&
+             img.height > 100;
+             
+      const isNotUIElement = !img.src.includes('logo') &&
+             !img.src.includes('icon') &&
+             !img.src.includes('avatar') &&
+             !img.className.includes('logo') &&
+             !img.className.includes('icon');
+             
+      const isNotMap = !img.src.toLowerCase().includes('map') &&
+             !img.src.toLowerCase().includes('tile') &&
+             !img.src.toLowerCase().includes('geographic') &&
+             !img.src.toLowerCase().includes('osm') &&
+             !img.src.toLowerCase().includes('openstreetmap') &&
+             !img.src.toLowerCase().includes('cartography') &&
+             !img.className.toLowerCase().includes('map') &&
+             !img.parentText.toLowerCase().includes('map') &&
+             !img.parentText.toLowerCase().includes('route') &&
+             !img.parentText.toLowerCase().includes('location');
+             
+      const shouldKeep = isValidPhoto && isNotUIElement && isNotMap;
+      if (shouldKeep) {
+        console.log(`✅ [FILTER] Keeping ${img.frameType} image: ${img.src.substring(0, 60)}... (${img.width}x${img.height})`);
+      }
+      return shouldKeep;
+    });
+    
+    console.log(`🎯 [FRAME AWARE] Total filtered images: ${filteredImages.length} from ${allImages.length} total`);
+    return filteredImages;
+  }
+
+  // Save debugging information on failure
+  private async saveDebugInfo(page: any, token: string, error: any): Promise<void> {
+    try {
+      const timestamp = Date.now();
+      const debugDir = DEBUG_SCREENSHOT_PATH;
+      
+      // Ensure debug directory exists
+      await new Promise((resolve, reject) => {
+        require('fs').mkdir(debugDir, { recursive: true }, (err: any) => {
+          if (err) reject(err);
+          else resolve(undefined);
+        });
+      });
+      
+      console.log(`💾 [DEBUG] Saving debug info for token: ${token}`);
+      
+      // Save screenshot if page is available
+      if (page && !page.isClosed()) {
+        try {
+          const screenshotPath = `${debugDir}screenshot-${token}-${timestamp}.png`;
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          console.log(`📸 [DEBUG] Screenshot saved: ${screenshotPath}`);
+        } catch (screenshotError: any) {
+          console.log(`📸 [DEBUG] Screenshot failed:`, screenshotError.message);
+        }
+        
+        // Save HTML content
+        try {
+          const htmlPath = `${debugDir}html-${token}-${timestamp}.html`;
+          const htmlContent = await page.content();
+          require('fs').writeFileSync(htmlPath, htmlContent);
+          console.log(`📄 [DEBUG] HTML saved: ${htmlPath}`);
+        } catch (htmlError: any) {
+          console.log(`📄 [DEBUG] HTML save failed:`, htmlError.message);
+        }
+        
+        // Save frame information
+        try {
+          const frameInfoPath = `${debugDir}frames-${token}-${timestamp}.json`;
+          const frameInfo = await page.evaluate(() => {
+            const frames = Array.from(document.querySelectorAll('iframe'));
+            return {
+              mainFrame: {
+                url: window.location.href,
+                images: Array.from(document.querySelectorAll('img')).length
+              },
+              iframes: frames.map((frame, index) => {
+                try {
+                  const frameDoc = frame.contentDocument || frame.contentWindow?.document;
+                  return {
+                    index,
+                    src: frame.src,
+                    accessible: !!frameDoc,
+                    images: frameDoc ? Array.from(frameDoc.querySelectorAll('img')).length : 0
+                  };
+                } catch (e: any) {
+                  return {
+                    index,
+                    src: frame.src,
+                    accessible: false,
+                    error: e.message
+                  };
+                }
+              })
+            };
+          });
+          require('fs').writeFileSync(frameInfoPath, JSON.stringify(frameInfo, null, 2));
+          console.log(`🖼️ [DEBUG] Frame info saved: ${frameInfoPath}`);
+        } catch (frameError: any) {
+          console.log(`🖼️ [DEBUG] Frame info save failed:`, frameError.message);
+        }
+      }
+      
+      // Save error information
+      const errorInfoPath = `${debugDir}error-${token}-${timestamp}.json`;
+      const errorInfo = {
+        token,
+        timestamp,
+        error: {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        },
+        url: `https://live.axylog.com/${token}`
+      };
+      require('fs').writeFileSync(errorInfoPath, JSON.stringify(errorInfo, null, 2));
+      console.log(`❌ [DEBUG] Error info saved: ${errorInfoPath}`);
+      
+    } catch (debugError: any) {
+      console.log(`💾 [DEBUG] Failed to save debug info:`, debugError.message);
+    }
   }
 }
 
@@ -2155,9 +2483,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract POD photos from tracking system
   app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
+      console.log(`🔍 [POD PHOTOS API] Route accessed by user: ${req.user?.email || 'unknown'} (ID: ${req.user?.id || 'unknown'})`);
+      console.log(`🔍 [POD PHOTOS API] User authenticated: ${!!req.user}`);
+      console.log(`🔍 [POD PHOTOS API] Request query:`, req.query);
+      
       const { trackingToken, priority = 'low' } = req.query;
       
       if (!trackingToken || typeof trackingToken !== 'string') {
+        console.log(`❌ [POD PHOTOS API] Missing or invalid trackingToken parameter`);
         return res.status(400).json({ message: "trackingToken parameter is required" });
       }
       
@@ -2167,13 +2500,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token = token.split('live.axylog.com/')[1];
       }
       
-      console.log(`Extracting photos for tracking token: ${token}`);
+      console.log(`📸 [POD PHOTOS API] Processing tracking token: ${token}, priority: ${priority}`);
       
       // Check cache first for instant response
       const cached = photoCache.get(token);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`Cache hit for token ${token} - returning cached photos instantly`);
-        return res.json({
+        console.log(`✅ [POD PHOTOS API] Cache hit for token ${token} - returning ${cached.photos.length} photos, ${cached.signaturePhotos.length} signatures`);
+        const response = {
           success: true,
           photos: cached.photos,
           signaturePhotos: cached.signaturePhotos,
@@ -2181,18 +2514,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           signatureCount: cached.signaturePhotos.length,
           status: 'ready',
           cached: true
+        };
+        console.log(`📤 [POD PHOTOS API] Sending response:`, {
+          ...response,
+          photos: `[${response.photos.length} photo URLs]`,
+          signaturePhotos: `[${response.signaturePhotos.length} signature URLs]`
         });
+        return res.json(response);
       }
       
       // Cache miss - return preparing status to avoid inline scraping delay
-      console.log(`Cache miss for token ${token} - returning preparing status`);
+      console.log(`⏳ [POD PHOTOS API] Cache miss for token ${token} - triggering background scraping and returning preparing status`);
       
       // Trigger background scraping for future requests (don't await)
       photoQueue.addRequest(token, priority as 'high' | 'low').catch(error => {
-        console.error(`Background photo scraping failed for token ${token}:`, error);
+        console.error(`❌ [POD PHOTOS API] Background photo scraping failed for token ${token}:`, error);
       });
       
-      return res.json({
+      const response = {
         success: true,
         photos: [],
         signaturePhotos: [],
@@ -2200,7 +2539,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signatureCount: 0,
         status: 'preparing',
         message: 'Photos are being prepared, please try again in a moment'
-      });
+      };
+      console.log(`📤 [POD PHOTOS API] Sending preparing response:`, response);
+      return res.json(response);
       
     } catch (error: any) {
       console.error("Error extracting POD photos:", error);

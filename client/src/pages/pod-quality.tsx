@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { getUser, logout, getToken, isAuthenticated } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Consignment, ScoreBreakdown } from "@shared/schema";
 import { calculateDriverStats, getDriversByCohort, getCohortSummary, DriverStats, DriverCohortConfig, DEFAULT_COHORT_CONFIG } from "@/utils/driverStats";
 import { useToast } from "@/hooks/use-toast";
@@ -111,28 +112,14 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     setError(false);
     
     try {
-      const token = getToken();
-      if (!token || !isAuthenticated()) {
-        console.error('No valid authentication token available');
+      if (!isAuthenticated()) {
+        console.error('User not authenticated');
         setError(true);
-        return;
-      }
-      
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        console.error('Authentication failed - token may be expired');
-        // Redirect to login or refresh page
         logout();
         return;
       }
       
-      if (!response.ok) throw new Error('Failed to load photos');
-      
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
       const data = await response.json();
       
       if (data.success) {
@@ -144,8 +131,15 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       } else {
         throw new Error(data.error || 'Failed to load photos');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading photos:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message?.includes('401')) {
+        console.error('Authentication failed - token may be expired');
+        logout();
+      }
+      
       setError(true);
     } finally {
       setLoading(false);
@@ -266,27 +260,14 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
     setError(false);
     
     try {
-      const token = getToken();
-      if (!token || !isAuthenticated()) {
-        console.error('No valid authentication token available');
+      if (!isAuthenticated()) {
+        console.error('User not authenticated');
         setError(true);
-        return;
-      }
-      
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        console.error('Authentication failed - token may be expired');
         logout();
         return;
       }
       
-      if (!response.ok) throw new Error('Failed to load signatures');
-      
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
       const data = await response.json();
       
       if (data.success) {
@@ -298,8 +279,15 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
       } else {
         throw new Error(data.error || 'Failed to load signatures');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading signatures:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message?.includes('401')) {
+        console.error('Authentication failed - token may be expired');
+        logout();
+      }
+      
       setError(true);
     } finally {
       setLoading(false);
@@ -667,27 +655,11 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
         setRetryTimeoutId(null);
       }
       
-      const token = getToken();
-      if (!token || !isAuthenticated()) {
-        throw new Error('No valid authentication token available');
+      if (!isAuthenticated()) {
+        throw new Error('User not authenticated');
       }
       
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.status === 401) {
-        console.error('Authentication failed - redirecting to login');
-        logout();
-        return;
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch photos: ${response.status}`);
-      }
-      
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
       const data = await response.json();
       
       if (data.success) {
@@ -700,8 +672,17 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
         throw new Error(data.message || 'Failed to extract photos');
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading photos:', err);
+      
+      // Handle authentication errors specifically
+      if (err.message?.includes('401')) {
+        console.error('Authentication failed - redirecting to login');
+        logout();
+        setError('Authentication failed. Please log in again.');
+        return;
+      }
+      
       setError('Unable to load photos from tracking system');
       setPhotos([]);
       setRetryCount(0); // Reset retry count on error
@@ -1949,7 +1930,7 @@ export default function PODQuality() {
     const regionInsights: WarehouseRegionInsights[] = [];
 
     // Analyze each warehouse/region
-    for (const [key, { region, consignments: warehouseConsignments }] of warehouseGroups) {
+    for (const [key, { region, consignments: warehouseConsignments }] of Array.from(warehouseGroups.entries())) {
       const [regionCode, warehouseName] = key.split('-', 2);
       
       // Analyze all consignments for this warehouse using existing analyzePOD function
@@ -1959,29 +1940,29 @@ export default function PODQuality() {
       if (totalDeliveries === 0) continue;
 
       // Calculate performance metrics
-      const avgQualityScore = analyses.reduce((sum, a) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
+      const avgQualityScore = analyses.reduce((sum: number, a: any) => sum + a.metrics.qualityScore, 0) / totalDeliveries;
       
       // Quality distribution
-      const goldCount = analyses.filter(a => a.metrics.qualityScore >= 90).length;
-      const silverCount = analyses.filter(a => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
-      const bronzeCount = analyses.filter(a => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
-      const nonCompliantCount = analyses.filter(a => a.metrics.qualityScore === 0).length;
+      const goldCount = analyses.filter((a: any) => a.metrics.qualityScore >= 90).length;
+      const silverCount = analyses.filter((a: any) => a.metrics.qualityScore >= 75 && a.metrics.qualityScore < 90).length;
+      const bronzeCount = analyses.filter((a: any) => a.metrics.qualityScore >= 60 && a.metrics.qualityScore < 75).length;
+      const nonCompliantCount = analyses.filter((a: any) => a.metrics.qualityScore === 0).length;
 
       // Photo metrics
-      const avgPhotosPerDelivery = analyses.reduce((sum, a) => sum + a.metrics.photoCount, 0) / totalDeliveries;
-      const missingPhotos = analyses.filter(a => a.metrics.photoCount === 0).length;
-      const onePhoto = analyses.filter(a => a.metrics.photoCount === 1).length;
-      const twoPhotos = analyses.filter(a => a.metrics.photoCount === 2).length;
-      const threeOrMorePhotos = analyses.filter(a => a.metrics.photoCount >= 3).length;
+      const avgPhotosPerDelivery = analyses.reduce((sum: number, a: any) => sum + a.metrics.photoCount, 0) / totalDeliveries;
+      const missingPhotos = analyses.filter((a: any) => a.metrics.photoCount === 0).length;
+      const onePhoto = analyses.filter((a: any) => a.metrics.photoCount === 1).length;
+      const twoPhotos = analyses.filter((a: any) => a.metrics.photoCount === 2).length;
+      const threeOrMorePhotos = analyses.filter((a: any) => a.metrics.photoCount >= 3).length;
 
       // Other metrics
-      const signatureRate = (analyses.filter(a => a.metrics.hasSignature).length / totalDeliveries) * 100;
-      const temperatureComplianceRate = (analyses.filter(a => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
-      const receiverNameRate = (analyses.filter(a => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
+      const signatureRate = (analyses.filter((a: any) => a.metrics.hasSignature).length / totalDeliveries) * 100;
+      const temperatureComplianceRate = (analyses.filter((a: any) => a.metrics.temperatureCompliant).length / totalDeliveries) * 100;
+      const receiverNameRate = (analyses.filter((a: any) => a.metrics.hasReceiverName).length / totalDeliveries) * 100;
 
       // Driver performance analysis
       const driverStats = new Map<string, { totalDeliveries: number; totalScore: number }>();
-      analyses.forEach(analysis => {
+      analyses.forEach((analysis: any) => {
         const driverName = analysis.consignment.driverName;
         if (!driverName) return;
 
@@ -2010,14 +1991,14 @@ export default function PODQuality() {
       // Identify top issues
       const topIssues: string[] = [];
       if (missingPhotos > 0) topIssues.push(`${missingPhotos} deliveries missing photos`);
-      if (analyses.filter(a => !a.metrics.hasSignature).length > 0) {
-        topIssues.push(`${analyses.filter(a => !a.metrics.hasSignature).length} deliveries missing signatures`);
+      if (analyses.filter((a: any) => !a.metrics.hasSignature).length > 0) {
+        topIssues.push(`${analyses.filter((a: any) => !a.metrics.hasSignature).length} deliveries missing signatures`);
       }
-      if (analyses.filter(a => !a.metrics.temperatureCompliant).length > 0) {
-        topIssues.push(`${analyses.filter(a => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
+      if (analyses.filter((a: any) => !a.metrics.temperatureCompliant).length > 0) {
+        topIssues.push(`${analyses.filter((a: any) => !a.metrics.temperatureCompliant).length} deliveries with temperature compliance issues`);
       }
-      if (analyses.filter(a => !a.metrics.hasReceiverName).length > 0) {
-        topIssues.push(`${analyses.filter(a => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
+      if (analyses.filter((a: any) => !a.metrics.hasReceiverName).length > 0) {
+        topIssues.push(`${analyses.filter((a: any) => !a.metrics.hasReceiverName).length} deliveries missing receiver names`);
       }
 
       // Generate formatted insights for this region
@@ -2508,27 +2489,26 @@ export default function PODQuality() {
   // Fetch POD photos for a tracking token
   const fetchPODPhotos = async (trackingToken: string) => {
     try {
-      const token = getToken();
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (!isAuthenticated()) {
+        throw new Error('User not authenticated');
       }
       
-      const response = await fetch(`/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=high`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to load photos');
-      
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingToken)}&priority=high`);
       const data = await response.json();
       return {
         success: true,
         photos: data.photos || [],
         signaturePhotos: data.signaturePhotos || []
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching POD photos:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message?.includes('401')) {
+        console.error('Authentication failed - token may be expired');
+        logout();
+      }
+      
       return {
         success: false,
         photos: [],
@@ -2558,14 +2538,7 @@ export default function PODQuality() {
 
       // Analyze up to 3 photos for performance
       const photosToAnalyze = podPhotos.photos.slice(0, 3);
-      const response = await fetch('/api/analyze-photos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ imageUrls: photosToAnalyze })
-      });
+      const response = await apiRequest('POST', '/api/analyze-photos', { imageUrls: photosToAnalyze });
 
       if (response.ok) {
         const analysisData = await response.json();

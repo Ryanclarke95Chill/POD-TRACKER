@@ -82,14 +82,65 @@ export class PhotoIngestionWorker {
       console.log(`[Worker] Extracting photos for token: ${token}`);
       
       try {
-        // Block unnecessary resources for faster loading
+        // Apply improved resource blocking logic for photo extraction
         await page.setRequestInterception(true);
         page.on('request', (req: any) => {
           const resourceType = req.resourceType();
-          if (['font', 'stylesheet'].includes(resourceType)) {
-            req.abort();
-          } else {
+          const url = req.url();
+          
+          // CRITICAL FIX: Allow data: URI images (base64 images - often signatures)
+          if (url.startsWith('data:image/')) {
+            console.log(`🔓 [WORKER] Allowing data URI image: ${url.substring(0, 50)}...`);
             req.continue();
+            return;
+          }
+          
+          try {
+            const urlObj = new URL(url);
+            const hostname = urlObj.hostname;
+            
+            const isAxylogDomain = hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com');
+            const isBlobStorage = hostname.includes('blob.core.windows.net') || hostname === 'axylogdata.blob.core.windows.net';
+            
+            // Allow ALL resources for axylog domains and blob storage - no blocking
+            if (isAxylogDomain || isBlobStorage) {
+              console.log(`🔓 [WORKER] Allowing ${resourceType}: ${url.substring(0, 80)}...`);
+              req.continue();
+              return;
+            }
+            
+            // Allow essential external resources including images for maps, etc.
+            const isEssentialExternal = (
+              resourceType === 'script' && (
+                url.includes('googleapis.com') ||
+                url.includes('gstatic.com') ||
+                url.includes('cdnjs.cloudflare.com') ||
+                url.includes('unpkg.com')
+              )
+            ) || (
+              resourceType === 'image' && (
+                url.includes('googleapis.com') ||
+                url.includes('gstatic.com') ||
+                url.includes('openstreetmap.org') ||
+                url.includes('tile.openstreetmap.org')
+              )
+            );
+            
+            if (isEssentialExternal) {
+              console.log(`🔓 [WORKER] Allowing external: ${url.substring(0, 80)}...`);
+              req.continue();
+            } else if (resourceType === 'image') {
+              // Be more permissive with images - they might be POD photos
+              console.log(`🔓 [WORKER] Allowing image (permissive): ${url.substring(0, 80)}...`);
+              req.continue();
+            } else {
+              // Block only truly non-essential resources
+              console.log(`🚫 [WORKER] Blocking ${resourceType}: ${url.substring(0, 80)}...`);
+              req.abort();
+            }
+          } catch (error) {
+            console.log(`❌ [WORKER] URL parsing failed for: ${url}, allowing request`);
+            req.continue(); // Allow on parsing error to avoid breaking the page
           }
         });
         
