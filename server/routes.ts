@@ -59,12 +59,36 @@ let browserInstance: any = null;
 const photoCache = new Map<string, { photos: string[], signaturePhotos: string[], timestamp: number }>();
 // Configurable cache duration with production-ready default
 const CACHE_DURATION = parseInt(process.env.PHOTO_CACHE_TTL_MS || '86400000'); // Default 24 hours (86400000ms)
+const EMPTY_CACHE_DURATION = 60000; // 60 seconds for empty results
 const DEBUG_SCREENSHOT_PATH = '/tmp/photo-debug-screenshots/';
+
+// Token normalization function for consistent cache keys
+function normalizeToken(token: string): string {
+  // Extract token from full URL if provided
+  if (token.includes('live.axylog.com/')) {
+    token = token.split('live.axylog.com/')[1];
+  }
+  // Remove query parameters and fragments
+  token = token.split('?')[0].split('#')[0];
+  // Trim whitespace (keep original case since Axylog URLs are case-sensitive)
+  return token.trim();
+}
+
+// Cache invalidation function
+function invalidatePhotoCache(token: string): boolean {
+  const normalizedToken = normalizeToken(token);
+  const deleted = photoCache.delete(normalizedToken);
+  if (deleted) {
+    console.log(`🗑️ [CACHE] Invalidated cache for token: ${normalizedToken}`);
+  }
+  return deleted;
+}
 
 // Photo scraping queue system with concurrency control and page pooling
 interface PhotoRequest {
   token: string;
   priority: 'high' | 'low'; // high = user clicks, low = background loading
+  force?: boolean; // bypass cache if true
   resolve: (photos: {photos: string[], signaturePhotos: string[]}) => void;
   reject: (error: Error) => void;
 }
@@ -90,7 +114,7 @@ class PhotoScrapingQueue {
   private lastBrowserFailure = 0; // Track when last failure occurred
   private readonly backoffDuration = 60000; // 1 minute backoff after failures
 
-  async addRequest(token: string, priority: 'high' | 'low'): Promise<{photos: string[], signaturePhotos: string[]}> {
+  async addRequest(token: string, priority: 'high' | 'low', force: boolean = false): Promise<{photos: string[], signaturePhotos: string[]}> {
     // Initialize page pool on first request with proper synchronization
     if (!this.pagePoolInitialized && !this.pagePoolInitializing) {
       this.pagePoolInitializing = true;
@@ -116,24 +140,34 @@ class PhotoScrapingQueue {
       return { photos: [], signaturePhotos: [] };
     }
     
-    // If already processing this token, wait for existing request
-    if (this.activeRequests.has(token)) {
-      // Return cached result if available
-      const cached = photoCache.get(token);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return {
-          photos: cached.photos,
-          signaturePhotos: cached.signaturePhotos
-        };
+    const normalizedToken = normalizeToken(token);
+    
+    // If already processing this token, wait for existing request  
+    if (this.activeRequests.has(normalizedToken)) {
+      // Return cached result if available (unless force refresh)
+      if (!force) {
+        const cached = photoCache.get(normalizedToken);
+        if (cached) {
+          const isEmptyResult = cached.photos.length === 0 && cached.signaturePhotos.length === 0;
+          const cacheDuration = isEmptyResult ? EMPTY_CACHE_DURATION : CACHE_DURATION;
+          const cacheValid = Date.now() - cached.timestamp < cacheDuration;
+          
+          if (cacheValid) {
+            return {
+              photos: cached.photos,
+              signaturePhotos: cached.signaturePhotos
+            };
+          }
+        }
       }
       
       // Wait a short time and try again
       await new Promise(resolve => setTimeout(resolve, 100));
-      return this.addRequest(token, priority);
+      return this.addRequest(token, priority, force);
     }
 
     return new Promise((resolve, reject) => {
-      const request: PhotoRequest = { token, priority, resolve, reject };
+      const request: PhotoRequest = { token: normalizedToken, priority, force, resolve, reject };
       
       // Insert based on priority - high priority goes to front
       if (priority === 'high') {
@@ -442,7 +476,7 @@ class PhotoScrapingQueue {
     this.activeRequests.add(request.token);
     
     try {
-      const photos = await this.scrapePhotos(request.token);
+      const photos = await this.scrapePhotos(request.token, request.force || false);
       request.resolve(photos);
     } catch (error) {
       request.reject(error as Error);
@@ -584,21 +618,64 @@ class PhotoScrapingQueue {
     }
   }
 
-  private async scrapePhotos(token: string): Promise<{photos: string[], signaturePhotos: string[]}> {
-    console.log(`📸 [SCRAPE DEBUG] Starting scrapePhotos for token: ${token}`);
-    console.log(`📸 [SCRAPE DEBUG] Tracking URL: https://live.axylog.com/${token}`);
+  private async scrapePhotos(token: string, force: boolean = false): Promise<{photos: string[], signaturePhotos: string[]}> {
+    const normalizedToken = normalizeToken(token);
+    console.log(`📸 [SCRAPE DEBUG] Starting scrapePhotos for token: ${normalizedToken} (original: ${token})`);
+    console.log(`📸 [SCRAPE DEBUG] Tracking URL: https://live.axylog.com/${normalizedToken}`);
+    console.log(`📸 [SCRAPE DEBUG] Force refresh: ${force}`);
     
-    // Check in-memory cache first
-    const cached = photoCache.get(token);
-    const cacheValid = cached && Date.now() - cached.timestamp < CACHE_DURATION;
-    console.log(`📸 [SCRAPE DEBUG] In-memory cache check - exists: ${!!cached}, valid: ${cacheValid}`);
-    
-    if (cacheValid) {
-      console.log(`📸 [SCRAPE DEBUG] Using cached photos for token: ${token} (${cached!.photos.length} regular, ${cached!.signaturePhotos.length} signature)`);
-      return {
-        photos: cached!.photos,
-        signaturePhotos: cached!.signaturePhotos
-      };
+    // Check in-memory cache first (unless force refresh)
+    if (!force) {
+      const cached = photoCache.get(normalizedToken);
+      if (cached) {
+        const isEmptyResult = cached.photos.length === 0 && cached.signaturePhotos.length === 0;
+        const cacheDuration = isEmptyResult ? EMPTY_CACHE_DURATION : CACHE_DURATION;
+        const cacheValid = Date.now() - cached.timestamp < cacheDuration;
+        
+        console.log(`📸 [SCRAPE DEBUG] In-memory cache check - exists: true, empty: ${isEmptyResult}, valid: ${cacheValid}`);
+        console.log(`📸 [SCRAPE DEBUG] Cache age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s, max age: ${Math.round(cacheDuration / 1000)}s`);
+        
+        if (cacheValid) {
+          console.log(`📸 [SCRAPE DEBUG] Using cached photos for token: ${normalizedToken} (${cached.photos.length} regular, ${cached.signaturePhotos.length} signature)`);
+          return {
+            photos: cached.photos,
+            signaturePhotos: cached.signaturePhotos
+          };
+        }
+      }
+      
+      // Check database if no valid cache
+      console.log(`📸 [SCRAPE DEBUG] No valid cache, checking database for token: ${normalizedToken}`);
+      try {
+        const dbPhotos = await storage.getPhotoAssetsByToken(normalizedToken);
+        const availablePhotos = dbPhotos.filter(photo => photo.status === 'available');
+        
+        if (availablePhotos.length > 0) {
+          const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
+          const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
+          
+          console.log(`📸 [SCRAPE DEBUG] Found ${photos.length} regular and ${signaturePhotos.length} signature photos in database`);
+          
+          // Update cache with database results
+          photoCache.set(normalizedToken, {
+            photos,
+            signaturePhotos,
+            timestamp: Date.now()
+          });
+          
+          return { photos, signaturePhotos };
+        } else if (dbPhotos.length > 0) {
+          // Has db entries but all failed/pending - check if recently failed
+          const recentFailure = dbPhotos.some(p => p.status === 'failed' && Date.now() - new Date(p.updatedAt || p.createdAt).getTime() < EMPTY_CACHE_DURATION);
+          if (recentFailure) {
+            console.log(`📸 [SCRAPE DEBUG] Recent failure in database, returning empty result`);
+            return { photos: [], signaturePhotos: [] };
+          }
+        }
+        console.log(`📸 [SCRAPE DEBUG] No available photos in database, proceeding with scraping`);
+      } catch (error) {
+        console.error(`📸 [SCRAPE DEBUG] Database check failed:`, error);
+      }
     }
 
     // Skip HTML parsing for Angular SPA - go directly to Puppeteer
@@ -616,9 +693,9 @@ class PhotoScrapingQueue {
       if (this.browserFailures >= this.maxBrowserFailures) {
         const timeSinceLastFailure = Date.now() - this.lastBrowserFailure;
         if (timeSinceLastFailure < this.backoffDuration) {
-          console.log(`🔴 [EMERGENCY FALLBACK] Circuit breaker active, returning empty result for token: ${token}`);
-          // Cache empty result to prevent repeated requests
-          photoCache.set(token, {
+          console.log(`🔴 [EMERGENCY FALLBACK] Circuit breaker active, returning empty result for token: ${normalizedToken}`);
+          // Cache empty result with short TTL to prevent repeated requests
+          photoCache.set(normalizedToken, {
             photos: [],
             signaturePhotos: [],
             timestamp: Date.now()
@@ -631,9 +708,9 @@ class PhotoScrapingQueue {
       pooledPage = await this.getPageFromPool();
       
       if (!pooledPage) {
-        console.log(`⚠️ [EMERGENCY FALLBACK] No available pages in pool for token: ${token}, returning empty result`);
-        // Cache empty result to prevent repeated requests
-        photoCache.set(token, {
+        console.log(`⚠️ [EMERGENCY FALLBACK] No available pages in pool for token: ${normalizedToken}, returning empty result`);
+        // Cache empty result with short TTL to prevent repeated requests
+        photoCache.set(normalizedToken, {
           photos: [],
           signaturePhotos: [],
           timestamp: Date.now()
@@ -642,9 +719,9 @@ class PhotoScrapingQueue {
       }
       
       const page = pooledPage.page;
-      console.log(`📝 [PUPPETEER] Using pooled page ${pooledPage.id} for token: ${token}`);
+      console.log(`📝 [PUPPETEER] Using pooled page ${pooledPage.id} for token: ${normalizedToken}`);
       
-      const trackingUrl = `https://live.axylog.com/${token}`;
+      const trackingUrl = `https://live.axylog.com/${normalizedToken}`;
       console.log(`🌍 [PUPPETEER] Navigating to: ${trackingUrl}`);
       
       await page.goto(trackingUrl, { 
@@ -735,10 +812,10 @@ class PhotoScrapingQueue {
       signaturePhotos = tempSignaturePhotos; // Update the outer scope variable
       
     } catch (error: any) {
-      console.error(`❌ [PUPPETEER] Error scraping photos for token ${token}: ${error.message}`);
+      console.error(`❌ [PUPPETEER] Error scraping photos for token ${normalizedToken}: ${error.message}`);
       
       // Save debugging information on failure
-      await this.saveDebugInfo(pooledPage ? pooledPage.page : null, token, error);
+      await this.saveDebugInfo(pooledPage ? pooledPage.page : null, normalizedToken, error);
       
       // If it's a connection error, invalidate browser instance and page pool
       if (error.message && (
@@ -768,10 +845,10 @@ class PhotoScrapingQueue {
       }
       
       // EMERGENCY FALLBACK: Return empty result instead of throwing error
-      console.log(`🚨 [EMERGENCY FALLBACK] Returning empty result for token ${token} due to Puppeteer failure`);
+      console.log(`🚨 [EMERGENCY FALLBACK] Returning empty result for token ${normalizedToken} due to Puppeteer failure`);
       
       // Don't cache empty results during debugging to allow retries
-      console.log(`🔄 [DEBUG MODE] Not caching empty result for token ${token} to allow retries`);
+      console.log(`🔄 [DEBUG MODE] Not caching empty result for token ${normalizedToken} to allow retries`);
       
       // Set empty arrays for the finally block
       photos = [];
@@ -787,14 +864,14 @@ class PhotoScrapingQueue {
     const uniqueRegularPhotos: string[] = Array.from(new Set(photos));
     const uniqueSignaturePhotos: string[] = Array.from(new Set(signaturePhotos));
     
-    // Cache the results
-    photoCache.set(token, {
+    // Cache the results using normalized token
+    photoCache.set(normalizedToken, {
       photos: uniqueRegularPhotos,
       signaturePhotos: uniqueSignaturePhotos,
       timestamp: Date.now()
     });
     
-    console.log(`✅ [PUPPETEER] Found ${uniqueRegularPhotos.length} regular photos and ${uniqueSignaturePhotos.length} signature photos for token ${token}`);
+    console.log(`✅ [PUPPETEER] Found ${uniqueRegularPhotos.length} regular photos and ${uniqueSignaturePhotos.length} signature photos for token ${normalizedToken}`);
     
     return {
       photos: uniqueRegularPhotos,
@@ -1134,6 +1211,9 @@ class PhotoScrapingQueue {
 }
 
 const photoQueue = new PhotoScrapingQueue();
+
+// Export functions for use by other modules
+export { invalidatePhotoCache, normalizeToken };
 
 // Production caching: Preserve cache between restarts for cost optimization
 // Only clear cache older than configured TTL during natural cleanup
@@ -2477,6 +2557,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Temporary cache clearing endpoint for debugging
+  app.delete("/api/pod-photos/cache/:token", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const { token } = req.params;
+      if (!token) {
+        return res.status(400).json({ message: "Token parameter is required" });
+      }
+      
+      const normalizedToken = normalizeToken(token);
+      const cleared = invalidatePhotoCache(normalizedToken);
+      
+      console.log(`🗑️ [MANUAL CACHE CLEAR] Cleared cache for token: ${normalizedToken}, success: ${cleared}`);
+      
+      res.json({ 
+        success: true, 
+        message: `Cache cleared for token: ${normalizedToken}`,
+        cleared 
+      });
+    } catch (error: any) {
+      console.error("Error clearing cache:", error);
+      res.status(500).json({ message: "Failed to clear cache", error: error.message });
+    }
+  });
+
   // Extract POD photos from tracking system
   app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
@@ -2484,48 +2588,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔍 [POD PHOTOS API] User authenticated: ${!!req.user}`);
       console.log(`🔍 [POD PHOTOS API] Request query:`, req.query);
       
-      const { trackingToken, priority = 'low' } = req.query;
+      const { trackingToken, priority = 'low', force = 'false' } = req.query;
+      const forceRefresh = force === 'true';
       
       if (!trackingToken || typeof trackingToken !== 'string') {
         console.log(`❌ [POD PHOTOS API] Missing or invalid trackingToken parameter`);
         return res.status(400).json({ message: "trackingToken parameter is required" });
       }
       
-      // Extract tracking token from full URL if provided
-      let token = trackingToken;
-      if (token.includes('live.axylog.com/')) {
-        token = token.split('live.axylog.com/')[1];
+      // Normalize tracking token to create consistent cache keys
+      const normalizedToken = normalizeToken(trackingToken);
+      
+      console.log(`📸 [POD PHOTOS API] Processing tracking token: ${normalizedToken} (original: ${trackingToken}), priority: ${priority}, force: ${forceRefresh}`);
+      
+      // Check cache first for instant response (unless force refresh)
+      if (!forceRefresh) {
+        const cached = photoCache.get(normalizedToken);
+        if (cached) {
+          const isEmptyResult = cached.photos.length === 0 && cached.signaturePhotos.length === 0;
+          const cacheDuration = isEmptyResult ? EMPTY_CACHE_DURATION : CACHE_DURATION;
+          const cacheValid = Date.now() - cached.timestamp < cacheDuration;
+          
+          if (cacheValid) {
+            console.log(`✅ [POD PHOTOS API] Cache hit for token ${normalizedToken} - returning ${cached.photos.length} photos, ${cached.signaturePhotos.length} signatures`);
+            const response = {
+              success: true,
+              photos: cached.photos,
+              signaturePhotos: cached.signaturePhotos,
+              count: cached.photos.length,
+              signatureCount: cached.signaturePhotos.length,
+              status: 'ready',
+              cached: true
+            };
+            console.log(`📤 [POD PHOTOS API] Sending response:`, {
+              ...response,
+              photos: `[${response.photos.length} photo URLs]`,
+              signaturePhotos: `[${response.signaturePhotos.length} signature URLs]`
+            });
+            return res.json(response);
+          }
+        }
+        
+        // Check database if no valid cache
+        console.log(`📸 [POD PHOTOS API] No valid cache, checking database for token: ${normalizedToken}`);
+        try {
+          const dbPhotos = await storage.getPhotoAssetsByToken(normalizedToken);
+          const availablePhotos = dbPhotos.filter(photo => photo.status === 'available');
+          
+          if (availablePhotos.length > 0) {
+            const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
+            const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
+            
+            console.log(`📸 [POD PHOTOS API] Found ${photos.length} regular and ${signaturePhotos.length} signature photos in database`);
+            
+            // Update cache with database results
+            photoCache.set(normalizedToken, {
+              photos,
+              signaturePhotos,
+              timestamp: Date.now()
+            });
+            
+            const response = {
+              success: true,
+              photos,
+              signaturePhotos,
+              count: photos.length,
+              signatureCount: signaturePhotos.length,
+              status: 'ready',
+              cached: false,
+              source: 'database'
+            };
+            
+            return res.json(response);
+          } else if (dbPhotos.length > 0) {
+            // Has db entries but all failed/pending - check if recently failed
+            const recentFailure = dbPhotos.some(p => p.status === 'failed' && Date.now() - new Date(p.updatedAt || p.createdAt).getTime() < EMPTY_CACHE_DURATION);
+            if (recentFailure) {
+              console.log(`📸 [POD PHOTOS API] Recent failure in database, returning empty result`);
+              return res.json({
+                success: true,
+                photos: [],
+                signaturePhotos: [],
+                count: 0,
+                signatureCount: 0,
+                status: 'failed',
+                message: 'Photos not available for this consignment'
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`📸 [POD PHOTOS API] Database check failed:`, error);
+        }
       }
       
-      console.log(`📸 [POD PHOTOS API] Processing tracking token: ${token}, priority: ${priority}`);
-      
-      // Check cache first for instant response
-      const cached = photoCache.get(token);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`✅ [POD PHOTOS API] Cache hit for token ${token} - returning ${cached.photos.length} photos, ${cached.signaturePhotos.length} signatures`);
-        const response = {
-          success: true,
-          photos: cached.photos,
-          signaturePhotos: cached.signaturePhotos,
-          count: cached.photos.length,
-          signatureCount: cached.signaturePhotos.length,
-          status: 'ready',
-          cached: true
-        };
-        console.log(`📤 [POD PHOTOS API] Sending response:`, {
-          ...response,
-          photos: `[${response.photos.length} photo URLs]`,
-          signaturePhotos: `[${response.signaturePhotos.length} signature URLs]`
-        });
-        return res.json(response);
-      }
-      
-      // Cache miss - return preparing status to avoid inline scraping delay
-      console.log(`⏳ [POD PHOTOS API] Cache miss for token ${token} - triggering background scraping and returning preparing status`);
+      // Cache miss or force refresh - return preparing status and trigger background scraping
+      console.log(`⏳ [POD PHOTOS API] ${forceRefresh ? 'Force refresh requested' : 'Cache miss'} for token ${normalizedToken} - triggering background scraping and returning preparing status`);
       
       // Trigger background scraping for future requests (don't await)
-      photoQueue.addRequest(token, priority as 'high' | 'low').catch(error => {
-        console.error(`❌ [POD PHOTOS API] Background photo scraping failed for token ${token}:`, error);
+      photoQueue.addRequest(normalizedToken, priority as 'high' | 'low', forceRefresh).catch(error => {
+        console.error(`❌ [POD PHOTOS API] Background photo scraping failed for token ${normalizedToken}:`, error);
       });
       
       const response = {

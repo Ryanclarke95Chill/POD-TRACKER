@@ -1,6 +1,7 @@
 import { Cluster } from 'puppeteer-cluster';
 import { storage } from './storage';
 import { createHash } from 'crypto';
+import { invalidatePhotoCache, normalizeToken } from './routes';
 
 // Security-aware browser arguments based on environment
 function getSecureBrowserArgs(): string[] {
@@ -491,6 +492,18 @@ export class PhotoIngestionWorker {
       if (newAssets.length > 0) {
         await storage.createPhotoAssetsBatch(newAssets);
         console.log(`[Worker] Stored ${newAssets.length} unique photos for token ${token} (${photoAssets.length - newAssets.length} duplicates filtered)`);
+        
+        // Invalidate in-memory cache after successful photo storage
+        try {
+          const { invalidatePhotoCache } = await import('./routes');
+          const normalizedToken = token.toLowerCase().trim(); // Basic normalization
+          const cacheCleared = invalidatePhotoCache(normalizedToken);
+          if (cacheCleared) {
+            console.log(`[Worker] Invalidated cache for token ${normalizedToken}`);
+          }
+        } catch (error) {
+          console.error(`[Worker] Failed to invalidate cache for token ${token}:`, error);
+        }
       } else {
         console.log(`[Worker] All ${photoAssets.length} photos for token ${token} were duplicates, none stored`);
       }

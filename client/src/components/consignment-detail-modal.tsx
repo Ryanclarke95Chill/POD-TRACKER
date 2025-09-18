@@ -1,12 +1,213 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Clock, MapPin, ExternalLink, Map, Thermometer, CheckCircle, Truck, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { Package, Clock, MapPin, ExternalLink, Map, Thermometer, CheckCircle, Truck, AlertTriangle, Camera, ChevronLeft, ChevronRight, X, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { isAuthenticated, logout } from "@/lib/auth";
 
 interface ConsignmentDetailModalProps {
   consignment: any;
   onClose: () => void;
+}
+
+// Photo Modal Component (extracted from pod-quality.tsx)
+interface InlinePhotoModalProps {
+  photos: string[];
+  isOpen: boolean;
+  onClose: () => void;
+  initialPhotoIndex?: number;
+  consignmentNo: string;
+}
+
+function InlinePhotoModal({ photos, isOpen, onClose, initialPhotoIndex = 0, consignmentNo }: InlinePhotoModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialPhotoIndex);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const nextPhoto = () => {
+    setCurrentIndex((prev) => (prev + 1) % photos.length);
+    setIsLoading(true);
+    setIsZoomed(false);
+  };
+
+  const prevPhoto = () => {
+    setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setIsLoading(true);
+    setIsZoomed(false);
+  };
+
+  const toggleZoom = () => {
+    setIsZoomed(!isZoomed);
+  };
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+    if (e.key === 'ArrowRight') nextPhoto();
+    if (e.key === 'ArrowLeft') prevPhoto();
+    if (e.key === 'Escape') onClose();
+    if (e.key === ' ') {
+      e.preventDefault();
+      toggleZoom();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  useEffect(() => {
+    setCurrentIndex(initialPhotoIndex);
+    setIsLoading(true);
+    setIsZoomed(false);
+  }, [initialPhotoIndex]);
+
+  if (!isOpen || photos.length === 0) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-7xl w-full h-[95vh] p-0 bg-black border-none">
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/80 to-transparent p-6">
+          <div className="flex items-center justify-between text-white">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
+                <span className="font-medium">Photo {currentIndex + 1} of {photos.length}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
+                <span className="text-sm opacity-90">{consignmentNo}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={toggleZoom}
+                className="text-white hover:bg-white/20 transition-all duration-200"
+                title="Toggle zoom (Spacebar)"
+                data-testid="button-toggle-zoom"
+              >
+                {isZoomed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onClose}
+                className="text-white hover:bg-white/20 transition-all duration-200"
+                data-testid="button-close-photo-modal"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Main Photo Display */}
+        <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+          {/* Loading Skeleton */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+          
+          {/* Navigation Buttons */}
+          {photos.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="absolute left-6 z-10 h-16 w-16 bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/20 rounded-full transition-all duration-300 hover:scale-110"
+                onClick={prevPhoto}
+                data-testid="button-prev-photo"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="absolute right-6 z-10 h-16 w-16 bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/20 rounded-full transition-all duration-300 hover:scale-110"
+                onClick={nextPhoto}
+                data-testid="button-next-photo"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </Button>
+            </>
+          )}
+          
+          {/* Photo Display */}
+          <div 
+            className={`transition-all duration-500 cursor-pointer ${
+              isZoomed ? 'scale-150 origin-center' : 'scale-100'
+            }`}
+            onClick={toggleZoom}
+          >
+            <img
+              src={`/api/image?src=${encodeURIComponent(photos[currentIndex])}&w=${isZoomed ? '2000' : '1400'}&q=95&fmt=webp`}
+              alt={`Photo ${currentIndex + 1} for ${consignmentNo}`}
+              className="max-w-full max-h-[95vh] object-contain transition-opacity duration-300"
+              onLoad={() => setIsLoading(false)}
+              data-testid={`photo-modal-${currentIndex}`}
+            />
+          </div>
+        </div>
+        
+        {/* Navigation Bar */}
+        {photos.length > 1 && (
+          <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/80 to-transparent p-6">
+            <div className="flex justify-center items-center gap-3">
+              {/* Thumbnail Navigation */}
+              <div className="flex gap-2 bg-white/10 backdrop-blur-sm rounded-full p-2 max-w-md overflow-x-auto">
+                {photos.map((photo, index) => (
+                  <button
+                    key={index}
+                    className={`flex-shrink-0 relative overflow-hidden rounded-lg transition-all duration-300 ${
+                      index === currentIndex 
+                        ? 'ring-2 ring-white scale-110 shadow-lg' 
+                        : 'hover:scale-105 opacity-60 hover:opacity-100'
+                    }`}
+                    onClick={() => {
+                      setCurrentIndex(index);
+                      setIsLoading(true);
+                      setIsZoomed(false);
+                    }}
+                    data-testid={`photo-thumb-nav-${index}`}
+                  >
+                    <img
+                      src={`/api/image?src=${encodeURIComponent(photo)}&w=60&q=80&fmt=webp`}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-12 h-12 object-cover"
+                    />
+                    {index === currentIndex && (
+                      <div className="absolute inset-0 bg-white/20" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Progress Indicator */}
+            <div className="mt-4 bg-white/10 rounded-full h-1 overflow-hidden">
+              <div 
+                className="h-full bg-white transition-all duration-500 ease-out"
+                style={{ width: `${((currentIndex + 1) / photos.length) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Keyboard Shortcuts Hint */}
+        <div className="absolute top-20 right-6 z-20 bg-black/50 backdrop-blur-sm rounded-lg p-3 text-white text-xs opacity-0 hover:opacity-100 transition-opacity duration-300">
+          <div className="space-y-1">
+            <div>← → Navigate</div>
+            <div>Space: Zoom</div>
+            <div>Esc: Close</div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function ConsignmentDetailModal({
@@ -14,6 +215,11 @@ export default function ConsignmentDetailModal({
   onClose,
 }: ConsignmentDetailModalProps) {
   const [showMap, setShowMap] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   if (!consignment) return null;
 
@@ -490,7 +696,99 @@ export default function ConsignmentDetailModal({
             )}
           </div>
 
+          {/* Photo Gallery Section */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Camera className="h-4 w-4 text-purple-600" />
+              Delivery Photos
+            </h3>
+            
+            {photoLoading && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                <span className="text-sm">Loading photos...</span>
+              </div>
+            )}
+            
+            {photoError && (
+              <div className="flex items-center gap-2 text-red-500">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm">{photoError}</span>
+              </div>
+            )}
+            
+            {!photoLoading && !photoError && photos.length === 0 && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Camera className="h-4 w-4" />
+                <span className="text-sm">No photos available</span>
+              </div>
+            )}
+            
+            {!photoLoading && photos.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    {photos.length} photo{photos.length !== 1 ? 's' : ''} available
+                  </span>
+                  <Button
+                    onClick={() => {
+                      setSelectedPhotoIndex(0);
+                      setPhotoModalOpen(true);
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 h-auto"
+                    size="sm"
+                    data-testid="button-view-all-photos"
+                  >
+                    <Camera className="h-3 w-3 mr-1" />
+                    View All Photos
+                  </Button>
+                </div>
+                
+                {/* Photo Thumbnails Grid */}
+                <div className="grid grid-cols-4 gap-2">
+                  {photos.slice(0, 8).map((photo, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setSelectedPhotoIndex(index);
+                        setPhotoModalOpen(true);
+                      }}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-purple-300 transition-colors group"
+                      data-testid={`photo-thumbnail-${index}`}
+                    >
+                      <img
+                        src={`/api/image?src=${encodeURIComponent(photo)}&w=200&q=75&fmt=webp`}
+                        alt={`Photo ${index + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                        <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                      </div>
+                    </button>
+                  ))}
+                  {photos.length > 8 && (
+                    <div className="aspect-square rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
+                      <span className="text-xs text-gray-500 font-medium">+{photos.length - 8}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
+        
+        {/* Photo Modal */}
+        <InlinePhotoModal
+          photos={photos}
+          isOpen={photoModalOpen}
+          onClose={() => setPhotoModalOpen(false)}
+          initialPhotoIndex={selectedPhotoIndex}
+          consignmentNo={consignment.orderNumberRef || consignment.consignmentNo || `${consignment.year}-${consignment.code}-${consignment.prog}` || 'Unknown'}
+        />
       </DialogContent>
     </Dialog>
   );

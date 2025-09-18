@@ -85,6 +85,78 @@ const photoCache = new Map<string, {photos: string[], signaturePhotos: string[]}
 // Global cache for signature photos specifically
 const signaturePhotoState = new Map<number, string[]>();
 
+// Global cache for photo counts to avoid duplicate API calls
+const photoCountCache = new Map<string, {count: number, timestamp: number}>();
+const PHOTO_COUNT_CACHE_DURATION = 300000; // 5 minutes cache duration
+
+// Async function to load actual photo count from API
+async function loadPhotoCount(consignment: Consignment): Promise<number> {
+  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
+  
+  if (!trackingLink) {
+    return 0;
+  }
+
+  // Normalize tracking token for consistent cache keys
+  const cacheKey = trackingLink;
+  
+  // Check cache first
+  const cached = photoCountCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < PHOTO_COUNT_CACHE_DURATION) {
+    return cached.count;
+  }
+
+  // Check if we already have photos in the main photo cache
+  if (photoCache.has(cacheKey)) {
+    const photoData = photoCache.get(cacheKey);
+    if (photoData) {
+      const count = photoData.photos.length;
+      // Cache the count
+      photoCountCache.set(cacheKey, { count, timestamp: Date.now() });
+      return count;
+    }
+  }
+
+  try {
+    if (!isAuthenticated()) {
+      console.error('User not authenticated for photo count loading');
+      return 0;
+    }
+    
+    const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
+    const data = await response.json();
+    
+    if (data.success) {
+      const photos = data.photos || [];
+      const signaturePhotos = data.signaturePhotos || [];
+      const count = photos.length;
+      
+      // Cache both the photo data and the count
+      photoCache.set(cacheKey, { photos, signaturePhotos });
+      photoCountCache.set(cacheKey, { count, timestamp: Date.now() });
+      
+      return count;
+    } else {
+      console.error('Failed to load photos for count:', data.error);
+      // Cache zero result briefly to avoid repeated failed calls
+      photoCountCache.set(cacheKey, { count: 0, timestamp: Date.now() });
+      return 0;
+    }
+  } catch (error: any) {
+    console.error('Error loading photo count:', error);
+    
+    // Handle authentication errors
+    if (error.message?.includes('401')) {
+      console.error('Authentication failed during photo count loading');
+      logout();
+    }
+    
+    // Cache zero result briefly to avoid repeated failed calls
+    photoCountCache.set(cacheKey, { count: 0, timestamp: Date.now() });
+    return 0;
+  }
+}
+
 function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately = false }: PhotoThumbnailsProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1148,20 +1220,8 @@ export default function PODQuality() {
         // For compliant/non-compliant, use simplified POD scoring
         let simpleScore = 0;
         
-        // Simplified photo count for filter performance (avoiding function initialization issues)
-        let photoCount = 0;
-        const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
-        const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
-        if (deliveryFileCount > 0 || pickupFileCount > 0) {
-          photoCount = Number(deliveryFileCount) + Number(pickupFileCount);
-          // Subtract signatures
-          if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-          if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-        } else {
-          // Fallback: check file paths
-          if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
-          if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
-        }
+        // Use consistent photo count logic instead of inline calculation
+        const photoCount = countPhotos(consignment);
         const hasSignature = Boolean(consignment.deliverySignatureName);
         const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
         
@@ -1269,20 +1329,8 @@ export default function PODQuality() {
             // For compliant/non-compliant, use simplified POD scoring
             let simpleScore = 0;
             
-            // Simplified photo count for filter performance (avoiding function initialization issues)
-            let photoCount = 0;
-            const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
-            const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
-            if (deliveryFileCount > 0 || pickupFileCount > 0) {
-              photoCount = Number(deliveryFileCount) + Number(pickupFileCount);
-              // Subtract signatures
-              if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-              if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-            } else {
-              // Fallback: check file paths
-              if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
-              if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
-            }
+            // Use consistent photo count logic instead of inline calculation
+            const photoCount = countPhotos(consignment);
             const hasSignature = Boolean(consignment.deliverySignatureName);
             const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
             
@@ -1660,20 +1708,42 @@ export default function PODQuality() {
     return { consignment, metrics };
   };
 
-  // Count photos from POD files using Axylog file count data
+  // Count photos from POD files using actual API data when available
   const countPhotos = (consignment: Consignment): number => {
-    let count = 0;
+    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
     
-    // First check if we have actual file count data from Axylog API
+    // HIGHEST PRIORITY: Check if we have cached photo count from API
+    if (trackingLink) {
+      const cacheKey = trackingLink;
+      
+      // Check photo count cache first
+      const cachedCount = photoCountCache.get(cacheKey);
+      if (cachedCount && Date.now() - cachedCount.timestamp < PHOTO_COUNT_CACHE_DURATION) {
+        return cachedCount.count;
+      }
+      
+      // Check if we have photos in the main photo cache
+      const cachedPhotos = photoCache.get(cacheKey);
+      if (cachedPhotos) {
+        const count = cachedPhotos.photos.length;
+        // Update the count cache
+        photoCountCache.set(cacheKey, { count, timestamp: Date.now() });
+        return count;
+      }
+    }
+    
+    // SECOND PRIORITY: Use database field fallback with improved logic 
+    // (subtract signatures from file count as estimated actual photo count)
+    let count = 0;
     const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
     const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
     
-    // Use the file count data from Axylog API if available
+    // Use the file count data from database if available
     if (deliveryFileCount > 0 || pickupFileCount > 0) {
       count = Number(deliveryFileCount) + Number(pickupFileCount);
       
       // Subtract signatures from file count since they're included in the total
-      // but we want to count actual photos only
+      // but we want to count actual photos only (better fallback logic)
       if (consignment.deliverySignatureName && deliveryFileCount > 0) {
         count = Math.max(0, count - 1); // Subtract delivery signature
       }
@@ -1684,7 +1754,7 @@ export default function PODQuality() {
       return count;
     }
     
-    // Fallback: Check if actual file paths are provided
+    // THIRD PRIORITY: Check if actual file paths are provided
     if (consignment.deliveryPodFiles) {
       count += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
     }
@@ -1692,20 +1762,8 @@ export default function PODQuality() {
       count += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
     }
     
-    // If no file paths but we have delivery signatures and tracking links,
-    // estimate based on presence of other delivery evidence
-    if (count === 0) {
-      // If there's a delivery signature, likely at least 1 photo
-      if (consignment.deliverySignatureName) {
-        count += 1;
-      }
-      
-      // If there's a tracking link and it's delivered, likely photos exist
-      if (consignment.deliveryLiveTrackLink && getStatusDisplay(consignment) === 'Delivered') {
-        count += Math.max(1, count); // At least 1 photo if delivered with tracking
-      }
-    }
-    
+    // FINAL FALLBACK: Return 0 instead of estimated values to avoid false positives
+    // Only return non-zero if we have actual data
     return count;
   };
 
@@ -2222,6 +2280,34 @@ export default function PODQuality() {
   
   // Current page data (for display)
   const podAnalyses = allFilteredAnalyses.slice(startIndex, endIndex);
+  
+  // Preload photo counts for visible consignments to ensure accurate counting
+  useEffect(() => {
+    const preloadPhotoCounts = async () => {
+      // Load photo counts for current page consignments in parallel for better performance
+      const preloadPromises = podAnalyses.map(async (analysis) => {
+        const consignment = analysis.consignment;
+        const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+        
+        if (trackingLink) {
+          try {
+            await loadPhotoCount(consignment);
+          } catch (error) {
+            // Silent failure for preloading - don't block UI
+            console.log(`Photo count preload failed for consignment ${consignment.id}:`, error);
+          }
+        }
+      });
+      
+      // Execute all preloads in parallel without blocking UI
+      Promise.allSettled(preloadPromises);
+    };
+    
+    // Only preload if we have consignments to process
+    if (podAnalyses.length > 0) {
+      preloadPhotoCounts();
+    }
+  }, [podAnalyses]);
   
   // Reset to page 1 when filters change
   useEffect(() => {
