@@ -1262,6 +1262,36 @@ function isHostAllowed(hostname: string): boolean {
   return ALLOWED_HOSTS.includes(hostname) || hostname.endsWith('.axylog.com');
 }
 
+// Photo filtering helpers for sanity-checking URLs
+function isHttpUrl(u: string): boolean {
+  try { 
+    const x = new URL(u); 
+    return x.protocol === 'http:' || x.protocol === 'https:'; 
+  }
+  catch { return false; }
+}
+
+// Collapse query/hash so resized/param variants dedupe
+function normalisePhotoKey(u: string): string {
+  const x = new URL(u);
+  return `${x.origin}${x.pathname}`;
+}
+
+function filterFetchablePhotos(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const u of urls) {
+    if (!isHttpUrl(u)) continue;
+    const { hostname } = new URL(u);
+    if (!isHostAllowed(hostname)) continue;
+    const key = normalisePhotoKey(u);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(u);
+  }
+  return out;
+}
+
 // Helper function to create cache key
 function createImageCacheKey(url: string, width?: number, quality?: number, format?: string): string {
   return createHash('md5').update(`${url}_${width}_${quality}_${format}`).digest('hex');
