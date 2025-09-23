@@ -599,10 +599,14 @@ class PhotoScrapingQueue {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
         
+        // Regular photos must be http(s) only - base64/blob should only be signatures
+        const isHttp = img.src?.startsWith('http://') || img.src?.startsWith('https://');
+        
         const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        return !(isDimensionSignature || isTextSignature);
+        // Must be http(s) AND not a signature
+        return isHttp && !(isDimensionSignature || isTextSignature);
       });
 
       let photos = Array.from(new Set(regularImages.map((img: any) => img.src)));
@@ -828,6 +832,9 @@ class PhotoScrapingQueue {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
         
+        // Regular photos must be http(s) only - base64/blob should only be signatures  
+        const isHttp = img.src?.startsWith('http://') || img.src?.startsWith('https://');
+        
         // Base64 images are typically signatures in Axylog
         const isBase64Signature = img.src && img.src.startsWith('data:image');
         
@@ -837,7 +844,8 @@ class PhotoScrapingQueue {
         // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        return !(isBase64Signature || isDimensionSignature || isTextSignature);
+        // Must be http(s) AND not a signature
+        return isHttp && !(isBase64Signature || isDimensionSignature || isTextSignature);
       });
       
       const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
