@@ -605,10 +605,15 @@ class PhotoScrapingQueue {
         return !(isDimensionSignature || isTextSignature);
       });
 
-      const photos = Array.from(new Set(regularImages.map((img: any) => img.src)));
-      const signaturePhotos = Array.from(new Set(signatureImages.map((img: any) => img.src)));
+      let photos = Array.from(new Set(regularImages.map((img: any) => img.src)));
+      let signaturePhotos = Array.from(new Set(signatureImages.map((img: any) => img.src)));
 
-      console.log(`HTML parsing extracted ${photos.length} regular photos and ${signaturePhotos.length} signature photos`);
+      console.log(`🔍 [HTML PARSE] Photos pre-filter: ${photos.length}, signatures pre-filter: ${signaturePhotos.length}`);
+
+      photos = filterFetchablePhotos(photos);
+      signaturePhotos = filterFetchablePhotos(signaturePhotos);
+
+      console.log(`✅ [HTML PARSE] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
 
       return { photos, signaturePhotos };
       
@@ -668,10 +673,15 @@ class PhotoScrapingQueue {
           // Only use database data if it's very recent (less than 15 minutes old)
           // This prevents stale data issues like showing 17 photos when only 1 exists
           if (dbAge < 15 * 60 * 1000) { // 15 minutes
-            const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
-            const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
+            let photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
+            let signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
             
-            console.log(`📸 [SCRAPE DEBUG] Using recent database data: ${photos.length} regular and ${signaturePhotos.length} signature photos`);
+            console.log(`🔍 [DB FALLBACK] Photos pre-filter: ${photos.length}, signatures pre-filter: ${signaturePhotos.length}`);
+            
+            photos = filterFetchablePhotos(photos);
+            signaturePhotos = filterFetchablePhotos(signaturePhotos);
+            
+            console.log(`✅ [DB FALLBACK] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
             
             // Update cache with database results
             photoCache.set(normalizedToken, {
@@ -832,8 +842,13 @@ class PhotoScrapingQueue {
       
       const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
       const regularPhotos: string[] = regularImages.map((img: any) => img.src);
-      photos = regularPhotos; // Keep for backward compatibility
-      signaturePhotos = tempSignaturePhotos; // Update the outer scope variable
+      
+      console.log(`🔍 [PUPPETEER] Photos pre-filter: ${regularPhotos.length}, signatures pre-filter: ${tempSignaturePhotos.length}`);
+      
+      photos = filterFetchablePhotos(regularPhotos); // Apply filtering
+      signaturePhotos = filterFetchablePhotos(tempSignaturePhotos); // Apply filtering
+      
+      console.log(`✅ [PUPPETEER] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
       
     } catch (error: any) {
       console.error(`❌ [PUPPETEER] Error scraping photos for token ${normalizedToken}: ${error.message}`);
@@ -2457,13 +2472,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📸 [PHOTO DEBUG] About to call photoQueue.addRequest with token: ${token}`);
         try {
           const photoResult = await photoQueue.addRequest(token, 'high');
-          console.log(`📸 [PHOTO DEBUG] photoQueue.addRequest completed. Result:`, {
-            photoCount: photoResult.photos?.length || 0,
-            signatureCount: photoResult.signaturePhotos?.length || 0
-          });
+          
+          // Apply filtering before sending response
+          const filteredPhotos = filterFetchablePhotos(photoResult.photos || []);
+          const filteredSignatures = filterFetchablePhotos(photoResult.signaturePhotos || []);
+          
+          console.log(`📸 [PHOTO DEBUG] photoQueue.addRequest completed. Pre-filter: ${photoResult.photos?.length || 0} photos, ${photoResult.signaturePhotos?.length || 0} signatures`);
+          console.log(`📸 [PHOTO DEBUG] Post-filter: ${filteredPhotos.length} photos, ${filteredSignatures.length} signatures`);
+          
           return res.json({ 
             success: true, 
-            photos: photoResult.photos || [], 
+            photos: filteredPhotos,
+            signaturePhotos: filteredSignatures,
+            count: filteredPhotos.length,
+            signatureCount: filteredSignatures.length,
             status: 'ready'
           });
         } catch (error) {
@@ -2485,9 +2507,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, photos: [], status: 'failed' });
       }
       
-      // Return available photos
-      const photos = availablePhotos.map(photo => photo.url);
-      return res.json({ success: true, photos, status: 'ready' });
+      // Return available photos with filtering
+      let photos = availablePhotos.map(photo => photo.url);
+      
+      console.log(`🔍 [DIRECT DB] Photos pre-filter: ${photos.length}`);
+      photos = filterFetchablePhotos(photos);
+      console.log(`✅ [DIRECT DB] Photos post-filter: ${photos.length}`);
+      
+      return res.json({ 
+        success: true, 
+        photos, 
+        count: photos.length,
+        status: 'ready' 
+      });
       
     } catch (error) {
       console.error('Error fetching photos for consignment:', error);
@@ -2690,10 +2722,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const availablePhotos = dbPhotos.filter(photo => photo.status === 'available');
           
           if (availablePhotos.length > 0) {
-            const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
-            const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
+            let photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
+            let signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
             
-            console.log(`📸 [POD PHOTOS API] Found ${photos.length} regular and ${signaturePhotos.length} signature photos in database`);
+            console.log(`🔍 [POD PHOTOS API DB] Photos pre-filter: ${photos.length}, signatures pre-filter: ${signaturePhotos.length}`);
+            
+            photos = filterFetchablePhotos(photos);
+            signaturePhotos = filterFetchablePhotos(signaturePhotos);
+            
+            console.log(`✅ [POD PHOTOS API DB] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
             
             // Update cache with database results
             photoCache.set(normalizedToken, {
@@ -2762,6 +2799,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to extract photos",
         error: error instanceof Error ? error.message : 'Unknown error',
         photos: []
+      });
+    }
+  });
+
+  // Cache purge endpoint for POD photos
+  app.delete("/api/pod-photos/cache/:trackingToken", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const { trackingToken } = req.params;
+      
+      if (!trackingToken) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Tracking token is required" 
+        });
+      }
+
+      console.log(`🗑️ [CACHE PURGE] Purging cache for token: ${trackingToken} (user: ${req.user?.email})`);
+      
+      // Normalise token and invalidate cache
+      const normalizedToken = normalizeToken(trackingToken);
+      const deleted = invalidatePhotoCache(normalizedToken);
+      
+      console.log(`🗑️ [CACHE PURGE] Cache purged for token: ${normalizedToken}, deleted: ${deleted}`);
+      
+      return res.json({
+        success: true,
+        message: `Cache purged for token: ${normalizedToken}`,
+        deleted
+      });
+      
+    } catch (error: any) {
+      console.error("Error purging photo cache:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to purge cache",
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
