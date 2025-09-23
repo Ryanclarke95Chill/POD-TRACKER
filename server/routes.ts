@@ -644,35 +644,59 @@ class PhotoScrapingQueue {
         }
       }
       
-      // Check database if no valid cache
-      console.log(`📸 [SCRAPE DEBUG] No valid cache, checking database for token: ${normalizedToken}`);
+      // Check database if no valid cache, but prioritize fresh data for accuracy
+      console.log(`📸 [SCRAPE DEBUG] No valid cache, checking database age for token: ${normalizedToken}`);
+      let shouldSkipDatabase = false;
+      
       try {
         const dbPhotos = await storage.getPhotoAssetsByToken(normalizedToken);
         const availablePhotos = dbPhotos.filter(photo => photo.status === 'available');
         
         if (availablePhotos.length > 0) {
-          const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
-          const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
-          
-          console.log(`📸 [SCRAPE DEBUG] Found ${photos.length} regular and ${signaturePhotos.length} signature photos in database`);
-          
-          // Update cache with database results
-          photoCache.set(normalizedToken, {
-            photos,
-            signaturePhotos,
-            timestamp: Date.now()
+          // Check if database data is recent (within last hour) 
+          const mostRecentPhoto = availablePhotos.reduce((latest, photo) => {
+            const photoTime = photo.fetchedAt ? new Date(photo.fetchedAt).getTime() : 0;
+            const latestTime = latest.fetchedAt ? new Date(latest.fetchedAt).getTime() : 0;
+            return photoTime > latestTime ? photo : latest;
           });
           
-          return { photos, signaturePhotos };
+          const dbAge = Date.now() - (mostRecentPhoto.fetchedAt ? new Date(mostRecentPhoto.fetchedAt).getTime() : 0);
+          const dbAgeHours = dbAge / (1000 * 60 * 60);
+          
+          console.log(`📸 [SCRAPE DEBUG] Database photos are ${dbAgeHours.toFixed(1)} hours old`);
+          
+          // Only use database data if it's very recent (less than 15 minutes old)
+          // This prevents stale data issues like showing 17 photos when only 1 exists
+          if (dbAge < 15 * 60 * 1000) { // 15 minutes
+            const photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
+            const signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
+            
+            console.log(`📸 [SCRAPE DEBUG] Using recent database data: ${photos.length} regular and ${signaturePhotos.length} signature photos`);
+            
+            // Update cache with database results
+            photoCache.set(normalizedToken, {
+              photos,
+              signaturePhotos,
+              timestamp: Date.now()
+            });
+            
+            return { photos, signaturePhotos };
+          } else {
+            console.log(`📸 [SCRAPE DEBUG] Database data is stale (${dbAgeHours.toFixed(1)}h old), fetching fresh data`);
+            shouldSkipDatabase = true;
+          }
         } else if (dbPhotos.length > 0) {
           // Has db entries but all failed/pending - check if recently failed
-          const recentFailure = dbPhotos.some(p => p.status === 'failed' && Date.now() - new Date(p.updatedAt || p.createdAt).getTime() < EMPTY_CACHE_DURATION);
+          const recentFailure = dbPhotos.some(p => p.status === 'failed' && p.fetchedAt && Date.now() - new Date(p.fetchedAt).getTime() < EMPTY_CACHE_DURATION);
           if (recentFailure) {
             console.log(`📸 [SCRAPE DEBUG] Recent failure in database, returning empty result`);
             return { photos: [], signaturePhotos: [] };
           }
         }
-        console.log(`📸 [SCRAPE DEBUG] No available photos in database, proceeding with scraping`);
+        
+        if (!shouldSkipDatabase) {
+          console.log(`📸 [SCRAPE DEBUG] No available photos in database, proceeding with fresh scraping`);
+        }
       } catch (error) {
         console.error(`📸 [SCRAPE DEBUG] Database check failed:`, error);
       }
@@ -2662,7 +2686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json(response);
           } else if (dbPhotos.length > 0) {
             // Has db entries but all failed/pending - check if recently failed
-            const recentFailure = dbPhotos.some(p => p.status === 'failed' && Date.now() - new Date(p.updatedAt || p.createdAt).getTime() < EMPTY_CACHE_DURATION);
+            const recentFailure = dbPhotos.some(p => p.status === 'failed' && p.fetchedAt && Date.now() - new Date(p.fetchedAt).getTime() < EMPTY_CACHE_DURATION);
             if (recentFailure) {
               console.log(`📸 [POD PHOTOS API] Recent failure in database, returning empty result`);
               return res.json({

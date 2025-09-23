@@ -1,0 +1,197 @@
+You are working in a Node/TypeScript app (server + React client).
+Bug: The POD photo counter shows inflated numbers (e.g., 17 or 37) and renders many empty thumbnails. Root cause: the scraper collects non-fetchable URLs (blob:, data:), UI assets, and duplicates; the image proxy only serves http(s) from allowed hosts, so most thumbnails fail. Counts and grids get out of sync due to caching.
+
+Goal
+
+Return only fetchable, unique, allowed-host http(s) image URLs from the server, and make the UI header use the same array length the grid renders. Result: header count === thumbnails shown. Example token kTGxJcnczLk2vpOy4X should yield 2 photos.
+
+Branching & Conventions
+
+Create a branch: fix/photo-count-sanity-filter.
+
+Keep Australian spelling in comments (minimise, normalise).
+
+Don’t change public API shapes beyond adding safer counts.
+
+1) Server helpers (e.g., server/routes.ts near your image proxy allow-list)
+
+Add these utilities:
+
+function isHttpUrl(u: string) {
+  try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; }
+  catch { return false; }
+}
+
+// Collapse query/hash so resized/param variants dedupe
+function normalisePhotoKey(u: string) {
+  const x = new URL(u);
+  return `${x.origin}${x.pathname}`;
+}
+
+function isHostAllowed(hostname: string) {
+  // Reuse your existing ALLOWED_HOSTS if present; otherwise include axylog + azure blob.
+  return (
+    ALLOWED_HOSTS?.includes(hostname) ||
+    hostname.endsWith('.axylog.com') ||
+    hostname === 'live.axylog.com' ||
+    hostname === 'axylogdata.blob.core.windows.net'
+  );
+}
+
+function filterFetchablePhotos(urls: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const u of urls) {
+    if (!isHttpUrl(u)) continue;
+    const { hostname } = new URL(u);
+    if (!isHostAllowed(hostname)) continue;
+    const key = normalisePhotoKey(u);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(u);
+  }
+  return out;
+}
+
+2) Apply the filter everywhere photos are produced
+A) Cheerio/HTML scrape path
+
+Right before returning photos from the scrape function:
+
+let photos = Array.from(new Set(regularImages.map((img: any) => img.src)));
+let signaturePhotos = Array.from(new Set(signatureImages.map((img: any) => img.src)));
+
+photos = filterFetchablePhotos(photos);
+signaturePhotos = filterFetchablePhotos(signaturePhotos);
+
+return { photos, signaturePhotos };
+
+B) Puppeteer/frame scrape path
+
+After building regularPhotos and tempSignaturePhotos:
+
+photos = filterFetchablePhotos(regularPhotos);
+signaturePhotos = filterFetchablePhotos(tempSignaturePhotos);
+
+C) DB fallback path
+
+When reading cached/DB results:
+
+let photos = dbPhotos.filter(p => p.kind === 'photo').map(p => p.url);
+let signaturePhotos = dbPhotos.filter(p => p.kind === 'signature').map(p => p.url);
+
+photos = filterFetchablePhotos(photos);
+signaturePhotos = filterFetchablePhotos(signaturePhotos);
+
+D) API response (/api/pod-photos)
+
+Before res.json(...), ensure counts derive from filtered arrays:
+
+const filteredPhotos = filterFetchablePhotos(photos);
+const filteredSign = filterFetchablePhotos(signaturePhotos);
+
+return res.json({
+  success: true,
+  photos: filteredPhotos,
+  signaturePhotos: filteredSign,
+  count: filteredPhotos.length,
+  signatureCount: filteredSign.length,
+  status: 'ok'
+});
+
+3) Tighten the scraper predicate (in your frame/DOM extractor)
+
+Ensure regular photos must be http(s); base64/blob should only land in signature buckets:
+
+const isHttp = src?.startsWith('http://') || src?.startsWith('https://');
+
+const isLikelyPhoto =
+  isHttp &&
+  (
+    (width >= 400 && height >= 300) ||
+    /photo|proof|delivery|pod|drop|dock|pallet|consignment/i.test(`${alt} ${className} ${parentText}`)
+  );
+
+// Keep your existing signature detection for base64/data/blob – do NOT count those as regular photos.
+
+4) Background worker (if you persist discovered photos)
+
+Before writing any URLs to DB, run filterFetchablePhotos(...) so the store stays clean.
+
+5) Frontend: one source of truth for the displayed count
+
+In the component that renders the header count (e.g., ConsignmentDetailModal.tsx or wherever), derive the number from the same photos array used by the thumbnail grid:
+
+// After fetching /api/pod-photos
+const [photos, setPhotos] = useState<string[]>([]);
+const [signaturePhotos, setSignaturePhotos] = useState<string[]>([]);
+
+// header:
+<h3>{photos.length} {photos.length === 1 ? 'photo' : 'photos'}</h3>
+
+// grid renders `photos` directly; remove any separate “cached count” field usage.
+
+
+Optionally, if some images fail onError, show a tiny inline notice (“Some images could not be loaded”), but do not render empty tiles.
+
+6) Cache behaviour
+
+If you cache counts and arrays separately, unify: cache the arrays only, and derive counts from array.length.
+
+If you keep existing caches, always store filtered arrays and compute counts on read.
+
+Provide a manual purge endpoint if not present:
+
+DELETE /api/pod-photos/cache/:trackingToken
+
+7) Tests / Acceptance
+
+Add a quick script or use curl/Thunder Client.
+
+P0 – Example provided by user
+
+Purge cache:
+
+DELETE /api/pod-photos/cache/kTGxJcnczLk2vpOy4X
+
+
+Force fresh:
+
+GET /api/pod-photos?trackingToken=kTGxJcnczLk2vpOy4X&force=true
+
+
+Expect: count: 2, photos.length === 2, both http(s) on allowed axylog/azure hosts. The UI header shows “2 photos” and the grid shows exactly 2 thumbnails.
+
+P1 – Single photo case
+Use a token that has exactly one image (from your earlier bug report). Expect count: 1, header “1 photo”, one thumbnail.
+
+P2 – No photos
+Token with zero valid photos. Expect count: 0, no placeholders.
+
+P3 – Deduping
+If two URLs differ only by querystring, they normalise to one entry.
+
+8) Logging & DX
+
+Log how many URLs were found pre-filter vs post-filter:
+console.info('photos pre', pre.length, 'post', post.length, { token })
+
+Guardrail: if pre > 0 and post === 0, log a warning with hostnames to catch allow-list issues.
+
+9) Commit
+
+Run the tests above.
+
+Commit with message: fix: sanity-filter photo URLs, unify counts with grid, tighten scraper (POD Checker).
+
+Open a PR for review.
+
+Done criteria
+
+No empty thumbnail tiles.
+
+Header count always equals number of thumbnails.
+
+Token kTGxJcnczLk2vpOy4X reliably returns exactly 2 thumbnails.
+
+If anything in the codebase is named differently, adapt paths but keep the behaviours and tests identical.

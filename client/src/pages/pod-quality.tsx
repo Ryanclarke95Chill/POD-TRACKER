@@ -87,7 +87,14 @@ const signaturePhotoState = new Map<number, string[]>();
 
 // Global cache for photo counts to avoid duplicate API calls
 const photoCountCache = new Map<string, {count: number, timestamp: number}>();
-const PHOTO_COUNT_CACHE_DURATION = 300000; // 5 minutes cache duration
+const PHOTO_COUNT_CACHE_DURATION = 60000; // 1 minute cache duration (reduced from 5 minutes for accuracy)
+
+// Function to clear photo count cache for fresh data
+function clearPhotoCountCache() {
+  photoCountCache.clear();
+  photoCache.clear();
+  console.log('🧹 Photo count cache cleared - will fetch fresh data');
+}
 
 // Async function to load actual photo count from API
 async function loadPhotoCount(consignment: Consignment): Promise<number> {
@@ -155,6 +162,73 @@ async function loadPhotoCount(consignment: Consignment): Promise<number> {
     photoCountCache.set(cacheKey, { count: 0, timestamp: Date.now() });
     return 0;
   }
+}
+
+// Count photos from POD files using reactive state for accurate counts
+function countPhotos(consignment: Consignment, reactivePhotoCounts?: Map<string, number>): number {
+  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
+  
+  // HIGHEST PRIORITY: Check reactive state for fresh photo count
+  if (trackingLink && reactivePhotoCounts) {
+    const reactiveCount = reactivePhotoCounts.get(trackingLink);
+    if (reactiveCount !== undefined) {
+      return reactiveCount;
+    }
+  }
+  
+  // FALLBACK: Check if we have cached photo count from API
+  if (trackingLink) {
+    const cacheKey = trackingLink;
+    
+    // Check photo count cache first
+    const cachedCount = photoCountCache.get(cacheKey);
+    if (cachedCount && Date.now() - cachedCount.timestamp < PHOTO_COUNT_CACHE_DURATION) {
+      return cachedCount.count;
+    }
+    
+    // Check if we have photos in the main photo cache
+    const cachedPhotos = photoCache.get(cacheKey);
+    if (cachedPhotos) {
+      const count = cachedPhotos.photos.length;
+      // Update the count cache
+      photoCountCache.set(cacheKey, { count, timestamp: Date.now() });
+      return count;
+    }
+  }
+  
+  // SECOND PRIORITY: Use database field fallback with improved logic 
+  // (subtract signatures from file count as estimated actual photo count)
+  let count = 0;
+  const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
+  const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
+  
+  // Use the file count data from database if available
+  if (deliveryFileCount > 0 || pickupFileCount > 0) {
+    count = Number(deliveryFileCount) + Number(pickupFileCount);
+    
+    // Subtract signatures from file count since they're included in the total
+    // but we want to count actual photos only (better fallback logic)
+    if (consignment.deliverySignatureName && deliveryFileCount > 0) {
+      count = Math.max(0, count - 1); // Subtract delivery signature
+    }
+    if (consignment.pickupSignatureName && pickupFileCount > 0) {
+      count = Math.max(0, count - 1); // Subtract pickup signature  
+    }
+    
+    return count;
+  }
+  
+  // THIRD PRIORITY: Check if actual file paths are provided
+  if (consignment.deliveryPodFiles) {
+    count += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
+  }
+  if (consignment.receivedDeliveryPodFiles) {
+    count += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
+  }
+  
+  // FINAL FALLBACK: Return 0 instead of estimated values to avoid false positives
+  // Only return non-zero if we have actual data
+  return count;
 }
 
 function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately = false }: PhotoThumbnailsProps) {
@@ -957,6 +1031,9 @@ export default function PODQuality() {
   const [selectedShipper, setSelectedShipper] = useState("all");
   const [selectedDriver, setSelectedDriver] = useState("all");
   const [regionalComparisonMode, setRegionalComparisonMode] = useState(false);
+  
+  // Reactive photo counts state - this will trigger re-renders when updated
+  const [reactivePhotoCounts, setReactivePhotoCounts] = useState<Map<string, number>>(new Map());
 
   // Regional stats calculation
   const calculateRegionalStats = (consignments: Consignment[]) => {
@@ -1538,7 +1615,7 @@ export default function PODQuality() {
 
   // Analyze POD quality for each consignment using new gated + bucketed system
   const analyzePOD = (consignment: Consignment): PODAnalysis => {
-    const photoCount = countPhotos(consignment);
+    const photoCount = countPhotos(consignment, reactivePhotoCounts);
     const hasSignature = Boolean(consignment.deliverySignatureName);
     const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 0);
     const hasTrackingLink = Boolean(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink);
@@ -1708,64 +1785,6 @@ export default function PODQuality() {
     return { consignment, metrics };
   };
 
-  // Count photos from POD files using actual API data when available
-  const countPhotos = (consignment: Consignment): number => {
-    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink || '';
-    
-    // HIGHEST PRIORITY: Check if we have cached photo count from API
-    if (trackingLink) {
-      const cacheKey = trackingLink;
-      
-      // Check photo count cache first
-      const cachedCount = photoCountCache.get(cacheKey);
-      if (cachedCount && Date.now() - cachedCount.timestamp < PHOTO_COUNT_CACHE_DURATION) {
-        return cachedCount.count;
-      }
-      
-      // Check if we have photos in the main photo cache
-      const cachedPhotos = photoCache.get(cacheKey);
-      if (cachedPhotos) {
-        const count = cachedPhotos.photos.length;
-        // Update the count cache
-        photoCountCache.set(cacheKey, { count, timestamp: Date.now() });
-        return count;
-      }
-    }
-    
-    // SECOND PRIORITY: Use database field fallback with improved logic 
-    // (subtract signatures from file count as estimated actual photo count)
-    let count = 0;
-    const deliveryFileCount = (consignment as any).deliveryReceivedFileCount || 0;
-    const pickupFileCount = (consignment as any).pickupReceivedFileCount || 0;
-    
-    // Use the file count data from database if available
-    if (deliveryFileCount > 0 || pickupFileCount > 0) {
-      count = Number(deliveryFileCount) + Number(pickupFileCount);
-      
-      // Subtract signatures from file count since they're included in the total
-      // but we want to count actual photos only (better fallback logic)
-      if (consignment.deliverySignatureName && deliveryFileCount > 0) {
-        count = Math.max(0, count - 1); // Subtract delivery signature
-      }
-      if (consignment.pickupSignatureName && pickupFileCount > 0) {
-        count = Math.max(0, count - 1); // Subtract pickup signature  
-      }
-      
-      return count;
-    }
-    
-    // THIRD PRIORITY: Check if actual file paths are provided
-    if (consignment.deliveryPodFiles) {
-      count += consignment.deliveryPodFiles.split(',').filter(f => f.trim()).length;
-    }
-    if (consignment.receivedDeliveryPodFiles) {
-      count += consignment.receivedDeliveryPodFiles.split(',').filter(f => f.trim()).length;
-    }
-    
-    // FINAL FALLBACK: Return 0 instead of estimated values to avoid false positives
-    // Only return non-zero if we have actual data
-    return count;
-  };
 
   // Format temperature display for expected vs actual
   const formatTemperatureDisplay = (consignment: Consignment) => {
@@ -2284,6 +2303,9 @@ export default function PODQuality() {
   // Preload photo counts for visible consignments to ensure accurate counting
   useEffect(() => {
     const preloadPhotoCounts = async () => {
+      // Clear stale cache to ensure fresh photo counts
+      clearPhotoCountCache();
+      
       // Load photo counts for current page consignments in parallel for better performance
       const preloadPromises = podAnalyses.map(async (analysis) => {
         const consignment = analysis.consignment;
@@ -2291,7 +2313,9 @@ export default function PODQuality() {
         
         if (trackingLink) {
           try {
-            await loadPhotoCount(consignment);
+            const count = await loadPhotoCount(consignment);
+            // Update reactive state to trigger re-render
+            setReactivePhotoCounts(prev => new Map(prev).set(trackingLink, count));
           } catch (error) {
             // Silent failure for preloading - don't block UI
             console.log(`Photo count preload failed for consignment ${consignment.id}:`, error);
