@@ -2926,20 +2926,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { src, w, q = 80, fmt = 'webp' } = req.query;
       
+      console.log(`🔍 [IMAGE PROXY] Request received: src=${src}, w=${w}, q=${q}, fmt=${fmt}`);
+      
       if (!src || typeof src !== 'string') {
         return res.status(400).json({ error: 'src parameter is required' });
       }
       
-      // Security: validate URL and host
+      // Handle data URLs directly (no proxying needed)
+      if (src.startsWith('data:image/')) {
+        console.log(`📸 [IMAGE PROXY] Handling data URL directly (length: ${src.length})`);
+        // For data URLs, just return the data directly after basic validation
+        try {
+          const buffer = Buffer.from(src.split(',')[1], 'base64');
+          const mimeType = src.split(';')[0].split(':')[1];
+          res.set({
+            'Content-Type': mimeType,
+            'Cache-Control': 'public, max-age=604800, immutable',
+            'X-Cache': 'DATA-URL'
+          });
+          return res.send(buffer);
+        } catch (error) {
+          console.log(`❌ [IMAGE PROXY] Failed to process data URL: ${error}`);
+          return res.status(400).json({ error: 'Invalid data URL' });
+        }
+      }
+      
+      // Security: validate URL and host for regular URLs
       let url: URL;
       try {
         url = new URL(src);
       } catch {
+        console.log(`❌ [IMAGE PROXY] Invalid URL format: ${src}`);
         return res.status(400).json({ error: 'Invalid URL' });
       }
       
       if (!isHostAllowed(url.hostname)) {
-        console.log(`Blocked image from hostname: ${url.hostname}, src: ${src}`);
+        console.log(`❌ [IMAGE PROXY] Blocked image from hostname: ${url.hostname}, src: ${src}`);
         return res.status(403).json({ error: 'Host not allowed' });
       }
       
@@ -2974,10 +2996,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch original image
+      console.log(`📸 [IMAGE PROXY] Fetching image from: ${src}`);
       const response = await fetch(src);
       if (!response.ok) {
+        console.log(`❌ [IMAGE PROXY] Failed to fetch image: ${src}, status: ${response.status}, statusText: ${response.statusText}`);
         return res.status(404).json({ error: 'Image not found' });
       }
+      console.log(`✅ [IMAGE PROXY] Successfully fetched image: ${src}`);
       
       const originalBuffer = Buffer.from(await response.arrayBuffer());
       
