@@ -2322,11 +2322,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Consignments endpoint
+  // Consignments stats endpoint - returns stats for ALL consignments (for analytics)
+  app.get("/api/consignments/stats", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      console.log(`User accessing consignments stats: ${user.email}, role: ${user.role}`);
+      
+      const userWithRole = {
+        id: user.id,
+        username: user.email.split('@')[0],
+        password: '', // Not needed for permissions
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        department: user.department || null,
+        isActive: true
+      };
+      const permissions = getUserPermissions(userWithRole);
+      
+      let allConsignments;
+      
+      if (permissions.canViewAllConsignments) {
+        // Admin and Manager can see ALL data for stats
+        allConsignments = await storage.getAllConsignments();
+      } else if (permissions.canViewDepartmentConsignments) {
+        allConsignments = await storage.getConsignmentsByDepartment(user.department || '');
+      } else if (permissions.canViewOwnConsignments) {
+        if (user.email.includes('shipper@')) {
+          allConsignments = await storage.getConsignmentsByShipper(user.email);
+        } else {
+          allConsignments = await storage.getConsignmentsByDriver(user.email);
+        }
+      } else {
+        allConsignments = await storage.getConsignmentsByUserId(user.id);
+      }
+      
+      res.json({
+        consignments: allConsignments,
+        totalCount: allConsignments.length
+      });
+    } catch (error) {
+      console.error("Error fetching consignments stats:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Consignments endpoint with pagination
   app.get("/api/consignments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
       const user = req.user!;
       console.log(`User accessing consignments: ${user.email}, role: ${user.role}`);
+      
+      // Parse pagination parameters
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50; // Default 50 per page
+      const offset = (page - 1) * limit;
+      
+      console.log(`Pagination: page=${page}, limit=${limit}, offset=${offset}`);
+      
       const userWithRole = {
         id: user.id,
         username: user.email.split('@')[0],
@@ -2340,17 +2393,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const permissions = getUserPermissions(userWithRole);
       console.log('User permissions:', permissions);
       
-      let consignments;
+      let result;
       
       if (permissions.canViewAllConsignments) {
-        // Admin and Manager can see all data with optional limit for performance
-        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-        consignments = await storage.getAllConsignments(limit);
+        // Admin and Manager can see all data with pagination
+        result = await storage.getAllConsignmentsPaginated(limit, offset);
       } else if (permissions.canViewDepartmentConsignments) {
-        // Supervisor can see department data
-        consignments = await storage.getConsignmentsByDepartment(user.department || '');
+        // Supervisor can see department data (implement pagination later if needed)
+        const consignments = await storage.getConsignmentsByDepartment(user.department || '');
+        result = {
+          consignments,
+          totalCount: consignments.length,
+          page,
+          limit,
+          totalPages: Math.ceil(consignments.length / limit)
+        };
       } else if (permissions.canViewOwnConsignments) {
-        // Check if this is a shipper or driver
+        // Check if this is a shipper or driver (implement pagination later if needed)
+        let consignments;
         if (user.email.includes('shipper@')) {
           console.log('Shipper user detected, calling getConsignmentsByShipper');
           consignments = await storage.getConsignmentsByShipper(user.email);
@@ -2358,13 +2418,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Driver user, calling getConsignmentsByDriver');
           consignments = await storage.getConsignmentsByDriver(user.email);
         }
+        result = {
+          consignments,
+          totalCount: consignments.length,
+          page,
+          limit,
+          totalPages: Math.ceil(consignments.length / limit)
+        };
       } else {
         // Fallback for other viewer types
         console.log('Using getConsignmentsByUserId fallback');
-        consignments = await storage.getConsignmentsByUserId(user.id);
+        const consignments = await storage.getConsignmentsByUserId(user.id);
+        result = {
+          consignments,
+          totalCount: consignments.length,
+          page,
+          limit,
+          totalPages: Math.ceil(consignments.length / limit)
+        };
       }
       
-      res.json(consignments);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching consignments:", error);
       res.status(500).json({ message: "Server error" });

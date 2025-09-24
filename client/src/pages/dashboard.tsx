@@ -34,11 +34,23 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
 
-  const { data: consignments = [], isLoading, refetch } = useQuery({
+  const { data: consignmentResponse, isLoading, refetch } = useQuery({
     queryKey: ["/api/consignments", { limit: 1000 }],
     staleTime: 0,
     gcTime: 0,
   });
+
+  // Separate query for stats (ALL consignments)
+  const { data: statsResponse, isLoading: isStatsLoading } = useQuery({
+    queryKey: ["/api/consignments/stats"],
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Extract consignments from pagination response for display
+  const consignments = (consignmentResponse as any)?.consignments || [];
+  // Extract ALL consignments for stats calculation
+  const allConsignmentsForStats = (statsResponse as any)?.consignments || [];
 
   // Force refresh when component mounts and clear cache
   useEffect(() => {
@@ -81,21 +93,21 @@ export default function Dashboard() {
 
   // Get unique warehouse company names for filter dropdown
   const warehouseCompanies = Array.from(
-    new Set((consignments as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
+    new Set((allConsignmentsForStats as Consignment[]).map(c => c.warehouseCompanyName).filter(Boolean))
   ).sort();
 
   // Get unique shipper company names for filter dropdown
   const shipperCompanies = Array.from(
-    new Set((consignments as Consignment[]).map(c => (c as any).shipperCompanyName).filter(Boolean))
+    new Set((allConsignmentsForStats as Consignment[]).map(c => (c as any).shipperCompanyName).filter(Boolean))
   ).sort();
 
   // Get unique status values for filter dropdown
   const statusValues = Array.from(
-    new Set((consignments as Consignment[]).map(c => getStatusDisplay(c)).filter(Boolean))
+    new Set((allConsignmentsForStats as Consignment[]).map(c => getStatusDisplay(c)).filter(Boolean))
   ).sort();
 
-  // Calculate at-risk consignments (comparing calculated ETA vs delivery windows)
-  const atRiskConsignments = (consignments as Consignment[]).filter((consignment: Consignment) => {
+  // Calculate at-risk consignments from ALL data (comparing calculated ETA vs delivery windows)
+  const atRiskConsignments = (allConsignmentsForStats as Consignment[]).filter((consignment: Consignment) => {
     const status = getStatusDisplay(consignment);
     
     // Only check active consignments - exclude completed, failed, or delivered
@@ -235,7 +247,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Consignments</p>
-                <p className="text-3xl font-bold text-gray-900">{(consignments as Consignment[]).length}</p>
+                <p className="text-3xl font-bold text-gray-900">{(allConsignmentsForStats as Consignment[]).length}</p>
               </div>
               <div className="bg-primary/10 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-primary" />
@@ -254,7 +266,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">In Transit</p>
-                <p className="text-3xl font-bold text-blue-600">{(consignments as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Traveling" || getStatusDisplay(c) === "In Transit").length}</p>
+                <p className="text-3xl font-bold text-blue-600">{(allConsignmentsForStats as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Traveling" || getStatusDisplay(c) === "In Transit").length}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
@@ -273,7 +285,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-3xl font-bold text-green-600">{(consignments as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Delivered" || getStatusDisplay(c) === "Complete").length}</p>
+                <p className="text-3xl font-bold text-green-600">{(allConsignmentsForStats as Consignment[]).filter((c: Consignment) => getStatusDisplay(c) === "Delivered" || getStatusDisplay(c) === "Complete").length}</p>
               </div>
               <div className="bg-green-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-green-600" />
@@ -292,7 +304,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-3xl font-bold text-amber-600">{(consignments as Consignment[]).filter((c: Consignment) => {
+                <p className="text-3xl font-bold text-amber-600">{(allConsignmentsForStats as Consignment[]).filter((c: Consignment) => {
                   const status = getStatusDisplay(c);
                   return status !== "Traveling" && status !== "In Transit" && status !== "Delivered" && status !== "Complete";
                 }).length}</p>
@@ -477,7 +489,7 @@ export default function Dashboard() {
         
         {/* Consignments List */}
         <div className="gradient-card shadow-card rounded-xl overflow-hidden border border-white/20">
-          {isLoading ? (
+          {(isLoading || isStatsLoading) ? (
             /* Loading skeletons */
             <>
               {[...Array(5)].map((_, index) => (

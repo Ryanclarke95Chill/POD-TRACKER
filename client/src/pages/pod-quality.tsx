@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1136,10 +1136,20 @@ export default function PODQuality() {
   
   const user = getUser();
 
-  // Fetch all consignments and filter for delivered ones
-  const { data: allConsignments = [], isLoading } = useQuery({
-    queryKey: ['/api/consignments'],
+  // Fetch paginated consignments for display
+  const { data: consignmentResponse, isLoading } = useQuery({
+    queryKey: ['/api/consignments', { limit: 500 }], // Get more consignments for POD analysis
   });
+
+  // Fetch ALL consignments for stats calculation
+  const { data: statsResponse, isLoading: isStatsLoading } = useQuery({
+    queryKey: ['/api/consignments/stats'],
+  });
+
+  // Extract consignments from pagination response for display
+  const allConsignments = (consignmentResponse as any)?.consignments || [];
+  // Extract ALL consignments for stats calculation
+  const allConsignmentsForStats = (statsResponse as any)?.consignments || [];
 
   // Helper function to map status labels
   const getStatusDisplay = (consignment: Consignment) => {
@@ -1232,8 +1242,8 @@ export default function PODQuality() {
     return hasReturnType || isReturnToDepot;
   };
 
-  // Filter for delivered consignments, excluding returns and internal transfers
-  const deliveredConsignments = (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+  // Filter for delivered consignments from ALL data (for stats), excluding returns and internal transfers
+  const deliveredConsignments = (allConsignmentsForStats as Consignment[]).filter((consignment: Consignment) => {
     const status = getStatusDisplay(consignment);
     const isDelivered = status === 'Delivered';
     const isInternalTx = isInternalTransfer(consignment);
@@ -1370,9 +1380,9 @@ export default function PODQuality() {
     return matchesSearch && matchesWarehouse && matchesShipper && matchesDriver && matchesTempZone && matchesStatus && matchesDateRange;
   });
   
-  // For regional comparison, get delivered consignments with all filters except warehouse
+  // For regional comparison, get delivered consignments from ALL data with all filters except warehouse
   const deliveredConsignmentsForRegional = regionalComparisonMode 
-    ? (allConsignments as Consignment[]).filter((consignment: Consignment) => {
+    ? (allConsignmentsForStats as Consignment[]).filter((consignment: Consignment) => {
         const status = getStatusDisplay(consignment);
         const isDelivered = status === 'Delivered';
         const isInternalTx = isInternalTransfer(consignment);
@@ -2297,34 +2307,46 @@ export default function PODQuality() {
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   
-  // Current page data (for display)
-  const podAnalyses = allFilteredAnalyses.slice(startIndex, endIndex);
+  // Current page data (for display) - memoized to prevent infinite useEffect loops
+  const podAnalyses = useMemo(() => {
+    return allFilteredAnalyses.slice(startIndex, endIndex);
+  }, [allFilteredAnalyses, startIndex, endIndex]);
   
   // Preload photo counts for visible consignments to ensure accurate counting
   useEffect(() => {
     const preloadPhotoCounts = async () => {
-      // Clear stale cache to ensure fresh photo counts
-      clearPhotoCountCache();
+      // Process consignments in batches to avoid overwhelming the network
+      const BATCH_SIZE = 3; // Process 3 requests at a time
+      const BATCH_DELAY = 100; // 100ms delay between batches
       
-      // Load photo counts for current page consignments in parallel for better performance
-      const preloadPromises = podAnalyses.map(async (analysis) => {
-        const consignment = analysis.consignment;
-        const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+      for (let i = 0; i < podAnalyses.length; i += BATCH_SIZE) {
+        const batch = podAnalyses.slice(i, i + BATCH_SIZE);
         
-        if (trackingLink) {
-          try {
-            const count = await loadPhotoCount(consignment);
-            // Update reactive state to trigger re-render
-            setReactivePhotoCounts(prev => new Map(prev).set(trackingLink, count));
-          } catch (error) {
-            // Silent failure for preloading - don't block UI
-            console.log(`Photo count preload failed for consignment ${consignment.id}:`, error);
+        // Process current batch in parallel
+        const batchPromises = batch.map(async (analysis) => {
+          const consignment = analysis.consignment;
+          const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+          
+          if (trackingLink) {
+            try {
+              const count = await loadPhotoCount(consignment);
+              // Update reactive state to trigger re-render
+              setReactivePhotoCounts(prev => new Map(prev).set(trackingLink, count));
+            } catch (error) {
+              // Silent failure for preloading - don't block UI
+              console.error(`Error loading photo count:`, error);
+            }
           }
+        });
+        
+        // Wait for current batch to complete
+        await Promise.allSettled(batchPromises);
+        
+        // Add delay between batches (except for the last batch)
+        if (i + BATCH_SIZE < podAnalyses.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
-      });
-      
-      // Execute all preloads in parallel without blocking UI
-      Promise.allSettled(preloadPromises);
+      }
     };
     
     // Only preload if we have consignments to process
@@ -2585,7 +2607,7 @@ export default function PODQuality() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isStatsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="animate-pulse space-y-4 p-6">

@@ -14,6 +14,13 @@ export interface IStorage {
   getConsignmentsByUserId(userId: number): Promise<Consignment[]>;
   getConsignmentsByDepartment(department: string): Promise<Consignment[]>;
   getAllConsignments(): Promise<Consignment[]>;
+  getAllConsignmentsPaginated(limit: number, offset: number): Promise<{
+    consignments: Consignment[];
+    totalCount: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
   getConsignmentById(id: number): Promise<Consignment | undefined>;
   getConsignmentByNumber(consignmentNumber: string): Promise<Consignment | undefined>;
   createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
@@ -143,6 +150,60 @@ export class DatabaseStorage implements IStorage {
       });
     }, []);
     return result || [];
+  }
+
+  async getAllConsignmentsPaginated(limit: number, offset: number): Promise<{
+    consignments: Consignment[];
+    totalCount: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const result = await safeQuery(async () => {
+      // Get all consignments to filter depot transfers (this is needed for accurate count)
+      const allConsignmentRecords: Consignment[] = await db.select().from(consignments);
+      
+      // Filter out internal depot transfers
+      const filteredConsignmentRecords = allConsignmentRecords.filter((consignment: Consignment) => {
+        const from = consignment.shipFromMasterDataCode;
+        const to = consignment.shipToMasterDataCode;
+        
+        // Filter out depot transfer patterns
+        const depotTransferPatterns = [
+          { from: 'WA_8', to: 'WA_8D' },
+          { from: 'WA_8D', to: 'WA_8' },
+          { from: 'NSW_5', to: 'NSW_5D' },
+          { from: 'NSW_5D', to: 'NSW_5' },
+          { from: 'VIC_29963', to: 'VIC_29963D' },
+          { from: 'VIC_29963D', to: 'VIC_29963' },
+          { from: 'QLD_829', to: 'QLD_829D' },
+          { from: 'QLD_829D', to: 'QLD_829' }
+        ];
+        
+        const isDepotTransfer = depotTransferPatterns.some(pattern => 
+          pattern.from === from && pattern.to === to
+        );
+        
+        return !isDepotTransfer;
+      });
+      
+      const totalCount = filteredConsignmentRecords.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      const page = Math.floor(offset / limit) + 1;
+      
+      // Apply pagination to filtered results
+      const paginatedConsignments = filteredConsignmentRecords.slice(offset, offset + limit);
+      
+      return {
+        consignments: paginatedConsignments,
+        totalCount,
+        page,
+        limit,
+        totalPages
+      };
+    }, { consignments: [], totalCount: 0, page: 1, limit, totalPages: 0 });
+    
+    return result || { consignments: [], totalCount: 0, page: 1, limit, totalPages: 0 };
   }
 
   async getDashboardStats(): Promise<{

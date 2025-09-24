@@ -20,15 +20,35 @@ export async function apiRequest(
     ...(token ? { "Authorization": `Bearer ${token}` } : {})
   };
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: isFormData ? data as FormData : data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  // Retry logic for network failures
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: isFormData ? data as FormData : data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
 
-  await throwIfResNotOk(res);
-  return res;
+      await throwIfResNotOk(res);
+      return res;
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Only retry on network failures, not on HTTP errors
+      if (error instanceof Error && error.message.includes('Failed to fetch') && attempt < 3) {
+        // Exponential backoff: 100ms, 200ms for retries
+        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+        continue;
+      }
+      
+      // Don't retry on HTTP errors (401, 404, etc.) or on final attempt
+      throw error;
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
