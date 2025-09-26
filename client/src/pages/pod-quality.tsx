@@ -309,7 +309,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
           }
         });
       },
-      { threshold: 0.1, rootMargin: '800px' } // Even larger margin for ahead-of-scroll loading
+      { threshold: 0.1, rootMargin: '100px' } // Reduced margin to prevent loading too many photos
     );
 
     if (elementRef.current) {
@@ -456,7 +456,7 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
           }
         });
       },
-      { threshold: 0.1, rootMargin: '800px' }
+      { threshold: 0.1, rootMargin: '100px' }
     );
 
     if (elementRef.current) {
