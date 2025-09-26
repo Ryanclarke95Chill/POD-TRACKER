@@ -51,6 +51,7 @@ interface PODMetrics {
 interface PhotoGalleryProps {
   trackingLink: string;
   consignmentNo: string;
+  cachedPhotos?: string[]; // Pass pre-loaded photos to avoid re-fetching
 }
 
 interface InlinePhotoModalProps {
@@ -766,7 +767,7 @@ function ProgressiveImage({ src, alt, className, index }: ProgressiveImageProps)
   );
 }
 
-function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
+function PhotoGallery({ trackingLink, consignmentNo, cachedPhotos }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -778,8 +779,16 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
   const MAX_RETRIES = 5;
   const BASE_RETRY_DELAY = 2000; // Start with 2 seconds
 
-  // Check cache first for instant loading
+  // Use cached photos first if provided, then check cache, then load from API
   useEffect(() => {
+    // If cached photos are provided, use them immediately
+    if (cachedPhotos && cachedPhotos.length > 0) {
+      setPhotos(cachedPhotos);
+      setLoading(false);
+      return;
+    }
+    
+    // Otherwise, check cache first for instant loading
     const cachedData = photoCache.get(trackingLink);
     if (cachedData) {
       setPhotos(cachedData.photos);
@@ -788,7 +797,7 @@ function PhotoGallery({ trackingLink, consignmentNo }: PhotoGalleryProps) {
     }
     // If not cached, proceed with normal loading
     extractPhotos();
-  }, [trackingLink]);
+  }, [trackingLink, cachedPhotos]);
 
   const extractPhotos = async () => {
     try {
@@ -3918,6 +3927,7 @@ export default function PODQuality() {
                 <PhotoGallery 
                   trackingLink={selectedConsignment.deliveryLiveTrackLink || selectedConsignment.pickupLiveTrackLink || ''}
                   consignmentNo={selectedConsignment.consignmentNo || ''}
+                  cachedPhotos={loadedPhotos.get(selectedConsignment.id)}
                 />
               ) : (
                 <div className="flex items-center justify-center h-[70vh] text-gray-500 bg-gray-50 rounded-lg">
