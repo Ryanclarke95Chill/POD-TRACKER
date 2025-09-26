@@ -2400,12 +2400,20 @@ export default function PODQuality() {
   
   // Preload photo counts for visible consignments to ensure accurate counting
   useEffect(() => {
+    let isCancelled = false;
+    
     const preloadPhotoCounts = async () => {
-      // Process consignments in batches to avoid overwhelming the network
-      const BATCH_SIZE = 3; // Process 3 requests at a time
-      const BATCH_DELAY = 100; // 100ms delay between batches
+      // More conservative batching to prevent fetch failures
+      const BATCH_SIZE = 2; // Reduced to 2 requests at a time for better stability
+      const BATCH_DELAY = 300; // Increased delay to 300ms between batches
       
       for (let i = 0; i < podAnalyses.length; i += BATCH_SIZE) {
+        // Check if this effect was cancelled (user navigated away)
+        if (isCancelled) {
+          console.log('Photo count preloading cancelled - user navigated away');
+          return;
+        }
+        
         const batch = podAnalyses.slice(i, i + BATCH_SIZE);
         
         // Process current batch in parallel
@@ -2413,14 +2421,18 @@ export default function PODQuality() {
           const consignment = analysis.consignment;
           const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
           
-          if (trackingLink) {
+          if (trackingLink && !isCancelled) {
             try {
               const count = await loadPhotoCount(consignment);
-              // Update reactive state to trigger re-render
-              setReactivePhotoCounts(prev => new Map(prev).set(trackingLink, count));
-            } catch (error) {
-              // Silent failure for preloading - don't block UI
-              console.error(`Error loading photo count:`, error);
+              // Update reactive state to trigger re-render (only if not cancelled)
+              if (!isCancelled) {
+                setReactivePhotoCounts(prev => new Map(prev).set(trackingLink, count));
+              }
+            } catch (error: any) {
+              // Better error handling - only log if it's not a cancellation
+              if (!isCancelled && error.name !== 'AbortError') {
+                console.error(`Error loading photo count for ${consignment.consignmentNo}:`, error);
+              }
             }
           }
         });
@@ -2429,7 +2441,7 @@ export default function PODQuality() {
         await Promise.allSettled(batchPromises);
         
         // Add delay between batches (except for the last batch)
-        if (i + BATCH_SIZE < podAnalyses.length) {
+        if (i + BATCH_SIZE < podAnalyses.length && !isCancelled) {
           await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
       }
@@ -2437,8 +2449,17 @@ export default function PODQuality() {
     
     // Only preload if we have consignments to process
     if (podAnalyses.length > 0) {
-      preloadPhotoCounts();
+      preloadPhotoCounts().catch(error => {
+        if (!isCancelled) {
+          console.error('Photo count preloading failed:', error);
+        }
+      });
     }
+    
+    // Cleanup function to prevent memory leaks and unnecessary requests
+    return () => {
+      isCancelled = true;
+    };
   }, [podAnalyses]);
   
   // Reset to page 1 when filters change
