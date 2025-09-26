@@ -291,7 +291,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     } finally {
       setLoading(false);
     }
-  }, [trackingLink, cacheKey, consignment.id, onPhotoLoad, loading]);
+  }, [trackingLink, consignment.id, onPhotoLoad]);
 
   // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
   useEffect(() => {
