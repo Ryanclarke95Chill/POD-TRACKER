@@ -90,6 +90,9 @@ const signaturePhotoState = new Map<number, string[]>();
 const photoCountCache = new Map<string, {count: number, timestamp: number}>();
 const PHOTO_COUNT_CACHE_DURATION = 60000; // 1 minute cache duration (reduced from 5 minutes for accuracy)
 
+// Global map to track inflight requests to prevent duplicate API calls for same token
+const inflightRequests = new Map<string, Promise<any>>();
+
 // Function to clear photo count cache for fresh data
 function clearPhotoCountCache() {
   photoCountCache.clear();
@@ -242,8 +245,8 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
   const cacheKey = trackingLink;
 
   const loadPhotos = useCallback(async () => {
-    // Prevent multiple simultaneous loads and ensure we have a tracking link
-    if (loading || !trackingLink) return;
+    // Ensure we have a tracking link
+    if (!trackingLink) return;
 
     // Check cache first
     if (photoCache.has(cacheKey)) {
@@ -254,6 +257,26 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       }
       return;
     }
+
+    // Check if request is already in flight for this token
+    if (inflightRequests.has(cacheKey)) {
+      try {
+        // Wait for existing request to complete
+        const data = await inflightRequests.get(cacheKey);
+        if (data?.success) {
+          const loadedPhotos = data.photos || [];
+          setPhotos(loadedPhotos);
+          onPhotoLoad(consignment.id, loadedPhotos);
+        }
+      } catch (error) {
+        console.error('Error with inflight request:', error);
+        setError(true);
+      }
+      return;
+    }
+
+    // Prevent multiple simultaneous loads
+    if (loading) return;
 
     setLoading(true);
     setError(false);
@@ -266,8 +289,13 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
         return;
       }
       
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
-      const data = await response.json();
+      // Create and store the request promise
+      const requestPromise = apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`)
+        .then(response => response.json());
+      
+      inflightRequests.set(cacheKey, requestPromise);
+      
+      const data = await requestPromise;
       
       if (data.success) {
         const loadedPhotos = data.photos || [];
@@ -289,28 +317,40 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
       
       setError(true);
     } finally {
+      // Clean up inflight request
+      inflightRequests.delete(cacheKey);
       setLoading(false);
     }
-  }, [trackingLink, consignment.id, onPhotoLoad]);
+  }, [trackingLink, cacheKey]);
+
+  // Track if photos have been loaded to disconnect observer
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
   useEffect(() => {
     if (loadImmediately) {
       // Load immediately for current page items
-      loadPhotos();
+      loadPhotos().then(() => setHasLoaded(true));
       return;
     }
 
-    // Use intersection observer for future page items with large margin
+    // Don't recreate observer if already loaded
+    if (hasLoaded) return;
+
+    // Use intersection observer for future page items with reduced margin
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            loadPhotos();
+          if (entry.isIntersecting && !hasLoaded) {
+            loadPhotos().then(() => {
+              setHasLoaded(true);
+              // Disconnect observer after successful load to prevent retriggering
+              observer.disconnect();
+            });
           }
         });
       },
-      { threshold: 0.1, rootMargin: '100px' } // Reduced margin to prevent loading too many photos
+      { threshold: 0.1, rootMargin: '100px' }
     );
 
     if (elementRef.current) {
@@ -318,7 +358,7 @@ function PhotoThumbnails({ consignment, photoCount, onPhotoLoad, loadImmediately
     }
 
     return () => observer.disconnect();
-  }, [loadPhotos, loadImmediately]);
+  }, [loadImmediately, hasLoaded]); // Removed loadPhotos to prevent recreation
 
   if (loading) {
     return (
@@ -390,8 +430,8 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
   const cacheKey = trackingLink;
 
   const loadSignatures = useCallback(async () => {
-    // Prevent multiple simultaneous loads and ensure we have a tracking link
-    if (loading || !trackingLink) return;
+    // Ensure we have a tracking link
+    if (!trackingLink) return;
 
     // Check cache first
     if (photoCache.has(cacheKey)) {
@@ -402,6 +442,26 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
       }
       return;
     }
+
+    // Check if request is already in flight for this token
+    if (inflightRequests.has(cacheKey)) {
+      try {
+        // Wait for existing request to complete
+        const data = await inflightRequests.get(cacheKey);
+        if (data?.success) {
+          const loadedSignatures = data.signaturePhotos || [];
+          setSignatures(loadedSignatures);
+          onSignatureLoad(consignment.id, loadedSignatures);
+        }
+      } catch (error) {
+        console.error('Error with inflight signature request:', error);
+        setError(true);
+      }
+      return;
+    }
+
+    // Prevent multiple simultaneous loads
+    if (loading) return;
 
     setLoading(true);
     setError(false);
@@ -414,8 +474,15 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
         return;
       }
       
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
-      const data = await response.json();
+      // Create and store the request promise (reuse if already exists)
+      let requestPromise = inflightRequests.get(cacheKey);
+      if (!requestPromise) {
+        requestPromise = apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`)
+          .then(response => response.json());
+        inflightRequests.set(cacheKey, requestPromise);
+      }
+      
+      const data = await requestPromise;
       
       if (data.success) {
         const loadedPhotos = data.photos || [];
@@ -439,21 +506,31 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
     } finally {
       setLoading(false);
     }
-  }, [trackingLink, cacheKey, consignment.id, onSignatureLoad, loading]);
+  }, [trackingLink, cacheKey]);
+
+  // Track if signatures have been loaded to disconnect observer
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Load immediately for current page items, or use intersection observer for ahead-of-scroll loading
   useEffect(() => {
     if (loadImmediately) {
-      loadSignatures();
+      loadSignatures().then(() => setHasLoaded(true));
       return;
     }
 
-    // Use intersection observer for future page items with large margin
+    // Don't recreate observer if already loaded
+    if (hasLoaded) return;
+
+    // Use intersection observer for future page items with reduced margin
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            loadSignatures();
+          if (entry.isIntersecting && !hasLoaded) {
+            loadSignatures().then(() => {
+              setHasLoaded(true);
+              // Disconnect observer after successful load to prevent retriggering
+              observer.disconnect();
+            });
           }
         });
       },
@@ -465,7 +542,7 @@ function SignatureThumbnail({ consignment, onSignatureLoad, loadImmediately = fa
     }
 
     return () => observer.disconnect();
-  }, [loadSignatures]);
+  }, [loadImmediately, hasLoaded]); // Removed loadSignatures to prevent recreation
 
   if (loading) {
     return (
