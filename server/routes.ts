@@ -2752,9 +2752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Extract POD photos from tracking system
   app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
-      console.log(`🔍 [POD PHOTOS API] Route accessed by user: ${req.user?.email || 'unknown'} (ID: ${req.user?.id || 'unknown'})`);
-      console.log(`🔍 [POD PHOTOS API] User authenticated: ${!!req.user}`);
-      console.log(`🔍 [POD PHOTOS API] Request query:`, req.query);
+      // Debug logging removed for performance
+      // Debug logging removed for performance
+      // Debug logging removed for performance
       
       const { trackingToken, priority = 'low', force = 'false' } = req.query;
       const forceRefresh = force === 'true';
@@ -2767,7 +2767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Normalize tracking token to create consistent cache keys
       const normalizedToken = normalizeToken(trackingToken);
       
-      console.log(`📸 [POD PHOTOS API] Processing tracking token: ${normalizedToken} (original: ${trackingToken}), priority: ${priority}, force: ${forceRefresh}`);
+      // Debug logging removed for performance
       
       // Check cache first for instant response (unless force refresh)
       if (!forceRefresh) {
@@ -2778,7 +2778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cacheValid = Date.now() - cached.timestamp < cacheDuration;
           
           if (cacheValid) {
-            console.log(`✅ [POD PHOTOS API] Cache hit for token ${normalizedToken} - returning ${cached.photos.length} photos, ${cached.signaturePhotos.length} signatures`);
+            // Debug logging removed for performance
             const response = {
               success: true,
               photos: cached.photos,
@@ -2788,17 +2788,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: 'ready',
               cached: true
             };
-            console.log(`📤 [POD PHOTOS API] Sending response:`, {
-              ...response,
-              photos: `[${response.photos.length} photo URLs]`,
-              signaturePhotos: `[${response.signaturePhotos.length} signature URLs]`
-            });
+            // Debug logging removed for performance
             return res.json(response);
           }
         }
         
         // Check database if no valid cache
-        console.log(`📸 [POD PHOTOS API] No valid cache, checking database for token: ${normalizedToken}`);
+        // Debug logging removed for performance
         try {
           const dbPhotos = await storage.getPhotoAssetsByToken(normalizedToken);
           const availablePhotos = dbPhotos.filter(photo => photo.status === 'available');
@@ -2807,12 +2803,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let photos = availablePhotos.filter(p => p.kind === 'photo').map(p => p.url);
             let signaturePhotos = availablePhotos.filter(p => p.kind === 'signature').map(p => p.url);
             
-            console.log(`🔍 [POD PHOTOS API DB] Photos pre-filter: ${photos.length}, signatures pre-filter: ${signaturePhotos.length}`);
+            // Debug logging removed for performance
             
             photos = filterFetchablePhotos(photos);
             signaturePhotos = filterFetchablePhotos(signaturePhotos);
             
-            console.log(`✅ [POD PHOTOS API DB] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
+            // Debug logging removed for performance
             
             // Update cache with database results
             photoCache.set(normalizedToken, {
@@ -2837,7 +2833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Has db entries but all failed/pending - check if recently failed
             const recentFailure = dbPhotos.some(p => p.status === 'failed' && p.fetchedAt && Date.now() - new Date(p.fetchedAt).getTime() < EMPTY_CACHE_DURATION);
             if (recentFailure) {
-              console.log(`📸 [POD PHOTOS API] Recent failure in database, returning empty result`);
+              // Debug logging removed for performance
               return res.json({
                 success: true,
                 photos: [],
@@ -2850,16 +2846,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } catch (error) {
-          console.error(`📸 [POD PHOTOS API] Database check failed:`, error);
+          console.error(`Database check failed:`, error);
         }
       }
       
       // Cache miss or force refresh - return preparing status and trigger background scraping
-      console.log(`⏳ [POD PHOTOS API] ${forceRefresh ? 'Force refresh requested' : 'Cache miss'} for token ${normalizedToken} - triggering background scraping and returning preparing status`);
+      // Debug logging removed for performance
       
       // Trigger background scraping for future requests (don't await)
       photoQueue.addRequest(normalizedToken, priority as 'high' | 'low', forceRefresh).catch(error => {
-        console.error(`❌ [POD PHOTOS API] Background photo scraping failed for token ${normalizedToken}:`, error);
+        console.error(`Background photo scraping failed for token ${normalizedToken}:`, error);
       });
       
       const response = {
@@ -2871,7 +2867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'preparing',
         message: 'Photos are being prepared, please try again in a moment'
       };
-      console.log(`📤 [POD PHOTOS API] Sending preparing response:`, response);
+      // Debug logging removed for performance
       return res.json(response);
       
     } catch (error: any) {
@@ -2926,7 +2922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { src, w, q = 80, fmt = 'webp' } = req.query;
       
-      console.log(`🔍 [IMAGE PROXY] Request received: src=${src}, w=${w}, q=${q}, fmt=${fmt}`);
+      // Debug logging removed for performance
       
       if (!src || typeof src !== 'string') {
         return res.status(400).json({ error: 'src parameter is required' });
@@ -2934,7 +2930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle data URLs directly (no proxying needed)
       if (src.startsWith('data:image/')) {
-        console.log(`📸 [IMAGE PROXY] Handling data URL directly (length: ${src.length})`);
+        // Debug logging removed for performance
         // For data URLs, just return the data directly after basic validation
         try {
           const buffer = Buffer.from(src.split(',')[1], 'base64');
@@ -2946,7 +2942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           return res.send(buffer);
         } catch (error) {
-          console.log(`❌ [IMAGE PROXY] Failed to process data URL: ${error}`);
+          // Debug logging removed for performance
           return res.status(400).json({ error: 'Invalid data URL' });
         }
       }
@@ -2956,12 +2952,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         url = new URL(src);
       } catch {
-        console.log(`❌ [IMAGE PROXY] Invalid URL format: ${src}`);
+        // Debug logging removed for performance
         return res.status(400).json({ error: 'Invalid URL' });
       }
       
       if (!isHostAllowed(url.hostname)) {
-        console.log(`❌ [IMAGE PROXY] Blocked image from hostname: ${url.hostname}, src: ${src}`);
+        // Debug logging removed for performance
         return res.status(403).json({ error: 'Host not allowed' });
       }
       
@@ -2996,13 +2992,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch original image
-      console.log(`📸 [IMAGE PROXY] Fetching image from: ${src}`);
+      // Debug logging removed for performance
       const response = await fetch(src);
       if (!response.ok) {
-        console.log(`❌ [IMAGE PROXY] Failed to fetch image: ${src}, status: ${response.status}, statusText: ${response.statusText}`);
+        // Debug logging removed for performance
         return res.status(404).json({ error: 'Image not found' });
       }
-      console.log(`✅ [IMAGE PROXY] Successfully fetched image: ${src}`);
+      // Debug logging removed for performance
       
       const originalBuffer = Buffer.from(await response.arrayBuffer());
       
