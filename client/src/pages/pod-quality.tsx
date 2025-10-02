@@ -20,11 +20,13 @@ import {
   TrendingUp,
   Users,
   Package,
-  ExternalLink
+  ExternalLink,
+  Eye
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
 import { calculatePODScore, getQualityTier, getPhotoCount } from "@/utils/podMetrics";
+import { PhotoThumbnails } from "@/components/PhotoThumbnails";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -39,27 +41,43 @@ interface PhotoModalProps {
 function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: PhotoModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewingSignatures, setViewingSignatures] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   
   const allImages = viewingSignatures ? signatures : photos;
   const currentImage = allImages[currentIndex];
   
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+    setImageLoading(true);
   };
   
   const handleNext = () => {
     setCurrentIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+    setImageLoading(true);
   };
   
   useEffect(() => {
     setCurrentIndex(0);
+    setImageLoading(true);
   }, [viewingSignatures]);
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === 'ArrowLeft') handlePrevious();
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'Escape') onClose();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, allImages.length]);
   
   if (!isOpen) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>POD Photos - {consignmentNo}</span>
@@ -85,21 +103,32 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
         <div className="relative">
           {allImages.length > 0 ? (
             <>
-              <img
-                src={`/api/image?src=${encodeURIComponent(currentImage)}&w=800&q=90`}
-                alt={`${viewingSignatures ? 'Signature' : 'Photo'} ${currentIndex + 1}`}
-                className="w-full h-auto max-h-[60vh] object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = currentImage;
-                }}
-              />
+              <div className="relative bg-gray-100 min-h-[400px] flex items-center justify-center">
+                {imageLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                )}
+                <img
+                  src={`/api/image?src=${encodeURIComponent(currentImage)}&w=900&q=90`}
+                  alt={`${viewingSignatures ? 'Signature' : 'Photo'} ${currentIndex + 1}`}
+                  className="max-w-full h-auto max-h-[600px] object-contain"
+                  onLoad={() => setImageLoading(false)}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    // Fallback to original URL if image proxy fails
+                    target.src = currentImage;
+                    setImageLoading(false);
+                  }}
+                />
+              </div>
               
               {allImages.length > 1 && (
                 <>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="absolute left-2 top-1/2 -translate-y-1/2"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                     onClick={handlePrevious}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -108,21 +137,22 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                     onClick={handleNext}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                   
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded">
                     {currentIndex + 1} / {allImages.length}
                   </div>
                 </>
               )}
             </>
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-500">
-              No {viewingSignatures ? 'signatures' : 'photos'} available
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+              <Camera className="h-12 w-12 mb-2 text-gray-300" />
+              <p>No {viewingSignatures ? 'signatures' : 'photos'} available</p>
             </div>
           )}
         </div>
@@ -133,13 +163,13 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
 
 export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
     photos: string[];
     signatures: string[];
     consignmentNo: string;
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
+  const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const { toast } = useToast();
   
   // Fetch consignments
@@ -149,7 +179,7 @@ export default function PODQualityDashboard() {
   }>({
     queryKey: ["/api/consignments/stats"],
     enabled: true,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 60000, // Refresh every minute
   });
   
   const consignments = consignmentsData?.consignments || [];
@@ -206,8 +236,8 @@ export default function PODQualityDashboard() {
     stats.tempComplianceRate = Math.round((tempCompliantCount / filteredConsignments.length) * 100);
   }
   
-  // Load photos for a consignment
-  const loadPhotos = async (consignment: Consignment) => {
+  // Load photos for a consignment with retry logic
+  const loadPhotos = async (consignment: Consignment, retryCount = 0) => {
     const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
     if (!trackingLink) {
       toast({
@@ -218,17 +248,33 @@ export default function PODQualityDashboard() {
       return;
     }
     
+    setLoadingPhotos(consignment.id);
+    
     try {
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high&force=true`);
       const data = await response.json();
       
       if (data.success) {
-        setPhotoModal({
-          isOpen: true,
-          photos: data.photos || [],
-          signatures: data.signaturePhotos || [],
-          consignmentNo: consignment.consignmentNo || consignment.orderNumberRef || ""
-        });
+        if (data.status === 'preparing' && retryCount < 3) {
+          // Photos are being prepared, retry after a delay
+          setTimeout(() => loadPhotos(consignment, retryCount + 1), 2000);
+          return;
+        }
+        
+        if ((!data.photos || data.photos.length === 0) && (!data.signaturePhotos || data.signaturePhotos.length === 0)) {
+          toast({
+            title: "No photos found",
+            description: "Photos may still be processing. Try again in a moment.",
+            variant: "destructive"
+          });
+        } else {
+          setPhotoModal({
+            isOpen: true,
+            photos: data.photos || [],
+            signatures: data.signaturePhotos || [],
+            consignmentNo: consignment.consignmentNo || consignment.orderNumberRef || ""
+          });
+        }
       } else {
         toast({
           title: "Failed to load photos",
@@ -239,9 +285,11 @@ export default function PODQualityDashboard() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load photos",
+        description: "Failed to load photos. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setLoadingPhotos(null);
     }
   };
   
@@ -412,89 +460,93 @@ export default function PODQualityDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Consignment</th>
-                  <th className="text-left p-2">Driver</th>
-                  <th className="text-left p-2">Destination</th>
-                  <th className="text-center p-2">Photos</th>
-                  <th className="text-center p-2">Signature</th>
-                  <th className="text-center p-2">Temperature</th>
-                  <th className="text-center p-2">Score</th>
-                  <th className="text-center p-2">Actions</th>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left p-3 font-medium text-gray-700">Consignment</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Driver</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Destination</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Photos</th>
+                  <th className="text-center p-3 font-medium text-gray-700">Signature</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Temperature</th>
+                  <th className="text-center p-3 font-medium text-gray-700">Score</th>
+                  <th className="text-center p-3 font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredConsignments.slice(0, 100).map((consignment: Consignment) => {
                   const metrics = calculatePODScore(consignment);
                   const tier = getQualityTier(metrics.qualityScore);
-                  const hasLiveLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+                  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+                  const actualTemp = consignment.paymentMethod;
+                  const expectedTemp = consignment.expectedTemperature;
                   
                   return (
-                    <tr key={consignment.id} className="border-b hover:bg-gray-50">
-                      <td className="p-2">
+                    <tr key={consignment.id} className="border-b hover:bg-gray-50/50 transition-colors">
+                      <td className="p-3">
                         <div>
-                          <div className="font-medium">{consignment.consignmentNo || consignment.orderNumberRef}</div>
+                          <div className="font-medium text-gray-900">{consignment.consignmentNo || consignment.orderNumberRef}</div>
                           <div className="text-sm text-gray-500">{consignment.orderNumberRef}</div>
                         </div>
                       </td>
-                      <td className="p-2">
-                        <div className="text-sm">{consignment.driverName || "-"}</div>
+                      <td className="p-3">
+                        <div className="text-sm text-gray-700">{consignment.driverName || "-"}</div>
                       </td>
-                      <td className="p-2">
+                      <td className="p-3">
                         <div className="text-sm">
-                          <div>{consignment.shipToCompanyName}</div>
+                          <div className="text-gray-900">{consignment.shipToCompanyName}</div>
                           <div className="text-gray-500">{consignment.shipToCity}</div>
                         </div>
                       </td>
-                      <td className="p-2 text-center">
-                        {metrics.photoCount > 0 ? (
-                          <Badge variant={metrics.photoCount >= 3 ? "default" : "secondary"}>
-                            <Camera className="h-3 w-3 mr-1" />
-                            {metrics.photoCount}
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            0
-                          </Badge>
-                        )}
+                      <td className="p-3">
+                        <PhotoThumbnails
+                          trackingLink={trackingLink}
+                          photoCount={metrics.photoCount}
+                          consignmentId={consignment.id}
+                        />
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-3 text-center">
                         {metrics.hasSignature ? (
                           <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
                         ) : (
-                          <XCircle className="h-5 w-5 text-red-600 mx-auto" />
+                          <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                         )}
                       </td>
-                      <td className="p-2 text-center">
-                        {consignment.expectedTemperature === "Dry" ? (
+                      <td className="p-3">
+                        {expectedTemp === "Dry" || !expectedTemp ? (
                           <span className="text-sm text-gray-500">N/A</span>
-                        ) : metrics.temperatureCompliant ? (
-                          <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
                         ) : (
-                          <AlertTriangle className="h-5 w-5 text-yellow-600 mx-auto" />
+                          <div className="text-sm">
+                            <div className={`font-medium ${metrics.temperatureCompliant ? 'text-green-700' : 'text-red-700'}`}>
+                              {actualTemp ? `${actualTemp}°C` : 'Not recorded'}
+                            </div>
+                            <div className="text-gray-500 text-xs">{expectedTemp}</div>
+                          </div>
                         )}
                       </td>
-                      <td className="p-2 text-center">
-                        <Badge className={tier.color}>
+                      <td className="p-3 text-center">
+                        <Badge className={`${tier.color} bg-opacity-10`}>
                           {tier.icon} {metrics.qualityScore}%
                         </Badge>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-3 text-center">
                         <div className="flex gap-1 justify-center">
-                          {hasLiveLink && (
+                          {trackingLink && (
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => loadPhotos(consignment)}
+                              disabled={loadingPhotos === consignment.id}
                               data-testid={`button-view-photos-${consignment.id}`}
                             >
-                              <Camera className="h-4 w-4" />
+                              {loadingPhotos === consignment.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
                             </Button>
                           )}
-                          {hasLiveLink && (
+                          {trackingLink && (
                             <a
-                              href={hasLiveLink}
+                              href={trackingLink}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex"
