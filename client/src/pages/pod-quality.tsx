@@ -298,26 +298,37 @@ export default function PODQualityDashboard() {
   
   // Load photos for a consignment with improved retry logic
   const loadPhotos = async (consignment: Consignment) => {
-    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-    if (!trackingLink) {
-      toast({
-        title: "No tracking link",
-        description: "This consignment doesn't have a tracking link for photos",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Extract token from tracking link - the token is the last part of the URL
-    const token = trackingLink.split('/').pop() || trackingLink;
-    
     setLoadingPhotos(consignment.id);
     const currentRetries = photoLoadRetries.get(consignment.id) || 0;
     
     try {
-      // Force refresh to bypass cache
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high&force=true`);
-      const data = await response.json();
+      let response;
+      let data;
+      
+      // First try the direct Axylog API endpoint
+      response = await apiRequest('GET', `/api/pod-direct?consignmentId=${consignment.id}`);
+      data = await response.json();
+      
+      // If direct API doesn't return photos, fall back to web scraping
+      if (!data.success || ((!data.photos || data.photos.length === 0) && (!data.signaturePhotos || data.signaturePhotos.length === 0))) {
+        const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+        if (trackingLink) {
+          // Extract token from tracking link - the token is the last part of the URL
+          const token = trackingLink.split('/').pop() || trackingLink;
+          
+          // Force refresh to bypass cache
+          response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high&force=true`);
+          data = await response.json();
+        } else if (!data.success) {
+          // No tracking link and direct API failed
+          toast({
+            title: "No photos available",
+            description: "Unable to retrieve photos for this consignment",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
       
       if (data.success) {
         if ((data.status === 'preparing' || (!data.photos?.length && !data.signaturePhotos?.length)) && currentRetries < 5) {
