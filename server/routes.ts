@@ -2753,6 +2753,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log("Admin sync completed - all users will now see this data automatically");
         
+        // Proactively pre-fetch photos for all synced deliveries in background
+        try {
+          console.log("[PHOTO PRE-FETCH] Starting proactive photo ingestion for synced deliveries...");
+          await photoWorker.enqueueFromConsignments();
+          console.log("[PHOTO PRE-FETCH] Photo ingestion jobs queued successfully");
+        } catch (prefetchError) {
+          console.error("[PHOTO PRE-FETCH] Failed to queue photo jobs:", prefetchError);
+          // Don't fail the sync if photo pre-fetch fails
+        }
+        
       } catch (syncError) {
         syncStatus = 'failed';
         errorMessage = syncError instanceof Error ? syncError.message : 'Unknown error';
