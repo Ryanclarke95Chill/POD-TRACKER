@@ -2,6 +2,7 @@ import { Cluster } from 'puppeteer-cluster';
 import { storage } from './storage';
 import { createHash } from 'crypto';
 import { invalidatePhotoCache, normalizeToken } from './routes';
+import { filterAndClassifyPhotos, type PhotoCandidate } from './photoFilters';
 
 // Security-aware browser arguments based on environment
 function getSecureBrowserArgs(): string[] {
@@ -209,7 +210,7 @@ export class PhotoIngestionWorker {
         }
         
         // Extract all image elements and their metadata
-        const images = await page.evaluate(() => {
+        const images: PhotoCandidate[] = await page.evaluate(() => {
           const imgElements = Array.from(document.querySelectorAll('img'));
           return imgElements.map(img => ({
             src: img.src,
@@ -220,35 +221,21 @@ export class PhotoIngestionWorker {
           }));
         });
         
-        const extractedPhotos: ExtractedPhoto[] = [];
+        console.log(`[Worker] Extracted ${images.length} raw images from page for token ${token}`);
         
-        for (const img of images) {
-          // Filter out UI elements and invalid images
-          if (!img.src || img.width < 50 || img.height < 50) continue;
-          if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
-          if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
-          
-          // Classify as signature or regular photo using dimensions and text
-          const aspectRatio = img.width / Math.max(img.height, 1);
-          const text = (img.alt + ' ' + img.className).toLowerCase();
-          
-          // Signature photos are typically wide and short (high aspect ratio)
-          const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
-          
-          // Also check text content as backup
-          const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
-          
-          const isSignature = isDimensionSignature || isTextSignature;
-          
-          extractedPhotos.push({
-            url: img.src,
-            kind: isSignature ? 'signature' : 'photo',
-            width: img.width,
-            height: img.height
-          });
-        }
+        // Apply smart filtering to exclude UI elements, social icons, banners, etc.
+        const filteredPhotos = filterAndClassifyPhotos(images);
         
-        console.log(`[Worker] Found ${extractedPhotos.length} photos for token ${token}`);
+        console.log(`[Worker] After filtering: ${filteredPhotos.length} valid photos (${filteredPhotos.filter(p => p.kind === 'photo').length} delivery photos, ${filteredPhotos.filter(p => p.kind === 'signature').length} signatures) from ${images.length} raw images`);
+        
+        // Convert to ExtractedPhoto format
+        const extractedPhotos: ExtractedPhoto[] = filteredPhotos.map(photo => ({
+          url: photo.url,
+          kind: photo.kind,
+          width: photo.width,
+          height: photo.height
+        }));
+        
         return extractedPhotos;
         
       } catch (error) {
