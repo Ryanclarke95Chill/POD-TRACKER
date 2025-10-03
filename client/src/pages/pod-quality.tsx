@@ -177,10 +177,10 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
 
 export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<Filters>({
-    driver: "",
-    city: "",
+    driver: "all",
+    city: "all",
     scoreMin: 0,
     scoreMax: 100,
     tempCompliant: "all",
@@ -232,10 +232,10 @@ export default function PODQualityDashboard() {
     const metrics = calculatePODScore(c);
     
     // Driver filter
-    if (filters.driver && c.driverName !== filters.driver) return false;
+    if (filters.driver !== "all" && c.driverName !== filters.driver) return false;
     
     // City filter
-    if (filters.city && c.shipToCity !== filters.city) return false;
+    if (filters.city !== "all" && c.shipToCity !== filters.city) return false;
     
     // Score range filter
     if (metrics.qualityScore < filters.scoreMin || metrics.qualityScore > filters.scoreMax) return false;
@@ -398,8 +398,8 @@ export default function PODQualityDashboard() {
   
   const resetFilters = () => {
     setFilters({
-      driver: "",
-      city: "",
+      driver: "all",
+      city: "all",
       scoreMin: 0,
       scoreMax: 100,
       tempCompliant: "all",
@@ -410,8 +410,8 @@ export default function PODQualityDashboard() {
   };
   
   const activeFilterCount = [
-    filters.driver,
-    filters.city,
+    filters.driver !== "all",
+    filters.city !== "all",
     filters.scoreMin > 0 || filters.scoreMax < 100,
     filters.tempCompliant !== "all",
     filters.hasSignature !== "all",
@@ -588,7 +588,7 @@ export default function PODQualityDashboard() {
                         <SelectValue placeholder="All drivers" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All drivers</SelectItem>
+                        <SelectItem value="all">All drivers</SelectItem>
                         {uniqueDrivers.map(driver => (
                           <SelectItem key={driver} value={driver}>{driver}</SelectItem>
                         ))}
@@ -603,7 +603,7 @@ export default function PODQualityDashboard() {
                         <SelectValue placeholder="All cities" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All cities</SelectItem>
+                        <SelectItem value="all">All cities</SelectItem>
                         {uniqueCities.map(city => (
                           <SelectItem key={city} value={city}>{city}</SelectItem>
                         ))}
