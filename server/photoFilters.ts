@@ -50,14 +50,31 @@ export function filterAndClassifyPhotos(images: PhotoCandidate[]): FilteredPhoto
     
     // Check if it's a signature first (before dimension filtering)
     const text = ((img.alt || '') + ' ' + (img.className || '')).toLowerCase();
-    const isDimensionSignature = img.width >= 600 && img.height <= 400 && aspectRatio >= 2.0;
-    const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
-    const isSignature = isDimensionSignature || isTextSignature;
     
-    // For signatures, allow them through with special handling
+    // STRICT signature detection to exclude banners/headers:
+    // - Height must be ≤220px (actual signatures are thin)
+    // - Aspect ratio must be ≥3.0 (very wide and short)
+    // - Width must be between 300-1200px (not ultra-wide banners)
+    // - Pixel area must be ≤120k (no large marketing images)
+    const isDimensionSignature = 
+      img.height <= 220 && 
+      aspectRatio >= 3.0 && 
+      img.width >= 300 && 
+      img.width <= 1200 &&
+      pixelArea <= 120000;
+    
+    const isTextSignature = 
+      text.includes('signature') || 
+      text.includes('firma') || 
+      text.includes('sign');
+    
+    // Only accept as signature if BOTH dimension AND text match, or dimension criteria is very strict
+    const isSignature = (isDimensionSignature && isTextSignature) || 
+                        (isDimensionSignature && img.height <= 180);
+    
+    // For signatures, apply strict filtering
     if (isSignature) {
-      // Signatures can be wider/shorter, so less strict filtering
-      if (shortSide >= 100 && isValidPhotoUrl(img.src)) {
+      if (shortSide >= 120 && pixelArea <= 120000 && isValidPhotoUrl(img.src)) {
         filtered.push({
           url: img.src,
           kind: 'signature',

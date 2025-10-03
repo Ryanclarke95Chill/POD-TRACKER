@@ -41,13 +41,11 @@ interface PhotoModalProps {
 }
 
 interface Filters {
+  shipper: string;
+  warehouse: string;
   driver: string;
-  city: string;
-  scoreMin: number;
-  scoreMax: number;
-  tempCompliant: string;
-  hasSignature: string;
-  photoCount: string;
+  fromDate: string;
+  toDate: string;
 }
 
 function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: PhotoModalProps) {
@@ -178,13 +176,11 @@ export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<Filters>({
+    shipper: "all",
+    warehouse: "all",
     driver: "all",
-    city: "all",
-    scoreMin: 0,
-    scoreMax: 100,
-    tempCompliant: "all",
-    hasSignature: "all",
-    photoCount: "all"
+    fromDate: "",
+    toDate: ""
   });
   
   const [photoModal, setPhotoModal] = useState<{
@@ -209,9 +205,10 @@ export default function PODQualityDashboard() {
   
   const consignments = consignmentsData?.consignments || [];
   
-  // Get unique drivers and cities for filter dropdowns
+  // Get unique shippers, warehouses, and drivers for filter dropdowns
+  const uniqueShippers = Array.from(new Set(consignments.map((c: Consignment) => (c as any).shipperCompanyName).filter((name): name is string => Boolean(name)))).sort();
+  const uniqueWarehouses = Array.from(new Set(consignments.map((c: Consignment) => c.warehouseCompanyName).filter((name): name is string => Boolean(name)))).sort();
   const uniqueDrivers = Array.from(new Set(consignments.map((c: Consignment) => c.driverName).filter((name): name is string => Boolean(name)))).sort();
-  const uniqueCities = Array.from(new Set(consignments.map((c: Consignment) => c.shipToCity).filter((city): city is string => Boolean(city)))).sort();
   
   // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
@@ -227,32 +224,45 @@ export default function PODQualityDashboard() {
     
     if (!matchesSearch) return false;
     
-    // Apply additional filters
-    const metrics = calculatePODScore(c);
+    // Shipper filter
+    const matchesShipper = filters.shipper === "all" || (c as any).shipperCompanyName === filters.shipper;
+    
+    // Warehouse filter
+    const matchesWarehouse = filters.warehouse === "all" || c.warehouseCompanyName === filters.warehouse;
     
     // Driver filter
-    if (filters.driver !== "all" && c.driverName !== filters.driver) return false;
+    const matchesDriver = filters.driver === "all" || c.driverName === filters.driver;
     
-    // City filter
-    if (filters.city !== "all" && c.shipToCity !== filters.city) return false;
+    // Date filtering logic - convert to AEST timezone (same as dashboard)
+    const matchesDateRange = (() => {
+      if (!filters.fromDate && !filters.toDate) return true;
+      
+      // Check multiple ETA fields as suggested
+      const consignmentDate = (c as any).delivery_PlannedETA || 
+                              (c as any).delivery_ETA || 
+                              (c as any).delivery_FirstCalculatedETA ||
+                              (c as any).pickUp_PlannedETA ||
+                              (c as any).pickUp_ETA ||
+                              (c as any).pickUp_FirstCalculatedETA ||
+                              c.departureDateTime;
+      if (!consignmentDate) return true; // Show consignments without dates
+      
+      // Convert UTC date to AEST (UTC+10) for comparison
+      const utcDate = new Date(consignmentDate);
+      const aestDate = new Date(utcDate.getTime() + (10 * 60 * 60 * 1000)); // Add 10 hours for AEST
+      const dateString = aestDate.toISOString().split('T')[0];
+      
+      if (filters.fromDate && filters.toDate) {
+        return dateString >= filters.fromDate && dateString <= filters.toDate;
+      } else if (filters.fromDate) {
+        return dateString >= filters.fromDate;
+      } else if (filters.toDate) {
+        return dateString <= filters.toDate;
+      }
+      return true;
+    })();
     
-    // Score range filter
-    if (metrics.qualityScore < filters.scoreMin || metrics.qualityScore > filters.scoreMax) return false;
-    
-    // Temperature compliance filter
-    if (filters.tempCompliant === "yes" && !metrics.temperatureCompliant) return false;
-    if (filters.tempCompliant === "no" && metrics.temperatureCompliant) return false;
-    
-    // Signature filter
-    if (filters.hasSignature === "yes" && !metrics.hasSignature) return false;
-    if (filters.hasSignature === "no" && metrics.hasSignature) return false;
-    
-    // Photo count filter
-    if (filters.photoCount === "0" && metrics.photoCount > 0) return false;
-    if (filters.photoCount === "1-2" && (metrics.photoCount === 0 || metrics.photoCount > 2)) return false;
-    if (filters.photoCount === "3+" && metrics.photoCount < 3) return false;
-    
-    return true;
+    return matchesSearch && matchesShipper && matchesWarehouse && matchesDriver && matchesDateRange;
   });
   
   // Calculate overall statistics
@@ -400,24 +410,21 @@ export default function PODQualityDashboard() {
   
   const resetFilters = () => {
     setFilters({
+      shipper: "all",
+      warehouse: "all",
       driver: "all",
-      city: "all",
-      scoreMin: 0,
-      scoreMax: 100,
-      tempCompliant: "all",
-      hasSignature: "all",
-      photoCount: "all"
+      fromDate: "",
+      toDate: ""
     });
     setSearchTerm("");
   };
   
   const activeFilterCount = [
+    filters.shipper !== "all",
+    filters.warehouse !== "all",
     filters.driver !== "all",
-    filters.city !== "all",
-    filters.scoreMin > 0 || filters.scoreMax < 100,
-    filters.tempCompliant !== "all",
-    filters.hasSignature !== "all",
-    filters.photoCount !== "all"
+    filters.fromDate !== "",
+    filters.toDate !== ""
   ].filter(Boolean).length;
   
   if (isLoading) {
@@ -584,6 +591,36 @@ export default function PODQualityDashboard() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
+                    <label className="text-sm font-medium mb-1 block">Shipper</label>
+                    <Select value={filters.shipper} onValueChange={(v) => setFilters({...filters, shipper: v})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All shippers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All shippers</SelectItem>
+                        {uniqueShippers.map(shipper => (
+                          <SelectItem key={shipper} value={shipper}>{shipper}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Warehouse</label>
+                    <Select value={filters.warehouse} onValueChange={(v) => setFilters({...filters, warehouse: v})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All warehouses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All warehouses</SelectItem>
+                        {uniqueWarehouses.map(warehouse => (
+                          <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
                     <label className="text-sm font-medium mb-1 block">Driver</label>
                     <Select value={filters.driver} onValueChange={(v) => setFilters({...filters, driver: v})}>
                       <SelectTrigger>
@@ -599,86 +636,21 @@ export default function PODQualityDashboard() {
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium mb-1 block">City</label>
-                    <Select value={filters.city} onValueChange={(v) => setFilters({...filters, city: v})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All cities" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All cities</SelectItem>
-                        {uniqueCities.map(city => (
-                          <SelectItem key={city} value={city}>{city}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <label className="text-sm font-medium mb-1 block">From Date</label>
+                    <Input
+                      type="date"
+                      value={filters.fromDate}
+                      onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
+                    />
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium mb-1 block">Score Range</label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={filters.scoreMin}
-                        onChange={(e) => setFilters({...filters, scoreMin: Number(e.target.value)})}
-                        min={0}
-                        max={100}
-                        className="w-20"
-                      />
-                      <span className="self-center">-</span>
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={filters.scoreMax}
-                        onChange={(e) => setFilters({...filters, scoreMax: Number(e.target.value)})}
-                        min={0}
-                        max={100}
-                        className="w-20"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Temperature</label>
-                    <Select value={filters.tempCompliant} onValueChange={(v) => setFilters({...filters, tempCompliant: v})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="yes">Compliant</SelectItem>
-                        <SelectItem value="no">Non-compliant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Signature</label>
-                    <Select value={filters.hasSignature} onValueChange={(v) => setFilters({...filters, hasSignature: v})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="yes">Has signature</SelectItem>
-                        <SelectItem value="no">No signature</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Photo Count</label>
-                    <Select value={filters.photoCount} onValueChange={(v) => setFilters({...filters, photoCount: v})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="0">No photos</SelectItem>
-                        <SelectItem value="1-2">1-2 photos</SelectItem>
-                        <SelectItem value="3+">3+ photos</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="text-sm font-medium mb-1 block">To Date</label>
+                    <Input
+                      type="date"
+                      value={filters.toDate}
+                      onChange={(e) => setFilters({...filters, toDate: e.target.value})}
+                    />
                   </div>
                 </div>
               </div>
