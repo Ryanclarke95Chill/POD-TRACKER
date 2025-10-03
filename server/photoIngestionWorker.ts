@@ -513,18 +513,24 @@ export class PhotoIngestionWorker {
     console.log('[Worker] Photo ingestion worker stopped');
   }
   
-  // Method to bulk enqueue jobs from consignments
+  // Method to bulk enqueue jobs from consignments  
+  // Only enqueues first 50 deliveries for fast loading of top visible items
   async enqueueFromConsignments(): Promise<void> {
     try {
       const consignments = await storage.getAllConsignments();
       console.log(`[Worker] Found ${consignments.length} consignments for photo ingestion`);
       
-      for (const consignment of consignments) {
+      // PERFORMANCE OPTIMIZATION: Only queue first 50 deliveries (top of list that user sees first)
+      // Other deliveries will be loaded on-demand when user clicks "View Photos"
+      const topConsignments = consignments.slice(0, 50);
+      console.log(`[Worker] Prioritizing first ${topConsignments.length} consignments for fast loading`);
+      
+      for (const consignment of topConsignments) {
         // Extract token from delivery tracking link
         if (consignment.deliveryLiveTrackLink) {
           const token = this.extractTokenFromUrl(consignment.deliveryLiveTrackLink);
           if (token) {
-            await this.enqueueJob(token, 'low');
+            await this.enqueueJob(token, 'low'); // Low priority for background preload
           }
         }
         
@@ -532,12 +538,12 @@ export class PhotoIngestionWorker {
         if (consignment.pickupLiveTrackLink) {
           const token = this.extractTokenFromUrl(consignment.pickupLiveTrackLink);
           if (token) {
-            await this.enqueueJob(token, 'low');
+            await this.enqueueJob(token, 'low'); // Low priority for background preload
           }
         }
       }
       
-      console.log(`[Worker] Enqueued ${this.jobQueue.length} photo ingestion jobs`);
+      console.log(`[Worker] Enqueued ${this.jobQueue.length} photo ingestion jobs for top consignments`);
     } catch (error) {
       console.error('[Worker] Error enqueuing jobs from consignments:', error);
     }
