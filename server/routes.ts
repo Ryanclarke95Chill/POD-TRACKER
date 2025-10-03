@@ -2775,7 +2775,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signatures: string[] = [];
       
       // Try to get POD data from Axylog API
-      const axylogAPI = new AxylogAPI();
       const authenticated = await axylogAPI.authenticate();
       
       if (!authenticated) {
@@ -2787,7 +2786,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // Get year, code, prog from consignment reference or Axylog API
-        const credentials = (axylogAPI as any).credentials;
+        const credentials = axylogAPI.credentials;
+        
+        if (!credentials) {
+          throw new Error('Failed to get Axylog credentials');
+        }
         
         // Make POST request to get delivery info
         const deliveryResponse = await axios.post(
