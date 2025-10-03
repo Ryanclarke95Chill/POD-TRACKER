@@ -11,6 +11,26 @@ export interface PODMetrics {
   scoreBreakdown: ScoreBreakdown;
 }
 
+// Get actual temperature reading from consignment
+export function getActualTemperature(consignment: Consignment): string | null {
+  // Primary source: paymentMethod field
+  if (consignment.paymentMethod && consignment.paymentMethod !== "null") {
+    return consignment.paymentMethod;
+  }
+  
+  // Backup source: amountToCollect field
+  if (consignment.amountToCollect && consignment.amountToCollect !== "null") {
+    return consignment.amountToCollect;
+  }
+  
+  // Backup source: amountCollected field
+  if (consignment.amountCollected && consignment.amountCollected !== "null") {
+    return consignment.amountCollected;
+  }
+  
+  return null;
+}
+
 // Check if temperature reading is compliant with expected temperature zone
 export function checkTemperatureCompliance(consignment: Consignment): boolean {
   const expectedTemp = consignment.expectedTemperature;
@@ -20,8 +40,8 @@ export function checkTemperatureCompliance(consignment: Consignment): boolean {
     return true;
   }
   
-  // Get actual temperature reading from paymentMethod field
-  const actualTemp = consignment.paymentMethod;
+  // Get actual temperature reading
+  const actualTemp = getActualTemperature(consignment);
   
   // No temperature reading = not compliant if temperature is required
   if (!actualTemp) {
@@ -142,6 +162,8 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
   
   // Temperature compliance (20 points)
   const tempCompliant = checkTemperatureCompliance(consignment);
+  const actualTemp = getActualTemperature(consignment);
+  
   if (tempCompliant) {
     if (consignment.expectedTemperature === "Dry") {
       scoreBreakdown.temperature = { 
@@ -150,7 +172,6 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
         status: "pass" 
       };
     } else {
-      const actualTemp = consignment.paymentMethod;
       scoreBreakdown.temperature = { 
         points: 20, 
         reason: `Temperature compliant (${actualTemp}°C)`, 
@@ -158,11 +179,10 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
       };
     }
   } else {
-    const actualTemp = consignment.paymentMethod || "Not recorded";
     const expectedTemp = consignment.expectedTemperature;
     scoreBreakdown.temperature = { 
       points: 0, 
-      reason: `Temperature out of range (${actualTemp}°C, expected ${expectedTemp})`, 
+      reason: `Temperature out of range (${actualTemp || "Not recorded"}, expected ${expectedTemp})`, 
       status: "fail" 
     };
   }
@@ -198,15 +218,15 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
 export function getQualityTier(score: number): {
   tier: string;
   color: string;
-  icon: string;
+  label: string;
 } {
   if (score >= 90) {
-    return { tier: "Gold", color: "text-yellow-600", icon: "🏆" };
+    return { tier: "Excellent", color: "text-green-700", label: "Excellent" };
   } else if (score >= 75) {
-    return { tier: "Silver", color: "text-gray-600", icon: "🥈" };
+    return { tier: "Good", color: "text-blue-700", label: "Good" };
   } else if (score >= 60) {
-    return { tier: "Bronze", color: "text-orange-600", icon: "🥉" };
+    return { tier: "Fair", color: "text-yellow-700", label: "Fair" };
   } else {
-    return { tier: "Needs Improvement", color: "text-red-600", icon: "⚠️" };
+    return { tier: "Poor", color: "text-red-700", label: "Poor" };
   }
 }

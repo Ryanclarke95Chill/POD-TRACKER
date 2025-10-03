@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Camera, 
@@ -21,11 +22,13 @@ import {
   Users,
   Package,
   ExternalLink,
-  Eye
+  Eye,
+  Filter,
+  X
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
-import { calculatePODScore, getQualityTier, getPhotoCount } from "@/utils/podMetrics";
+import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature } from "@/utils/podMetrics";
 import { PhotoThumbnails } from "@/components/PhotoThumbnails";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -36,6 +39,16 @@ interface PhotoModalProps {
   photos: string[];
   signatures: string[];
   consignmentNo: string;
+}
+
+interface Filters {
+  driver: string;
+  city: string;
+  scoreMin: number;
+  scoreMax: number;
+  tempCompliant: string;
+  hasSignature: string;
+  photoCount: string;
 }
 
 function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: PhotoModalProps) {
@@ -153,6 +166,7 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
             <div className="flex flex-col items-center justify-center h-64 text-gray-500">
               <Camera className="h-12 w-12 mb-2 text-gray-300" />
               <p>No {viewingSignatures ? 'signatures' : 'photos'} available</p>
+              <p className="text-sm mt-2">Photos may still be processing, please try again in a moment</p>
             </div>
           )}
         </div>
@@ -163,6 +177,17 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
 
 export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    driver: "",
+    city: "",
+    scoreMin: 0,
+    scoreMax: 100,
+    tempCompliant: "all",
+    hasSignature: "all",
+    photoCount: "all"
+  });
+  
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
     photos: string[];
@@ -170,6 +195,7 @@ export default function PODQualityDashboard() {
     consignmentNo: string;
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
+  const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
   const { toast } = useToast();
   
   // Fetch consignments
@@ -184,16 +210,50 @@ export default function PODQualityDashboard() {
   
   const consignments = consignmentsData?.consignments || [];
   
-  // Filter consignments based on search
+  // Get unique drivers and cities for filter dropdowns
+  const uniqueDrivers = [...new Set(consignments.map((c: Consignment) => c.driverName).filter(Boolean))].sort();
+  const uniqueCities = [...new Set(consignments.map((c: Consignment) => c.shipToCity).filter(Boolean))].sort();
+  
+  // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
+    // Search filter
     const search = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = !searchTerm || (
       c.consignmentNo?.toLowerCase().includes(search) ||
       c.orderNumberRef?.toLowerCase().includes(search) ||
       c.driverName?.toLowerCase().includes(search) ||
       c.shipToCompanyName?.toLowerCase().includes(search) ||
       c.shipToCity?.toLowerCase().includes(search)
     );
+    
+    if (!matchesSearch) return false;
+    
+    // Apply additional filters
+    const metrics = calculatePODScore(c);
+    
+    // Driver filter
+    if (filters.driver && c.driverName !== filters.driver) return false;
+    
+    // City filter
+    if (filters.city && c.shipToCity !== filters.city) return false;
+    
+    // Score range filter
+    if (metrics.qualityScore < filters.scoreMin || metrics.qualityScore > filters.scoreMax) return false;
+    
+    // Temperature compliance filter
+    if (filters.tempCompliant === "yes" && !metrics.temperatureCompliant) return false;
+    if (filters.tempCompliant === "no" && metrics.temperatureCompliant) return false;
+    
+    // Signature filter
+    if (filters.hasSignature === "yes" && !metrics.hasSignature) return false;
+    if (filters.hasSignature === "no" && metrics.hasSignature) return false;
+    
+    // Photo count filter
+    if (filters.photoCount === "0" && metrics.photoCount > 0) return false;
+    if (filters.photoCount === "1-2" && (metrics.photoCount === 0 || metrics.photoCount > 2)) return false;
+    if (filters.photoCount === "3+" && metrics.photoCount < 3) return false;
+    
+    return true;
   });
   
   // Calculate overall statistics
@@ -224,9 +284,9 @@ export default function PODQualityDashboard() {
       if (metrics.temperatureCompliant) tempCompliantCount++;
       
       const tier = getQualityTier(metrics.qualityScore);
-      if (tier.tier === "Gold") stats.goldCount++;
-      else if (tier.tier === "Silver") stats.silverCount++;
-      else if (tier.tier === "Bronze") stats.bronzeCount++;
+      if (tier.tier === "Excellent") stats.goldCount++;
+      else if (tier.tier === "Good") stats.silverCount++;
+      else if (tier.tier === "Fair") stats.bronzeCount++;
       else stats.needsImprovementCount++;
     });
     
@@ -236,8 +296,8 @@ export default function PODQualityDashboard() {
     stats.tempComplianceRate = Math.round((tempCompliantCount / filteredConsignments.length) * 100);
   }
   
-  // Load photos for a consignment with retry logic
-  const loadPhotos = async (consignment: Consignment, retryCount = 0) => {
+  // Load photos for a consignment with improved retry logic
+  const loadPhotos = async (consignment: Consignment) => {
     const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
     if (!trackingLink) {
       toast({
@@ -249,22 +309,39 @@ export default function PODQualityDashboard() {
     }
     
     setLoadingPhotos(consignment.id);
+    const currentRetries = photoLoadRetries.get(consignment.id) || 0;
     
     try {
+      // Force refresh to bypass cache
       const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high&force=true`);
       const data = await response.json();
       
       if (data.success) {
-        if (data.status === 'preparing' && retryCount < 3) {
-          // Photos are being prepared, retry after a delay
-          setTimeout(() => loadPhotos(consignment, retryCount + 1), 2000);
+        if ((data.status === 'preparing' || (!data.photos?.length && !data.signaturePhotos?.length)) && currentRetries < 5) {
+          // Increment retry count
+          setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, currentRetries + 1)));
+          
+          // Show loading toast only on first retry
+          if (currentRetries === 0) {
+            toast({
+              title: "Loading photos...",
+              description: "Photos are being processed, this may take a moment",
+            });
+          }
+          
+          // Retry with exponential backoff
+          const delay = Math.min(1000 * Math.pow(1.5, currentRetries), 5000);
+          setTimeout(() => loadPhotos(consignment), delay);
           return;
         }
         
+        // Reset retry count on success
+        setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, 0)));
+        
         if ((!data.photos || data.photos.length === 0) && (!data.signaturePhotos || data.signaturePhotos.length === 0)) {
           toast({
-            title: "No photos found",
-            description: "Photos may still be processing. Try again in a moment.",
+            title: "No photos available",
+            description: "No photos found for this consignment. They may not have been uploaded yet.",
             variant: "destructive"
           });
         } else {
@@ -283,6 +360,7 @@ export default function PODQualityDashboard() {
         });
       }
     } catch (error) {
+      console.error('Photo loading error:', error);
       toast({
         title: "Error",
         description: "Failed to load photos. Please try again.",
@@ -317,6 +395,28 @@ export default function PODQualityDashboard() {
       });
     }
   });
+  
+  const resetFilters = () => {
+    setFilters({
+      driver: "",
+      city: "",
+      scoreMin: 0,
+      scoreMax: 100,
+      tempCompliant: "all",
+      hasSignature: "all",
+      photoCount: "all"
+    });
+    setSearchTerm("");
+  };
+  
+  const activeFilterCount = [
+    filters.driver,
+    filters.city,
+    filters.scoreMin > 0 || filters.scoreMax < 100,
+    filters.tempCompliant !== "all",
+    filters.hasSignature !== "all",
+    filters.photoCount !== "all"
+  ].filter(Boolean).length;
   
   if (isLoading) {
     return (
@@ -411,25 +511,25 @@ export default function PODQualityDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-3xl mb-1">🏆</div>
-              <div className="text-2xl font-bold text-yellow-600">{stats.goldCount}</div>
-              <div className="text-sm text-gray-600">Gold (90+)</div>
+            <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
+              <div className="text-3xl font-bold text-green-700 mb-1">{stats.goldCount}</div>
+              <div className="text-sm font-medium text-green-800">Excellent</div>
+              <div className="text-xs text-green-600">90-100%</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl mb-1">🥈</div>
-              <div className="text-2xl font-bold text-gray-600">{stats.silverCount}</div>
-              <div className="text-sm text-gray-600">Silver (75-89)</div>
+            <div className="text-center p-4 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-3xl font-bold text-blue-700 mb-1">{stats.silverCount}</div>
+              <div className="text-sm font-medium text-blue-800">Good</div>
+              <div className="text-xs text-blue-600">75-89%</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl mb-1">🥉</div>
-              <div className="text-2xl font-bold text-orange-600">{stats.bronzeCount}</div>
-              <div className="text-sm text-gray-600">Bronze (60-74)</div>
+            <div className="text-center p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+              <div className="text-3xl font-bold text-yellow-700 mb-1">{stats.bronzeCount}</div>
+              <div className="text-sm font-medium text-yellow-800">Fair</div>
+              <div className="text-xs text-yellow-600">60-74%</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl mb-1">⚠️</div>
-              <div className="text-2xl font-bold text-red-600">{stats.needsImprovementCount}</div>
-              <div className="text-sm text-gray-600">Needs Work</div>
+            <div className="text-center p-4 rounded-lg bg-red-50 border border-red-200">
+              <div className="text-3xl font-bold text-red-700 mb-1">{stats.needsImprovementCount}</div>
+              <div className="text-sm font-medium text-red-800">Poor</div>
+              <div className="text-xs text-red-600">&lt;60%</div>
             </div>
           </div>
         </CardContent>
@@ -438,22 +538,149 @@ export default function PODQualityDashboard() {
       {/* Consignments Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Consignments</CardTitle>
-              <CardDescription>Detailed POD quality scores</CardDescription>
-            </div>
-            <div className="w-72">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search consignments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Consignments</CardTitle>
+                <CardDescription>Detailed POD quality scores</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-72">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search consignments..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="relative"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <Badge className="ml-2 bg-blue-500 text-white">{activeFilterCount}</Badge>
+                  )}
+                </Button>
               </div>
             </div>
+            
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">Filters</h3>
+                  <Button size="sm" variant="ghost" onClick={resetFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear All
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Driver</label>
+                    <Select value={filters.driver} onValueChange={(v) => setFilters({...filters, driver: v})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All drivers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All drivers</SelectItem>
+                        {uniqueDrivers.map(driver => (
+                          <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">City</label>
+                    <Select value={filters.city} onValueChange={(v) => setFilters({...filters, city: v})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All cities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All cities</SelectItem>
+                        {uniqueCities.map(city => (
+                          <SelectItem key={city} value={city}>{city}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Score Range</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.scoreMin}
+                        onChange={(e) => setFilters({...filters, scoreMin: Number(e.target.value)})}
+                        min={0}
+                        max={100}
+                        className="w-20"
+                      />
+                      <span className="self-center">-</span>
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.scoreMax}
+                        onChange={(e) => setFilters({...filters, scoreMax: Number(e.target.value)})}
+                        min={0}
+                        max={100}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Temperature</label>
+                    <Select value={filters.tempCompliant} onValueChange={(v) => setFilters({...filters, tempCompliant: v})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Compliant</SelectItem>
+                        <SelectItem value="no">Non-compliant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Signature</label>
+                    <Select value={filters.hasSignature} onValueChange={(v) => setFilters({...filters, hasSignature: v})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Has signature</SelectItem>
+                        <SelectItem value="no">No signature</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Photo Count</label>
+                    <Select value={filters.photoCount} onValueChange={(v) => setFilters({...filters, photoCount: v})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="0">No photos</SelectItem>
+                        <SelectItem value="1-2">1-2 photos</SelectItem>
+                        <SelectItem value="3+">3+ photos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -476,7 +703,7 @@ export default function PODQualityDashboard() {
                   const metrics = calculatePODScore(consignment);
                   const tier = getQualityTier(metrics.qualityScore);
                   const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-                  const actualTemp = consignment.paymentMethod;
+                  const actualTemp = getActualTemperature(consignment);
                   const expectedTemp = consignment.expectedTemperature;
                   
                   return (
@@ -523,9 +750,17 @@ export default function PODQualityDashboard() {
                         )}
                       </td>
                       <td className="p-3 text-center">
-                        <Badge className={`${tier.color} bg-opacity-10`}>
-                          {tier.icon} {metrics.qualityScore}%
-                        </Badge>
+                        <div className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-medium text-sm ${
+                          metrics.qualityScore >= 90 
+                            ? "bg-green-100 text-green-800 border border-green-200"
+                            : metrics.qualityScore >= 75
+                            ? "bg-blue-100 text-blue-800 border border-blue-200"
+                            : metrics.qualityScore >= 60
+                            ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                            : "bg-red-100 text-red-800 border border-red-200"
+                        }`}>
+                          {metrics.qualityScore}%
+                        </div>
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex gap-1 justify-center">
@@ -566,7 +801,7 @@ export default function PODQualityDashboard() {
             
             {filteredConsignments.length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                No consignments found
+                No consignments found matching your filters
               </div>
             )}
             
