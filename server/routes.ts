@@ -831,26 +831,55 @@ class PhotoScrapingQueue {
       const regularImages = imageData.filter((img: any) => {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
+        const pixelArea = img.width * img.height;
+        const shortSide = Math.min(img.width, img.height);
+        const longSide = Math.max(img.width, img.height);
         
         // Check if it's a valid photo URL (http/https or base64)
         const isValidUrl = (img.src?.startsWith('http://') || img.src?.startsWith('https://') || img.src?.startsWith('data:image'));
         
-        // Check if it's an Azure blob URL (these often return 403 and should be excluded if we have base64 alternatives)
-        const isAzureBlobUrl = img.src?.includes('blob.core.windows.net');
+        // Check if it's an Azure blob URL (actual delivery photos)
+        const isAzureBlobUrl = img.src?.includes('blob.core.windows.net') || img.src?.includes('azureedge.net');
         
         // Signature detection - wide and short images or explicitly labeled
         const isDimensionSignature = img.width >= 300 && img.height <= 200 && aspectRatio >= 2.0;
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        // For now, include base64 images as regular photos if they're not signatures
-        // This is because Azure Blob URLs are returning 403 errors
-        const isBase64 = img.src?.startsWith('data:image');
+        // DELIVERY PHOTO QUALITY FILTERS (to exclude UI elements like icons, banners, headers):
         
-        // Include as regular photo if:
-        // 1. It's a valid URL AND
-        // 2. It's not a signature AND
-        // 3. Either it's base64 OR it's not an Azure blob (or we'll try Azure blobs as fallback)
-        return isValidUrl && !(isDimensionSignature || isTextSignature);
+        // 1. Exclude very small images (social icons, buttons) - must have short side ≥ 350px
+        if (shortSide < 350) {
+          console.log(`❌ [FILTER] Rejecting small image (short side ${shortSide}px < 350px): ${img.src.substring(0, 50)}...`);
+          return false;
+        }
+        
+        // 2. Exclude images with insufficient pixel area (< 200k pixels) - drops icons and small UI elements
+        if (pixelArea < 200000) {
+          console.log(`❌ [FILTER] Rejecting low pixel area (${pixelArea} < 200k): ${img.src.substring(0, 50)}...`);
+          return false;
+        }
+        
+        // 3. Aspect ratio must be within reasonable photo range (0.45 to 1.9)
+        // This excludes ultra-wide banners (AR > 2.0) and ultra-tall elements (AR < 0.45)
+        if (aspectRatio < 0.45 || aspectRatio > 1.9) {
+          console.log(`❌ [FILTER] Rejecting bad aspect ratio (${aspectRatio.toFixed(2)} outside 0.45-1.9): ${img.src.substring(0, 50)}...`);
+          return false;
+        }
+        
+        // 4. At least one dimension must be ≥ 600px (ensures actual photos like 768x1024 pass)
+        if (longSide < 600) {
+          console.log(`❌ [FILTER] Rejecting too small (max side ${longSide}px < 600px): ${img.src.substring(0, 50)}...`);
+          return false;
+        }
+        
+        // 5. Exclude signatures
+        if (isDimensionSignature || isTextSignature) {
+          return false;
+        }
+        
+        // If it passes all quality checks, it's likely a real delivery photo
+        console.log(`✅ [FILTER] Keeping delivery photo: ${img.src.substring(0, 50)}... (${img.width}x${img.height})`);
+        return isValidUrl;
       });
       
       const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
@@ -858,27 +887,33 @@ class PhotoScrapingQueue {
       
       console.log(`🔍 [PUPPETEER] Photos pre-filter: ${regularPhotos.length}, signatures pre-filter: ${tempSignaturePhotos.length}`);
       
-      // Separate base64 images from HTTP URLs
+      // Separate Azure Blob URLs from base64 images
+      const azureBlobPhotos = regularPhotos.filter(url => url.includes('blob.core.windows.net') || url.includes('azureedge.net'));
       const base64Photos = regularPhotos.filter(url => url.startsWith('data:image'));
-      const httpPhotos = regularPhotos.filter(url => url.startsWith('http'));
       const base64Signatures = tempSignaturePhotos.filter(url => url.startsWith('data:image'));
       const httpSignatures = tempSignaturePhotos.filter(url => url.startsWith('http'));
       
-      // Prefer base64 images over HTTP URLs (since Azure Blob URLs often return 403)
-      // If we have base64 images, use those; otherwise, try HTTP URLs
-      if (base64Photos.length > 0) {
+      // Prefer Azure Blob URLs (real driver photos) over base64 (UI elements that passed filter)
+      // Azure Blob photos are the actual delivery photos taken by drivers
+      if (azureBlobPhotos.length > 0) {
+        photos = azureBlobPhotos;
+        console.log(`📸 [PUPPETEER] Using ${azureBlobPhotos.length} Azure Blob photos (actual driver photos)`);
+      } else if (base64Photos.length > 0) {
         photos = base64Photos;
+        console.log(`📸 [PUPPETEER] Using ${base64Photos.length} base64 photos (fallback)`);
       } else {
-        photos = filterFetchablePhotos(httpPhotos);
+        photos = [];
+        console.log(`⚠️ [PUPPETEER] No photos found after filtering`);
       }
       
+      // Signatures are typically base64
       if (base64Signatures.length > 0) {
         signaturePhotos = base64Signatures;
       } else {
         signaturePhotos = filterFetchablePhotos(httpSignatures);
       }
       
-      console.log(`✅ [PUPPETEER] Photos post-filter: ${photos.length} (${base64Photos.length} base64, ${httpPhotos.length} http), signatures: ${signaturePhotos.length}`);
+      console.log(`✅ [PUPPETEER] Final result: ${photos.length} photos, ${signaturePhotos.length} signatures`);
       
     } catch (error: any) {
       console.error(`❌ [PUPPETEER] Error scraping photos for token ${normalizedToken}: ${error.message}`);
