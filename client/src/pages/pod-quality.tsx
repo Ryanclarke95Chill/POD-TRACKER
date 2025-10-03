@@ -211,8 +211,8 @@ export default function PODQualityDashboard() {
   const consignments = consignmentsData?.consignments || [];
   
   // Get unique drivers and cities for filter dropdowns
-  const uniqueDrivers = [...new Set(consignments.map((c: Consignment) => c.driverName).filter(Boolean))].sort();
-  const uniqueCities = [...new Set(consignments.map((c: Consignment) => c.shipToCity).filter(Boolean))].sort();
+  const uniqueDrivers = Array.from(new Set(consignments.map((c: Consignment) => c.driverName).filter((name): name is string => Boolean(name)))).sort();
+  const uniqueCities = Array.from(new Set(consignments.map((c: Consignment) => c.shipToCity).filter((city): city is string => Boolean(city)))).sort();
   
   // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
@@ -308,12 +308,15 @@ export default function PODQualityDashboard() {
       return;
     }
     
+    // Extract token from tracking link - the token is the last part of the URL
+    const token = trackingLink.split('/').pop() || trackingLink;
+    
     setLoadingPhotos(consignment.id);
     const currentRetries = photoLoadRetries.get(consignment.id) || 0;
     
     try {
       // Force refresh to bypass cache
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high&force=true`);
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high&force=true`);
       const data = await response.json();
       
       if (data.success) {

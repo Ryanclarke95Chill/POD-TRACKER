@@ -2749,6 +2749,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Direct Axylog POD endpoint - fetch photos and signatures directly from API
+  app.get("/api/pod-direct", authenticate, async (req: AuthRequest, res: Response) => {
+    const { consignmentId } = req.query;
+    
+    if (!consignmentId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Consignment ID is required" 
+      });
+    }
+    
+    try {
+      // Get consignment from database
+      const consignment = await storage.getConsignmentById(parseInt(consignmentId as string, 10));
+      
+      if (!consignment) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Consignment not found" 
+        });
+      }
+      
+      const photos: string[] = [];
+      const signatures: string[] = [];
+      
+      // Try to get POD data from Axylog API
+      const axylogAPI = new AxylogAPI();
+      const authenticated = await axylogAPI.authenticate();
+      
+      if (!authenticated) {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Failed to authenticate with Axylog" 
+        });
+      }
+      
+      try {
+        // Get year, code, prog from consignment reference or Axylog API
+        const credentials = (axylogAPI as any).credentials;
+        
+        // Make POST request to get delivery info
+        const deliveryResponse = await axios.post(
+          'https://api.axylog.com/Deliveries?v=2',
+          {
+            "from": "2024-01-01",
+            "to": new Date().toISOString().split('T')[0],
+            "consignmentNo": consignment.consignmentNo || consignment.orderNumberRef,
+            "statusUpdatesOnly": false
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.token}`,
+              'User': credentials.userId,
+              'Company': credentials.companyId,
+              'ContextOwner': credentials.contextOwnerId
+            }
+          }
+        );
+        
+        if (deliveryResponse.data && deliveryResponse.data.length > 0) {
+          const delivery = deliveryResponse.data[0];
+          
+          // Extract year, code, prog from the delivery
+          const year = delivery.year || new Date(delivery.deliveryDate || delivery.plannedDate).getFullYear();
+          const code = delivery.code || delivery.deliveryCode;
+          const prog = delivery.prog || delivery.progressiveNumber || delivery.deliveryNumber;
+          
+          if (year && code && prog) {
+            // Get signature info
+            try {
+              const signatureInfoResponse = await axios.get(
+                `https://api.axylog.com/outcomes/${year}/${code}/${prog}/signatureinfo/delivery`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${credentials.token}`,
+                    'User': credentials.userId,
+                    'Company': credentials.companyId,
+                    'ContextOwner': credentials.contextOwnerId
+                  }
+                }
+              );
+              
+              if (signatureInfoResponse.data && signatureInfoResponse.data.filename) {
+                const signatureUrl = `https://api.axylog.com/deliveries/${year}/${code}/${prog}/${signatureInfoResponse.data.filename}`;
+                signatures.push(signatureUrl);
+              }
+            } catch (sigError) {
+              console.log('No signature available for this delivery');
+            }
+            
+            // Get photo files list
+            try {
+              const filesResponse = await axios.get(
+                `https://api.axylog.com/outcomes/${year}/${code}/${prog}/files`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${credentials.token}`,
+                    'User': credentials.userId,
+                    'Company': credentials.companyId,
+                    'ContextOwner': credentials.contextOwnerId
+                  }
+                }
+              );
+              
+              if (filesResponse.data && Array.isArray(filesResponse.data)) {
+                for (const file of filesResponse.data) {
+                  if (file.filename || file) {
+                    const filename = file.filename || file;
+                    const photoUrl = `https://api.axylog.com/deliveries/${year}/${code}/${prog}/${filename}`;
+                    photos.push(photoUrl);
+                  }
+                }
+              }
+            } catch (filesError) {
+              console.log('No photos available for this delivery');
+            }
+          }
+        }
+      } catch (apiError: any) {
+        console.error('Error fetching POD data from Axylog API:', apiError.message);
+      }
+      
+      return res.json({
+        success: true,
+        photos,
+        signaturePhotos: signatures,
+        source: 'axylog_api'
+      });
+      
+    } catch (error: any) {
+      console.error('Error in POD direct endpoint:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Failed to fetch POD data' 
+      });
+    }
+  });
+
   // Extract POD photos from tracking system
   app.get("/api/pod-photos", authenticate, async (req: AuthRequest, res: Response) => {
     try {
