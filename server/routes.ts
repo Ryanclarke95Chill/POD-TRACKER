@@ -2807,7 +2807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'Authorization': `Bearer ${credentials.token}`,
               'User': credentials.userId,
               'Company': credentials.companyId,
-              'ContextOwner': credentials.contextOwnerId
+              'ContextOwner': credentials.contextOwnerId,
+              'SourceDeviceType': '2',
+              'LanguageCode': 'EN'
             }
           }
         );
@@ -2830,7 +2832,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'Authorization': `Bearer ${credentials.token}`,
                     'User': credentials.userId,
                     'Company': credentials.companyId,
-                    'ContextOwner': credentials.contextOwnerId
+                    'ContextOwner': credentials.contextOwnerId,
+                    'SourceDeviceType': '2',
+                    'LanguageCode': 'EN'
                   }
                 }
               );
@@ -2852,7 +2856,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'Authorization': `Bearer ${credentials.token}`,
                     'User': credentials.userId,
                     'Company': credentials.companyId,
-                    'ContextOwner': credentials.contextOwnerId
+                    'ContextOwner': credentials.contextOwnerId,
+                    'SourceDeviceType': '2',
+                    'LanguageCode': 'EN'
                   }
                 }
               );
