@@ -832,20 +832,25 @@ class PhotoScrapingQueue {
         const aspectRatio = img.width / Math.max(img.height, 1);
         const text = (img.alt + ' ' + img.className + ' ' + img.parentText).toLowerCase();
         
-        // Regular photos must be http(s) only - base64/blob should only be signatures  
-        const isHttp = img.src?.startsWith('http://') || img.src?.startsWith('https://');
+        // Check if it's a valid photo URL (http/https or base64)
+        const isValidUrl = (img.src?.startsWith('http://') || img.src?.startsWith('https://') || img.src?.startsWith('data:image'));
         
-        // Base64 images are typically signatures in Axylog
-        const isBase64Signature = img.src && img.src.startsWith('data:image');
+        // Check if it's an Azure blob URL (these often return 403 and should be excluded if we have base64 alternatives)
+        const isAzureBlobUrl = img.src?.includes('blob.core.windows.net');
         
-        // Signature photos are typically wide and short (high aspect ratio)  
+        // Signature detection - wide and short images or explicitly labeled
         const isDimensionSignature = img.width >= 300 && img.height <= 200 && aspectRatio >= 2.0;
-        
-        // Also check text content as backup
         const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
         
-        // Must be http(s) AND not a signature
-        return isHttp && !(isBase64Signature || isDimensionSignature || isTextSignature);
+        // For now, include base64 images as regular photos if they're not signatures
+        // This is because Azure Blob URLs are returning 403 errors
+        const isBase64 = img.src?.startsWith('data:image');
+        
+        // Include as regular photo if:
+        // 1. It's a valid URL AND
+        // 2. It's not a signature AND
+        // 3. Either it's base64 OR it's not an Azure blob (or we'll try Azure blobs as fallback)
+        return isValidUrl && !(isDimensionSignature || isTextSignature);
       });
       
       const tempSignaturePhotos: string[] = signatureImages.map((img: any) => img.src);
@@ -853,10 +858,27 @@ class PhotoScrapingQueue {
       
       console.log(`🔍 [PUPPETEER] Photos pre-filter: ${regularPhotos.length}, signatures pre-filter: ${tempSignaturePhotos.length}`);
       
-      photos = filterFetchablePhotos(regularPhotos); // Apply filtering
-      signaturePhotos = filterFetchablePhotos(tempSignaturePhotos); // Apply filtering
+      // Separate base64 images from HTTP URLs
+      const base64Photos = regularPhotos.filter(url => url.startsWith('data:image'));
+      const httpPhotos = regularPhotos.filter(url => url.startsWith('http'));
+      const base64Signatures = tempSignaturePhotos.filter(url => url.startsWith('data:image'));
+      const httpSignatures = tempSignaturePhotos.filter(url => url.startsWith('http'));
       
-      console.log(`✅ [PUPPETEER] Photos post-filter: ${photos.length}, signatures post-filter: ${signaturePhotos.length}`);
+      // Prefer base64 images over HTTP URLs (since Azure Blob URLs often return 403)
+      // If we have base64 images, use those; otherwise, try HTTP URLs
+      if (base64Photos.length > 0) {
+        photos = base64Photos;
+      } else {
+        photos = filterFetchablePhotos(httpPhotos);
+      }
+      
+      if (base64Signatures.length > 0) {
+        signaturePhotos = base64Signatures;
+      } else {
+        signaturePhotos = filterFetchablePhotos(httpSignatures);
+      }
+      
+      console.log(`✅ [PUPPETEER] Photos post-filter: ${photos.length} (${base64Photos.length} base64, ${httpPhotos.length} http), signatures: ${signaturePhotos.length}`);
       
     } catch (error: any) {
       console.error(`❌ [PUPPETEER] Error scraping photos for token ${normalizedToken}: ${error.message}`);
@@ -2792,14 +2814,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error('Failed to get Axylog credentials');
         }
         
-        // Make POST request to get delivery info
+        // Make POST request to get delivery info with proper structure
         const deliveryResponse = await axios.post(
           'https://api.axylog.com/Deliveries?v=2',
           {
-            "from": "2024-01-01",
-            "to": new Date().toISOString().split('T')[0],
-            "consignmentNo": consignment.consignmentNo || consignment.orderNumberRef,
-            "statusUpdatesOnly": false
+            pagination: {
+              skip: 0,
+              pageSize: 10
+            },
+            filters: {
+              type: "",
+              pickUp_Delivery_From: "2024-01-01T00:00:00.000Z",
+              pickUp_Delivery_To: new Date().toISOString(),
+              gridHeaderFilters: {
+                orderNumberRef: consignment.consignmentNo || consignment.orderNumberRef,
+                shipperMasterDataCode: "",
+                shipperCompanyName: "",
+                shipFromMasterDataCode: "",
+                shipFromCompanyName: "",
+                shipToMasterDataCode: "",
+                shipToCompanyName: ""
+              }
+            }
           },
           {
             headers: {
@@ -2814,8 +2850,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         );
         
-        if (deliveryResponse.data && deliveryResponse.data.length > 0) {
-          const delivery = deliveryResponse.data[0];
+        if (deliveryResponse.data && deliveryResponse.data.itemList && deliveryResponse.data.itemList.length > 0) {
+          const delivery = deliveryResponse.data.itemList[0];
           
           // Extract year, code, prog from the delivery
           const year = delivery.year || new Date(delivery.deliveryDate || delivery.plannedDate).getFullYear();
@@ -2998,25 +3034,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Cache miss or force refresh - return preparing status and trigger background scraping
+      // Cache miss or force refresh - wait for actual scraping results
       // Debug logging removed for performance
+      console.log(`📸 [POD PHOTOS API] Cache miss for token ${normalizedToken}, fetching fresh photos...`);
       
-      // Trigger background scraping for future requests (don't await)
-      photoQueue.addRequest(normalizedToken, priority as 'high' | 'low', forceRefresh).catch(error => {
+      try {
+        // Wait for actual photo scraping results (not just background processing)
+        const photoResult = await photoQueue.addRequest(normalizedToken, priority as 'high' | 'low', forceRefresh);
+        
+        // Store in database for future requests
+        if (photoResult.photos.length > 0 || photoResult.signaturePhotos.length > 0) {
+          try {
+            // Store photos in database
+            const photoAssets = [
+              ...photoResult.photos.map(url => ({ 
+                token: normalizedToken, 
+                url, 
+                kind: 'photo' as const, 
+                status: 'available' as const,
+                width: null,
+                height: null,
+                hash: null,
+                errorMessage: null
+              })),
+              ...photoResult.signaturePhotos.map(url => ({ 
+                token: normalizedToken, 
+                url, 
+                kind: 'signature' as const, 
+                status: 'available' as const,
+                width: null,
+                height: null,
+                hash: null,
+                errorMessage: null
+              }))
+            ];
+            
+            if (photoAssets.length > 0) {
+              await storage.createPhotoAssetsBatch(photoAssets);
+            }
+          } catch (dbError) {
+            console.error(`Failed to store photos in database:`, dbError);
+          }
+        }
+        
+        const response = {
+          success: true,
+          photos: photoResult.photos,
+          signaturePhotos: photoResult.signaturePhotos,
+          count: photoResult.photos.length,
+          signatureCount: photoResult.signaturePhotos.length,
+          status: 'ready',
+          cached: false,
+          source: 'fresh_scrape'
+        };
+        
+        console.log(`📸 [POD PHOTOS API] Returning ${photoResult.photos.length} photos and ${photoResult.signaturePhotos.length} signatures`);
+        return res.json(response);
+        
+      } catch (error) {
         console.error(`Background photo scraping failed for token ${normalizedToken}:`, error);
-      });
-      
-      const response = {
-        success: true,
-        photos: [],
-        signaturePhotos: [],
-        count: 0,
-        signatureCount: 0,
-        status: 'preparing',
-        message: 'Photos are being prepared, please try again in a moment'
-      };
-      // Debug logging removed for performance
-      return res.json(response);
+        // Return empty result on error
+        const response = {
+          success: true,
+          photos: [],
+          signaturePhotos: [],
+          count: 0,
+          signatureCount: 0,
+          status: 'error',
+          message: 'Failed to fetch photos'
+        };
+        return res.json(response);
+      }
       
     } catch (error: any) {
       console.error("Error extracting POD photos:", error);

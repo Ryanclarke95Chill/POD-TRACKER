@@ -14,38 +14,21 @@ export function PhotoThumbnails({ trackingLink, photoCount, consignmentId }: Pho
   const [error, setError] = useState(false);
   
   useEffect(() => {
-    if (photoCount === 0) return;
+    if (!trackingLink || photoCount === 0) return;
     
     const loadPhotos = async () => {
       setLoading(true);
       setError(false);
       
       try {
-        // First try the direct Axylog API endpoint
-        if (consignmentId) {
-          const directResponse = await apiRequest('GET', `/api/pod-direct?consignmentId=${consignmentId}`);
-          const directData = await directResponse.json();
-          
-          if (directData.success && (directData.photos.length > 0 || directData.signaturePhotos.length > 0)) {
-            const allPhotos = [...directData.photos, ...directData.signaturePhotos];
-            setPhotos(allPhotos.slice(0, 3)); // Get first 3 photos for thumbnails
-            return;
-          }
-        }
+        const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=low`);
+        const data = await response.json();
         
-        // Fall back to tracking link if available
-        if (trackingLink) {
-          const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(trackingLink)}&priority=high`);
-          const data = await response.json();
-          
-          if (data.success && data.photos && data.photos.length > 0) {
-            setPhotos(data.photos.slice(0, 3)); // Get first 3 photos for thumbnails
-          } else if (data.status === 'preparing') {
-            // Photos are being prepared, retry after a delay
-            setTimeout(loadPhotos, 3000);
-          } else {
-            setError(true);
-          }
+        if (data.success && data.photos && data.photos.length > 0) {
+          setPhotos(data.photos.slice(0, 3)); // Get first 3 photos for thumbnails
+        } else if (data.status === 'preparing') {
+          // Photos are being prepared, retry after a delay
+          setTimeout(loadPhotos, 3000);
         } else {
           setError(true);
         }
@@ -58,7 +41,7 @@ export function PhotoThumbnails({ trackingLink, photoCount, consignmentId }: Pho
     };
     
     loadPhotos();
-  }, [trackingLink, photoCount, consignmentId]);
+  }, [trackingLink, photoCount]);
   
   if (photoCount === 0) {
     return (

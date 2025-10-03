@@ -29,7 +29,6 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
 import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature } from "@/utils/podMetrics";
-import { PhotoThumbnails } from "@/components/PhotoThumbnails";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -298,37 +297,26 @@ export default function PODQualityDashboard() {
   
   // Load photos for a consignment with improved retry logic
   const loadPhotos = async (consignment: Consignment) => {
+    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+    if (!trackingLink) {
+      toast({
+        title: "No tracking link",
+        description: "This consignment doesn't have a tracking link for photos",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Extract token from tracking link - the token is the last part of the URL
+    const token = trackingLink.split('/').pop() || trackingLink;
+    
     setLoadingPhotos(consignment.id);
     const currentRetries = photoLoadRetries.get(consignment.id) || 0;
     
     try {
-      let response;
-      let data;
-      
-      // First try the direct Axylog API endpoint
-      response = await apiRequest('GET', `/api/pod-direct?consignmentId=${consignment.id}`);
-      data = await response.json();
-      
-      // If direct API doesn't return photos, fall back to web scraping
-      if (!data.success || ((!data.photos || data.photos.length === 0) && (!data.signaturePhotos || data.signaturePhotos.length === 0))) {
-        const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-        if (trackingLink) {
-          // Extract token from tracking link - the token is the last part of the URL
-          const token = trackingLink.split('/').pop() || trackingLink;
-          
-          // Force refresh to bypass cache
-          response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high&force=true`);
-          data = await response.json();
-        } else if (!data.success) {
-          // No tracking link and direct API failed
-          toast({
-            title: "No photos available",
-            description: "Unable to retrieve photos for this consignment",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
+      // Use web scraping for fast, reliable photo retrieval
+      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high`);
+      const data = await response.json();
       
       if (data.success) {
         if ((data.status === 'preparing' || (!data.photos?.length && !data.signaturePhotos?.length)) && currentRetries < 5) {
@@ -738,11 +726,12 @@ export default function PODQualityDashboard() {
                         </div>
                       </td>
                       <td className="p-3">
-                        <PhotoThumbnails
-                          trackingLink={trackingLink}
-                          photoCount={metrics.photoCount}
-                          consignmentId={consignment.id}
-                        />
+                        <div className="flex items-center justify-center gap-1">
+                          <Camera className={`h-4 w-4 ${metrics.photoCount > 0 ? 'text-green-600' : 'text-red-600'}`} data-testid={`icon-photos-${consignment.id}`} />
+                          <span className={`text-sm font-medium ${metrics.photoCount > 0 ? 'text-green-700' : 'text-red-700'}`} data-testid={`text-photo-count-${consignment.id}`}>
+                            {metrics.photoCount}
+                          </span>
+                        </div>
                       </td>
                       <td className="p-3 text-center">
                         {metrics.hasSignature ? (
