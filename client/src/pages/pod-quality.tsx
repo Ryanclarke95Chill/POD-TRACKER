@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,11 @@ import {
   ExternalLink,
   Eye,
   Filter,
-  X
+  X,
+  BarChart3,
+  ArrowUpDown
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
 import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature } from "@/utils/podMetrics";
@@ -305,6 +308,50 @@ export default function PODQualityDashboard() {
     stats.tempComplianceRate = Math.round((tempCompliantCount / filteredConsignments.length) * 100);
   }
   
+  // Calculate warehouse comparison data
+  const warehouseComparison = useMemo(() => {
+    const warehouseMap = new Map<string, {
+      warehouse: string;
+      deliveryCount: number;
+      totalScore: number;
+      totalPhotos: number;
+      signaturesCount: number;
+      tempCompliantCount: number;
+    }>();
+    
+    filteredConsignments.forEach((c: Consignment) => {
+      const warehouse = c.shipFromCompanyName || "Unknown Warehouse";
+      const metrics = calculatePODScore(c);
+      
+      if (!warehouseMap.has(warehouse)) {
+        warehouseMap.set(warehouse, {
+          warehouse,
+          deliveryCount: 0,
+          totalScore: 0,
+          totalPhotos: 0,
+          signaturesCount: 0,
+          tempCompliantCount: 0
+        });
+      }
+      
+      const data = warehouseMap.get(warehouse)!;
+      data.deliveryCount++;
+      data.totalScore += metrics.qualityScore;
+      data.totalPhotos += metrics.photoCount;
+      if (metrics.hasSignature) data.signaturesCount++;
+      if (metrics.temperatureCompliant) data.tempCompliantCount++;
+    });
+    
+    return Array.from(warehouseMap.values()).map(w => ({
+      warehouse: w.warehouse,
+      deliveryCount: w.deliveryCount,
+      avgScore: Math.round(w.totalScore / w.deliveryCount),
+      photoRate: Math.round((w.totalPhotos / w.deliveryCount) * 10) / 10,
+      signatureRate: Math.round((w.signaturesCount / w.deliveryCount) * 100),
+      tempComplianceRate: Math.round((w.tempCompliantCount / w.deliveryCount) * 100)
+    })).sort((a, b) => b.avgScore - a.avgScore);
+  }, [filteredConsignments]);
+  
   // Load photos for a consignment with improved retry logic
   const loadPhotos = async (consignment: Consignment) => {
     const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
@@ -457,6 +504,17 @@ export default function PODQualityDashboard() {
         </div>
       </div>
       
+      {/* Dynamic Summary Header */}
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <h2 className="text-xl font-semibold">Summary</h2>
+          <p className="text-sm text-gray-600">
+            Showing {filteredConsignments.length} of {consignments.length} deliveries
+            {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
+          </p>
+        </div>
+      </div>
+      
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -543,6 +601,74 @@ export default function PODQualityDashboard() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Warehouse Comparison */}
+      {warehouseComparison.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Warehouse Performance Comparison
+            </CardTitle>
+            <CardDescription>Compare POD quality metrics across warehouses {activeFilterCount > 0 && "(filtered)"}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Bar Chart */}
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={warehouseComparison}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="warehouse" angle={-45} textAnchor="end" height={100} fontSize={12} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="avgScore" fill="#3b82f6" name="Avg Score (%)" />
+                    <Bar dataKey="signatureRate" fill="#10b981" name="Signature Rate (%)" />
+                    <Bar dataKey="tempComplianceRate" fill="#f59e0b" name="Temp Compliance (%)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Comparison Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-3 font-medium text-gray-700">Warehouse</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Deliveries</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Avg Score</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Photos/Delivery</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Signature %</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Temp Compliance %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warehouseComparison.map((w, idx) => (
+                      <tr key={w.warehouse} className="border-b hover:bg-gray-50/50">
+                        <td className="p-3 font-medium text-gray-900">{w.warehouse}</td>
+                        <td className="p-3 text-center text-gray-700">{w.deliveryCount}</td>
+                        <td className="p-3 text-center">
+                          <span className={`font-semibold ${
+                            w.avgScore >= 90 ? 'text-green-600' :
+                            w.avgScore >= 75 ? 'text-blue-600' :
+                            w.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {w.avgScore}%
+                          </span>
+                        </td>
+                        <td className="p-3 text-center text-gray-700">{w.photoRate}</td>
+                        <td className="p-3 text-center text-gray-700">{w.signatureRate}%</td>
+                        <td className="p-3 text-center text-gray-700">{w.tempComplianceRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Consignments Table */}
       <Card>
