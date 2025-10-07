@@ -784,129 +784,131 @@ export default function PODQualityDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 font-medium text-gray-700">Order / Consignment</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Warehouse / Depot</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Driver</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Customer</th>
-                  <th className="text-center p-3 font-medium text-gray-700">POD Quality</th>
-                  <th className="text-center p-3 font-medium text-gray-700">Score</th>
-                  <th className="text-center p-3 font-medium text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredConsignments.slice(0, 100).map((consignment: Consignment) => {
-                  const metrics = calculatePODScore(consignment);
-                  const tier = getQualityTier(metrics.qualityScore);
-                  const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-                  const actualTemp = getActualTemperature(consignment);
-                  const expectedTemp = consignment.expectedTemperature;
-                  
-                  return (
-                    <tr key={consignment.id} className="border-b hover:bg-gray-50/50 transition-colors" data-testid={`row-consignment-${consignment.id}`}>
-                      <td className="p-3">
-                        <div>
-                          <div className="font-medium text-gray-900" data-testid={`text-order-${consignment.id}`}>
-                            {consignment.orderNumberRef || consignment.consignmentNo || '-'}
+          <div className="space-y-3">
+            {filteredConsignments.slice(0, 100).map((consignment: Consignment) => {
+              const metrics = calculatePODScore(consignment);
+              const tier = getQualityTier(metrics.qualityScore);
+              const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+              const actualTemp = getActualTemperature(consignment);
+              const expectedTemp = consignment.expectedTemperature;
+              
+              return (
+                <Card key={consignment.id} className="hover:shadow-md transition-shadow" data-testid={`card-consignment-${consignment.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      {/* Left: Main Information */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Package className="h-4 w-4 text-gray-400" />
+                              <span className="font-semibold text-gray-900" data-testid={`text-order-${consignment.id}`}>
+                                {consignment.orderNumberRef || consignment.consignmentNo || '-'}
+                              </span>
+                            </div>
+                            {consignment.consignmentNo && consignment.consignmentNo !== consignment.orderNumberRef && (
+                              <div className="text-xs text-gray-500 ml-6">{consignment.consignmentNo}</div>
+                            )}
                           </div>
-                          {consignment.consignmentNo && consignment.consignmentNo !== consignment.orderNumberRef && (
-                            <div className="text-xs text-gray-500">{consignment.consignmentNo}</div>
-                          )}
+                          <div className={`px-3 py-1 rounded-full font-semibold text-lg ${
+                            metrics.qualityScore >= 90 
+                              ? "bg-green-100 text-green-800"
+                              : metrics.qualityScore >= 75
+                              ? "bg-blue-100 text-blue-800"
+                              : metrics.qualityScore >= 60
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                          }`} data-testid={`badge-score-${consignment.id}`}>
+                            {metrics.qualityScore}%
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {consignment.warehouseCompanyName || '-'}
+                        
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Customer</div>
+                            <div className="font-medium text-gray-900">{consignment.shipToCompanyName || '-'}</div>
+                            <div className="text-xs text-gray-500">{consignment.shipToCity || '-'}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">Warehouse / Depot</div>
+                            <div className="font-medium text-gray-900">{consignment.warehouseCompanyName || '-'}</div>
+                            <div className="text-xs text-gray-500">
+                              <Users className="h-3 w-3 inline mr-1" />
+                              {consignment.driverName || "No driver assigned"}
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm text-gray-700">{consignment.driverName || "-"}</div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">{consignment.shipToCompanyName || '-'}</div>
-                          <div className="text-xs text-gray-500">{consignment.shipToCity || '-'}</div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="flex items-center gap-1" title={`${metrics.photoCount} photo${metrics.photoCount !== 1 ? 's' : ''}`}>
-                            <Camera className={`h-4 w-4 ${metrics.photoCount >= 3 ? 'text-green-600' : metrics.photoCount > 0 ? 'text-yellow-600' : 'text-red-600'}`} data-testid={`icon-photos-${consignment.id}`} />
-                            <span className={`text-xs font-medium ${metrics.photoCount >= 3 ? 'text-green-700' : metrics.photoCount > 0 ? 'text-yellow-700' : 'text-red-700'}`} data-testid={`text-photo-count-${consignment.id}`}>
-                              {metrics.photoCount}
+                        
+                        {/* POD Quality Metrics */}
+                        <div className="flex items-center gap-4 pt-3 border-t">
+                          <div className="flex items-center gap-2">
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.photoCount >= 3 ? 'bg-green-50' : metrics.photoCount > 0 ? 'bg-yellow-50' : 'bg-red-50'}`}>
+                              <Camera className={`h-4 w-4 ${metrics.photoCount >= 3 ? 'text-green-600' : metrics.photoCount > 0 ? 'text-yellow-600' : 'text-red-600'}`} data-testid={`icon-photos-${consignment.id}`} />
+                              <span className={`text-sm font-medium ${metrics.photoCount >= 3 ? 'text-green-700' : metrics.photoCount > 0 ? 'text-yellow-700' : 'text-red-700'}`} data-testid={`text-photo-count-${consignment.id}`}>
+                                {metrics.photoCount} {metrics.photoCount === 1 ? 'photo' : 'photos'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.hasSignature ? 'bg-green-50' : 'bg-red-50'}`}>
+                            <FileSignature className={`h-4 w-4 ${metrics.hasSignature ? 'text-green-600' : 'text-red-600'}`} />
+                            <span className={`text-sm font-medium ${metrics.hasSignature ? 'text-green-700' : 'text-red-700'}`}>
+                              {metrics.hasSignature ? 'Signature ✓' : 'No signature'}
                             </span>
                           </div>
                           
-                          <div title={metrics.hasSignature ? 'Signature captured' : 'No signature'}>
-                            {metrics.hasSignature ? (
-                              <FileSignature className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <FileSignature className="h-4 w-4 text-red-500" />
-                            )}
-                          </div>
-                          
-                          <div title={expectedTemp ? (metrics.temperatureCompliant ? `Temperature OK: ${actualTemp}°C` : `Temperature issue: ${actualTemp || 'Not recorded'}`) : 'No temp requirement'}>
-                            {expectedTemp && expectedTemp !== "Dry" ? (
+                          {expectedTemp && expectedTemp !== "Dry" && (
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.temperatureCompliant ? 'bg-green-50' : 'bg-red-50'}`}>
                               <Thermometer className={`h-4 w-4 ${metrics.temperatureCompliant ? 'text-green-600' : 'text-red-600'}`} />
-                            ) : (
-                              <Thermometer className="h-4 w-4 text-gray-300" />
+                              <span className={`text-sm font-medium ${metrics.temperatureCompliant ? 'text-green-700' : 'text-red-700'}`}>
+                                {actualTemp ? `${actualTemp}°C` : 'No temp'} 
+                                <span className="text-xs ml-1">({expectedTemp})</span>
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="ml-auto flex gap-2">
+                            {trackingLink && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => loadPhotos(consignment)}
+                                disabled={loadingPhotos === consignment.id}
+                                data-testid={`button-view-photos-${consignment.id}`}
+                              >
+                                {loadingPhotos === consignment.id ? (
+                                  <>
+                                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                    Loading...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Photos
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            {trackingLink && (
+                              <a
+                                href={trackingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button size="sm" variant="outline" data-testid={`link-tracking-${consignment.id}`}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Track
+                                </Button>
+                              </a>
                             )}
                           </div>
                         </div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-medium text-sm ${
-                          metrics.qualityScore >= 90 
-                            ? "bg-green-100 text-green-800 border border-green-200"
-                            : metrics.qualityScore >= 75
-                            ? "bg-blue-100 text-blue-800 border border-blue-200"
-                            : metrics.qualityScore >= 60
-                            ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
-                            : "bg-red-100 text-red-800 border border-red-200"
-                        }`} data-testid={`badge-score-${consignment.id}`}>
-                          {metrics.qualityScore}%
-                        </div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex gap-1 justify-center">
-                          {trackingLink && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => loadPhotos(consignment)}
-                              disabled={loadingPhotos === consignment.id}
-                              data-testid={`button-view-photos-${consignment.id}`}
-                              title="View photos"
-                            >
-                              {loadingPhotos === consignment.id ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                          {trackingLink && (
-                            <a
-                              href={trackingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex"
-                            >
-                              <Button size="sm" variant="ghost" data-testid={`link-tracking-${consignment.id}`} title="Open tracking">
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
             
             {filteredConsignments.length === 0 && (
               <div className="text-center py-8 text-gray-500">
