@@ -100,24 +100,28 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     total: 0
   };
   
-  // Photo count (30 points)
+  // Photo count (30 base points + up to 5 bonus points for 4-8+ photos)
   const photoCount = actualPhotoCount ?? getPhotoCount(consignment);
   if (photoCount >= 3) {
+    // Base 30 points for meeting minimum 3 photos
+    // +1 point for each additional photo (4th, 5th, 6th, 7th, 8th+), capped at +5
+    const bonusPhotos = Math.min(photoCount - 3, 5);
+    const totalPoints = 30 + bonusPhotos;
     scoreBreakdown.photos = { 
-      points: 30, 
-      reason: `${photoCount} photos captured`, 
+      points: totalPoints, 
+      reason: photoCount === 3 ? "3 photos (minimum met)" : `${photoCount} photos (+${bonusPhotos} bonus)`, 
       status: "pass" 
     };
   } else if (photoCount >= 2) {
     scoreBreakdown.photos = { 
       points: 20, 
-      reason: `${photoCount} photos (3+ recommended)`, 
+      reason: `${photoCount} photos (3 minimum required)`, 
       status: "partial" 
     };
   } else if (photoCount >= 1) {
     scoreBreakdown.photos = { 
       points: 10, 
-      reason: `Only ${photoCount} photo (3+ required)`, 
+      reason: `Only ${photoCount} photo (3 minimum required)`, 
       status: "partial" 
     };
   } else {
@@ -144,11 +148,11 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Receiver name (15 points)
+  // Receiver name (20 points)
   const hasReceiverName = !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
   if (hasReceiverName) {
     scoreBreakdown.receiverName = { 
-      points: 15, 
+      points: 20, 
       reason: "Receiver name recorded", 
       status: "pass" 
     };
@@ -160,20 +164,20 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Temperature compliance (20 points)
+  // Temperature compliance (25 points)
   const tempCompliant = checkTemperatureCompliance(consignment);
   const actualTemp = getActualTemperature(consignment);
   
   if (tempCompliant) {
     if (consignment.expectedTemperature === "Dry") {
       scoreBreakdown.temperature = { 
-        points: 20, 
+        points: 25, 
         reason: "No temperature requirement", 
         status: "pass" 
       };
     } else {
       scoreBreakdown.temperature = { 
-        points: 20, 
+        points: 25, 
         reason: `Temperature compliant (${actualTemp}°C)`, 
         status: "pass" 
       };
@@ -187,10 +191,10 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Clear photos quality (10 points) - placeholder for now
+  // Clear photos removed - not used
   scoreBreakdown.clearPhotos = {
-    points: 10,
-    reason: "Photo quality pending",
+    points: 0,
+    reason: "",
     status: "pending"
   };
   
@@ -199,8 +203,7 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     scoreBreakdown.photos.points +
     scoreBreakdown.signature.points +
     scoreBreakdown.receiverName.points +
-    scoreBreakdown.temperature.points +
-    scoreBreakdown.clearPhotos.points;
+    scoreBreakdown.temperature.points;
   
   return {
     photoCount,

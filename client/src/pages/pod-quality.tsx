@@ -320,7 +320,7 @@ export default function PODQualityDashboard() {
     }>();
     
     filteredConsignments.forEach((c: Consignment) => {
-      const warehouse = c.shipFromCompanyName || "Unknown Warehouse";
+      const warehouse = c.warehouseCompanyName || "Unknown Warehouse";
       const metrics = calculatePODScore(c);
       
       if (!warehouseMap.has(warehouse)) {
@@ -788,12 +788,11 @@ export default function PODQualityDashboard() {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 font-medium text-gray-700">Consignment</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Order / Consignment</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Warehouse / Depot</th>
                   <th className="text-left p-3 font-medium text-gray-700">Driver</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Destination</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Photos</th>
-                  <th className="text-center p-3 font-medium text-gray-700">Signature</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Temperature</th>
+                  <th className="text-left p-3 font-medium text-gray-700">Customer</th>
+                  <th className="text-center p-3 font-medium text-gray-700">POD Quality</th>
                   <th className="text-center p-3 font-medium text-gray-700">Score</th>
                   <th className="text-center p-3 font-medium text-gray-700">Actions</th>
                 </tr>
@@ -807,11 +806,20 @@ export default function PODQualityDashboard() {
                   const expectedTemp = consignment.expectedTemperature;
                   
                   return (
-                    <tr key={consignment.id} className="border-b hover:bg-gray-50/50 transition-colors">
+                    <tr key={consignment.id} className="border-b hover:bg-gray-50/50 transition-colors" data-testid={`row-consignment-${consignment.id}`}>
                       <td className="p-3">
                         <div>
-                          <div className="font-medium text-gray-900">{consignment.consignmentNo || consignment.orderNumberRef}</div>
-                          <div className="text-sm text-gray-500">{consignment.orderNumberRef}</div>
+                          <div className="font-medium text-gray-900" data-testid={`text-order-${consignment.id}`}>
+                            {consignment.orderNumberRef || consignment.consignmentNo || '-'}
+                          </div>
+                          {consignment.consignmentNo && consignment.consignmentNo !== consignment.orderNumberRef && (
+                            <div className="text-xs text-gray-500">{consignment.consignmentNo}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm font-medium text-gray-900">
+                          {consignment.warehouseCompanyName || '-'}
                         </div>
                       </td>
                       <td className="p-3">
@@ -819,36 +827,35 @@ export default function PODQualityDashboard() {
                       </td>
                       <td className="p-3">
                         <div className="text-sm">
-                          <div className="text-gray-900">{consignment.shipToCompanyName}</div>
-                          <div className="text-gray-500">{consignment.shipToCity}</div>
+                          <div className="font-medium text-gray-900">{consignment.shipToCompanyName || '-'}</div>
+                          <div className="text-xs text-gray-500">{consignment.shipToCity || '-'}</div>
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <Camera className={`h-4 w-4 ${metrics.photoCount > 0 ? 'text-green-600' : 'text-red-600'}`} data-testid={`icon-photos-${consignment.id}`} />
-                          <span className={`text-sm font-medium ${metrics.photoCount > 0 ? 'text-green-700' : 'text-red-700'}`} data-testid={`text-photo-count-${consignment.id}`}>
-                            {metrics.photoCount}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-3 text-center">
-                        {metrics.hasSignature ? (
-                          <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {expectedTemp === "Dry" || !expectedTemp ? (
-                          <span className="text-sm text-gray-500">N/A</span>
-                        ) : (
-                          <div className="text-sm">
-                            <div className={`font-medium ${metrics.temperatureCompliant ? 'text-green-700' : 'text-red-700'}`}>
-                              {actualTemp ? `${actualTemp}°C` : 'Not recorded'}
-                            </div>
-                            <div className="text-gray-500 text-xs">{expectedTemp}</div>
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="flex items-center gap-1" title={`${metrics.photoCount} photo${metrics.photoCount !== 1 ? 's' : ''}`}>
+                            <Camera className={`h-4 w-4 ${metrics.photoCount >= 3 ? 'text-green-600' : metrics.photoCount > 0 ? 'text-yellow-600' : 'text-red-600'}`} data-testid={`icon-photos-${consignment.id}`} />
+                            <span className={`text-xs font-medium ${metrics.photoCount >= 3 ? 'text-green-700' : metrics.photoCount > 0 ? 'text-yellow-700' : 'text-red-700'}`} data-testid={`text-photo-count-${consignment.id}`}>
+                              {metrics.photoCount}
+                            </span>
                           </div>
-                        )}
+                          
+                          <div title={metrics.hasSignature ? 'Signature captured' : 'No signature'}>
+                            {metrics.hasSignature ? (
+                              <FileSignature className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <FileSignature className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                          
+                          <div title={expectedTemp ? (metrics.temperatureCompliant ? `Temperature OK: ${actualTemp}°C` : `Temperature issue: ${actualTemp || 'Not recorded'}`) : 'No temp requirement'}>
+                            {expectedTemp && expectedTemp !== "Dry" ? (
+                              <Thermometer className={`h-4 w-4 ${metrics.temperatureCompliant ? 'text-green-600' : 'text-red-600'}`} />
+                            ) : (
+                              <Thermometer className="h-4 w-4 text-gray-300" />
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="p-3 text-center">
                         <div className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-medium text-sm ${
@@ -859,7 +866,7 @@ export default function PODQualityDashboard() {
                             : metrics.qualityScore >= 60
                             ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
                             : "bg-red-100 text-red-800 border border-red-200"
-                        }`}>
+                        }`} data-testid={`badge-score-${consignment.id}`}>
                           {metrics.qualityScore}%
                         </div>
                       </td>
@@ -872,6 +879,7 @@ export default function PODQualityDashboard() {
                               onClick={() => loadPhotos(consignment)}
                               disabled={loadingPhotos === consignment.id}
                               data-testid={`button-view-photos-${consignment.id}`}
+                              title="View photos"
                             >
                               {loadingPhotos === consignment.id ? (
                                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -887,7 +895,7 @@ export default function PODQualityDashboard() {
                               rel="noopener noreferrer"
                               className="inline-flex"
                             >
-                              <Button size="sm" variant="ghost" data-testid={`link-tracking-${consignment.id}`}>
+                              <Button size="sm" variant="ghost" data-testid={`link-tracking-${consignment.id}`} title="Open tracking">
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
                             </a>
