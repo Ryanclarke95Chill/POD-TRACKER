@@ -315,12 +315,23 @@ export class AxylogAPI {
         // Map temperature zone to our format
         const tempZoneMap: Record<string, string> = {
           "AMB": "Dry",
+          "DRY": "Dry",
           "CHI": "Chiller (0–4°C)",
+          "CHILLER": "Chiller (0–4°C)",
           "FRE": "Freezer (-20°C)",
+          "FREEZER": "Freezer (-20°C)",
           "WIN": "Wine (14°C)",
+          "WINE": "Wine (14°C)",
           "CON": "Confectionery (15–20°C)",
           "PHA": "Pharma (2–8°C)",
           // Add more temperature zone mappings as needed
+        };
+        
+        // Parse temperature zone from documentNote (first line typically contains the zone)
+        const parseTempZone = (note: string | null) => {
+          if (!note) return null;
+          const firstLine = note.split('\\n')[0]?.trim().toUpperCase();
+          return tempZoneMap[firstLine] || tempZoneMap[delivery.expectedTemperature] || delivery.expectedTemperature || null;
         };
 
         // Convert events to our format with null checking
@@ -493,7 +504,7 @@ export class AxylogAPI {
           expectedPaymentMethod: delivery.expectedPaymentMethod || null,
           expectedPaymentMethodCode: delivery.expectedPaymentMethodCode || null,
           expectedPaymentNotes: delivery.expectedPaymentNotes || null,
-          expectedTemperature: tempZoneMap[delivery.expectedTemperature] || delivery.expectedTemperature || null,
+          expectedTemperature: parseTempZone(delivery.documentNote),
           // Actual payment and temperature data
           paymentMethod: delivery.paymentMethod || null, // Contains actual recorded temperature
           amountToCollect: delivery.amountToCollect || null,
