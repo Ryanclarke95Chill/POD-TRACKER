@@ -175,6 +175,8 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
   );
 }
 
+type ConsignmentWithPhotoCount = Consignment & { actualPhotoCount?: number };
+
 export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(true);
@@ -201,7 +203,7 @@ export default function PODQualityDashboard() {
   
   // Fetch consignments
   const { data: consignmentsData, isLoading, refetch } = useQuery<{
-    consignments: Consignment[];
+    consignments: ConsignmentWithPhotoCount[];
     totalCount: number;
   }>({
     queryKey: ["/api/consignments/stats"],
@@ -344,8 +346,8 @@ export default function PODQualityDashboard() {
     let signaturesCount = 0;
     let tempCompliantCount = 0;
     
-    filteredConsignments.forEach((c: Consignment) => {
-      const metrics = calculatePODScore(c);
+    filteredConsignments.forEach((c: ConsignmentWithPhotoCount) => {
+      const metrics = calculatePODScore(c, c.actualPhotoCount);
       totalScore += metrics.qualityScore;
       totalPhotos += metrics.photoCount;
       
@@ -376,9 +378,9 @@ export default function PODQualityDashboard() {
       tempCompliantCount: number;
     }>();
     
-    filteredConsignments.forEach((c: Consignment) => {
+    filteredConsignments.forEach((c: ConsignmentWithPhotoCount) => {
       const warehouse = c.warehouseCompanyName || "Unknown Warehouse";
-      const metrics = calculatePODScore(c);
+      const metrics = calculatePODScore(c, c.actualPhotoCount);
       
       if (!warehouseMap.has(warehouse)) {
         warehouseMap.set(warehouse, {
@@ -842,8 +844,8 @@ export default function PODQualityDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {paginatedConsignments.map((consignment: Consignment) => {
-              const metrics = calculatePODScore(consignment);
+            {paginatedConsignments.map((consignment: ConsignmentWithPhotoCount) => {
+              const metrics = calculatePODScore(consignment, consignment.actualPhotoCount);
               const tier = getQualityTier(metrics.qualityScore);
               const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
               const actualTemp = getActualTemperature(consignment);

@@ -2401,9 +2401,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allConsignments = await storage.getConsignmentsByUserId(user.id);
       }
       
+      const extractTrackingToken = (consignment: any): string | null => {
+        const url = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+        if (!url) return null;
+        const match = url.match(/\/([^/]+)$/);
+        return match ? match[1] : null;
+      };
+      
+      const photoCounts: Record<number, number> = {};
+      
+      await Promise.all(allConsignments.map(async (consignment: any) => {
+        const token = extractTrackingToken(consignment);
+        if (token) {
+          const photos = await storage.getPhotoAssetsByTokenAndKind(token, 'photo');
+          const availablePhotos = photos.filter(p => p.status === 'available');
+          photoCounts[consignment.id] = availablePhotos.length;
+        } else {
+          photoCounts[consignment.id] = 0;
+        }
+      }));
+      
+      const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => ({
+        ...consignment,
+        actualPhotoCount: photoCounts[consignment.id] || 0
+      }));
+      
       res.json({
-        consignments: allConsignments,
-        totalCount: allConsignments.length
+        consignments: consignmentsWithPhotoCounts,
+        totalCount: consignmentsWithPhotoCounts.length
       });
     } catch (error) {
       console.error("Error fetching consignments stats:", error);
