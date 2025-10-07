@@ -308,12 +308,13 @@ export default function PODQualityDashboard() {
         if (!trackingLink) continue;
         
         try {
-          const response = await apiRequest<{ photos: string[]; signatures: string[] }>(
-            `/api/consignments/${consignment.id}/photos`,
-            'GET'
+          const res = await apiRequest(
+            'GET',
+            `/api/consignments/${consignment.id}/photos`
           );
-          if (response.photos && response.photos.length > 0) {
-            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, response.photos[0]));
+          const data = await res.json() as { photos: string[]; signatures: string[] };
+          if (data.photos && data.photos.length > 0) {
+            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, data.photos[0]));
           }
         } catch (error) {
           // Silently fail for thumbnails
@@ -852,24 +853,7 @@ export default function PODQualityDashboard() {
               return (
                 <Card key={consignment.id} className="hover:shadow-md transition-shadow" data-testid={`card-consignment-${consignment.id}`}>
                   <CardContent className="p-4">
-                    <div className="flex gap-4">
-                      {/* Photo Thumbnail */}
-                      {thumbnail && (
-                        <div className="flex-shrink-0">
-                          <div 
-                            className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
-                            onClick={() => loadPhotos(consignment)}
-                          >
-                            <img 
-                              src={thumbnail} 
-                              alt="Delivery photo" 
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      
+                    <div className="flex flex-col gap-3">
                       {/* Main Information */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-3">
@@ -978,6 +962,23 @@ export default function PODQualityDashboard() {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Photo Thumbnail Section */}
+                      {thumbnail && (
+                        <div className="border-t pt-3">
+                          <div 
+                            className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
+                            onClick={() => loadPhotos(consignment)}
+                          >
+                            <img 
+                              src={thumbnail} 
+                              alt="Delivery photo" 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

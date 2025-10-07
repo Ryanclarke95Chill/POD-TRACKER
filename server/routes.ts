@@ -14,6 +14,7 @@ import { photoAnalysisService } from "./photoAnalysis";
 import { photoWorker } from "./photoIngestionWorker";
 import axios from "axios";
 import * as cheerio from "cheerio";
+import { filterFetchablePhotos } from "./photoFilters";
 
 // Security-aware browser arguments based on environment
 function getSecureBrowserArgs(): string[] {
@@ -1357,20 +1358,6 @@ function normalisePhotoKey(u: string): string {
   return `${x.origin}${x.pathname}`;
 }
 
-function filterFetchablePhotos(urls: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const u of urls) {
-    if (!isHttpUrl(u)) continue;
-    const { hostname } = new URL(u);
-    if (!isHostAllowed(hostname)) continue;
-    const key = normalisePhotoKey(u);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(u);
-  }
-  return out;
-}
 
 // Helper function to create cache key
 function createImageCacheKey(url: string, width?: number, quality?: number, format?: string): string {
