@@ -215,6 +215,23 @@ export default function PODQualityDashboard() {
   
   // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
+    // Exclude auto-generated references (year-code-prog format like "2025-134641-3")
+    const autoGenPattern = /^\d{4}-\d{5,}-\d+$/;
+    if (autoGenPattern.test(c.orderNumberRef || '') || autoGenPattern.test(c.consignmentNo || '')) {
+      return false;
+    }
+    
+    // Exclude Chill depot deliveries (depot-to-depot transfers)
+    const customerName = (c.shipToCompanyName || '').toLowerCase();
+    const warehouseName = (c.warehouseCompanyName || '').toLowerCase();
+    const isChillDepot = 
+      (customerName.includes('chill') && customerName.includes('depot')) ||
+      (warehouseName.includes('chill') && warehouseName.includes('depot')) ||
+      (customerName.includes('chill') && warehouseName.includes('depot'));
+    if (isChillDepot) {
+      return false;
+    }
+    
     // Search filter
     const search = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
