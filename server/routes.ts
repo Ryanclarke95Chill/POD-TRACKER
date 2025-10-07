@@ -2633,12 +2633,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, photos: [], status: 'failed' });
       }
       
-      // Return available photos with filtering
+      // Return available photos (now accepting data URIs)
       let photos = availablePhotos.map(photo => photo.url);
       
-      console.log(`🔍 [DIRECT DB] Photos pre-filter: ${photos.length}`);
-      photos = filterFetchablePhotos(photos);
-      console.log(`✅ [DIRECT DB] Photos post-filter: ${photos.length}`);
+      console.log(`🔍 [DIRECT DB] Photos returned: ${photos.length}`);
       
       return res.json({ 
         success: true, 
