@@ -178,6 +178,8 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
 export default function PODQualityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
   const [filters, setFilters] = useState<Filters>({
     shipper: "all",
     warehouse: "all",
@@ -194,6 +196,7 @@ export default function PODQualityDashboard() {
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
+  const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string>>(new Map());
   const { toast } = useToast();
   
   // Fetch consignments
@@ -283,6 +286,43 @@ export default function PODQualityDashboard() {
     
     return matchesSearch && matchesShipper && matchesWarehouse && matchesDriver && matchesDateRange;
   });
+  
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters]);
+  
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredConsignments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedConsignments = filteredConsignments.slice(startIndex, endIndex);
+  
+  // Load photo thumbnails for current page
+  useEffect(() => {
+    const loadThumbnails = async () => {
+      for (const consignment of paginatedConsignments) {
+        if (photoThumbnails.has(consignment.id)) continue;
+        
+        const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+        if (!trackingLink) continue;
+        
+        try {
+          const response = await apiRequest<{ photos: string[]; signatures: string[] }>(
+            `/api/consignments/${consignment.id}/photos`,
+            'GET'
+          );
+          if (response.photos && response.photos.length > 0) {
+            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, response.photos[0]));
+          }
+        } catch (error) {
+          // Silently fail for thumbnails
+        }
+      }
+    };
+    
+    loadThumbnails();
+  }, [paginatedConsignments]);
   
   // Calculate overall statistics
   const stats = {
@@ -801,18 +841,36 @@ export default function PODQualityDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {filteredConsignments.slice(0, 100).map((consignment: Consignment) => {
+            {paginatedConsignments.map((consignment: Consignment) => {
               const metrics = calculatePODScore(consignment);
               const tier = getQualityTier(metrics.qualityScore);
               const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
               const actualTemp = getActualTemperature(consignment);
               const expectedTemp = consignment.expectedTemperature;
+              const thumbnail = photoThumbnails.get(consignment.id);
               
               return (
                 <Card key={consignment.id} className="hover:shadow-md transition-shadow" data-testid={`card-consignment-${consignment.id}`}>
                   <CardContent className="p-4">
                     <div className="flex gap-4">
-                      {/* Left: Main Information */}
+                      {/* Photo Thumbnail */}
+                      {thumbnail && (
+                        <div className="flex-shrink-0">
+                          <div 
+                            className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
+                            onClick={() => loadPhotos(consignment)}
+                          >
+                            <img 
+                              src={thumbnail} 
+                              alt="Delivery photo" 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Main Information */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
@@ -931,13 +989,67 @@ export default function PODQualityDashboard() {
                 No consignments found matching your filters
               </div>
             )}
-            
-            {filteredConsignments.length > 100 && (
-              <div className="text-center py-4 text-sm text-gray-500">
-                Showing first 100 of {filteredConsignments.length} consignments
-              </div>
-            )}
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between border-t pt-4">
+              <div className="text-sm text-gray-600">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredConsignments.length)} of {filteredConsignments.length} consignments
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        size="sm"
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        onClick={() => setCurrentPage(pageNum)}
+                        data-testid={`button-page-${pageNum}`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
       
