@@ -2,7 +2,6 @@ import { Switch, Route, useLocation, Router } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
 import PODQuality from "@/pages/pod-quality";
 import AdminPage from "@/pages/admin";
 import SimpleImport from "@/pages/simple-import";
@@ -33,8 +32,7 @@ function App() {
         <div className="min-h-screen flex flex-col">
           <Switch>
             <Route path="/" component={Login} />
-            <Route path="/dashboard" component={Dashboard} />
-            <Route path="/pod-quality" component={PODQuality} />
+            <Route path="/dashboard" component={PODQuality} />
             <Route path="/user-management" component={UserManagement} />
             <Route path="/simple-import" component={SimpleImport} />
             <Route path="/settings" component={Settings} />

@@ -333,6 +333,9 @@ export const consignments = pgTable("consignments", {
   pickUp_LastPositionType: text("pickup_last_position_type"),
   pickUp_LastPositionDateTime: text("pickup_last_position_date_time"),
   
+  // Sync tracking
+  syncedAt: timestamp("synced_at").defaultNow(),
+  
   // Events data
   events: text("events").default('[]'),
 }, (table) => ({

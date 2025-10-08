@@ -26,7 +26,8 @@ import {
   Filter,
   X,
   BarChart3,
-  ArrowUpDown
+  ArrowUpDown,
+  LogOut
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,6 +35,7 @@ import { Consignment } from "@shared/schema";
 import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature } from "@/utils/podMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { getUser, logout } from "@/lib/auth";
 
 interface PhotoModalProps {
   isOpen: boolean;
@@ -178,6 +180,7 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
 type ConsignmentWithPhotoCount = Consignment & { actualPhotoCount?: number };
 
 export default function PODQualityDashboard() {
+  const user = getUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -289,16 +292,24 @@ export default function PODQualityDashboard() {
     return matchesSearch && matchesShipper && matchesWarehouse && matchesDriver && matchesDateRange;
   });
   
+  // Sort by syncedAt descending (most recent first)
+  const sortedConsignments = [...filteredConsignments].sort((a, b) => {
+    if (!a.syncedAt && !b.syncedAt) return 0;
+    if (!a.syncedAt) return 1;
+    if (!b.syncedAt) return -1;
+    return new Date(b.syncedAt).getTime() - new Date(a.syncedAt).getTime();
+  });
+  
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filters]);
   
   // Pagination calculations
-  const totalPages = Math.ceil(filteredConsignments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedConsignments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedConsignments = filteredConsignments.slice(startIndex, endIndex);
+  const paginatedConsignments = sortedConsignments.slice(startIndex, endIndex);
   
   // Load photo thumbnails for current page
   useEffect(() => {
@@ -535,20 +546,70 @@ export default function PODQualityDashboard() {
   
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin" />
+      <div className="flex-1 flex flex-col">
+        <header className="gradient-primary shadow-header z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div className="flex items-center">
+              <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+              <span className="ml-3 text-blue-100 text-sm">POD Quality Dashboard</span>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+                <span>{user?.email}</span>
+              </div>
+
+              <Button 
+                className="gradient-accent hover:opacity-90 text-white border-0"
+                onClick={logout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </header>
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <RefreshCw className="h-8 w-8 animate-spin" />
+          </div>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="flex-1 flex flex-col">
       {/* Header */}
+      <header className="gradient-primary shadow-header z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
+            <span className="ml-3 text-blue-100 text-sm">POD Quality Dashboard</span>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+              <span>{user?.email}</span>
+            </div>
+
+            <Button 
+              className="gradient-accent hover:opacity-90 text-white border-0"
+              onClick={logout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">POD Quality Dashboard</h1>
+          <h2 className="text-2xl font-bold">POD Quality Dashboard</h2>
           <p className="text-gray-600">Monitor proof of delivery quality and compliance</p>
         </div>
         <div className="flex gap-3">
@@ -568,7 +629,7 @@ export default function PODQualityDashboard() {
         <div>
           <h2 className="text-xl font-semibold">Summary</h2>
           <p className="text-sm text-gray-600">
-            Showing {filteredConsignments.length} of {consignments.length} deliveries
+            Showing {sortedConsignments.length} of {consignments.length} deliveries (sorted by last synced)
             {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
           </p>
         </div>
@@ -865,6 +926,21 @@ export default function PODQualityDashboard() {
                               <span className="font-semibold text-gray-900" data-testid={`text-order-${consignment.id}`}>
                                 {consignment.orderNumberRef || consignment.consignmentNo || '-'}
                               </span>
+                              {consignment.syncedAt && (
+                                <span className="text-xs text-gray-400 ml-2" title={new Date(consignment.syncedAt).toLocaleString()}>
+                                  synced {(() => {
+                                    const now = Date.now();
+                                    const synced = new Date(consignment.syncedAt).getTime();
+                                    const diffMs = now - synced;
+                                    const diffMins = Math.floor(diffMs / 60000);
+                                    const diffHours = Math.floor(diffMs / 3600000);
+                                    if (diffMins < 1) return 'just now';
+                                    if (diffMins < 60) return `${diffMins}m ago`;
+                                    if (diffHours < 24) return `${diffHours}h ago`;
+                                    return new Date(consignment.syncedAt).toLocaleDateString();
+                                  })()}
+                                </span>
+                              )}
                             </div>
                             {consignment.consignmentNo && consignment.consignmentNo !== consignment.orderNumberRef && (
                               <div className="text-xs text-gray-500 ml-6">{consignment.consignmentNo}</div>
@@ -1064,6 +1140,7 @@ export default function PODQualityDashboard() {
         signatures={photoModal.signatures}
         consignmentNo={photoModal.consignmentNo}
       />
+      </main>
     </div>
   );
 }

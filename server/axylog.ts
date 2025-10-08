@@ -93,7 +93,7 @@ export class AxylogAPI {
   }
 
   // Get deliveries (consignments) from Axylog for a specific user email
-  async getDeliveries(userEmail: string): Promise<Omit<Consignment, "id">[]> {
+  async getDeliveries(userEmail: string): Promise<Omit<Consignment, "id" | "syncedAt">[]> {
     try {
       // Get only today's deliveries in AEST timezone
       const todayAEST = new Date().toLocaleString("en-US", { timeZone: "Australia/Sydney" });
@@ -120,7 +120,7 @@ export class AxylogAPI {
     deliveryEmail?: string;
     customerName?: string;
     warehouseCompanyName?: string;
-  }): Promise<Omit<Consignment, "id">[]> {
+  }): Promise<Omit<Consignment, "id" | "syncedAt">[]> {
     try {
       // Authenticate if needed
       if (!this.credentials && !(await this.authenticate())) {
@@ -286,7 +286,7 @@ export class AxylogAPI {
   }
 
   // Convert Axylog deliveries to our Consignment format and filter by email
-  private convertAndFilterDeliveries(deliveries: AxylogDelivery[], userEmail: string): Omit<Consignment, "id">[] {
+  private convertAndFilterDeliveries(deliveries: AxylogDelivery[], userEmail: string): Omit<Consignment, "id" | "syncedAt">[] {
     if (!deliveries || !Array.isArray(deliveries)) {
       return [];
     }

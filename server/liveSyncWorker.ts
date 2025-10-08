@@ -114,12 +114,16 @@ export class LiveSyncWorker {
       const lastSyncTime = syncState.lastSyncTimestamp;
       const now = new Date();
       
-      console.log(`[LiveSync] Checking for consignments updated since: ${lastSyncTime.toISOString()}`);
+      // Only track from October 6th, 2024 onwards
+      const MIN_TRACKING_DATE = new Date('2024-10-06');
+      const fromDate = lastSyncTime > MIN_TRACKING_DATE ? lastSyncTime : MIN_TRACKING_DATE;
+      
+      console.log(`[LiveSync] Checking for consignments from: ${fromDate.toISOString()}`);
 
-      // Fetch consignments that were completed/closed since last sync
-      // Use a date range from last sync to now
+      // Fetch consignments that were completed/closed since last sync (but not before Oct 6th)
+      // Use a date range from the later of (last sync or Oct 6th) to now
       const newConsignments = await this.axylogAPI.getConsignmentsWithFilters({
-        pickupDateFrom: lastSyncTime.toISOString().split('T')[0],
+        pickupDateFrom: fromDate.toISOString().split('T')[0],
         pickupDateTo: now.toISOString().split('T')[0],
       });
 
@@ -153,6 +157,7 @@ export class LiveSyncWorker {
           const consignmentsToInsert = toInsert.map(c => ({
             ...c,
             userId: 1,
+            syncedAt: now, // Set sync timestamp
           }));
           await storage.createConsignmentsBatch(consignmentsToInsert);
           totalProcessed += toInsert.length;
@@ -176,7 +181,8 @@ export class LiveSyncWorker {
             if (consignment.consignmentNo) {
               await storage.updateConsignmentByNumber(consignment.consignmentNo, {
                 ...consignment,
-                userId: 1
+                userId: 1,
+                syncedAt: now, // Update sync timestamp
               });
             }
           }
