@@ -48,6 +48,7 @@ export interface IStorage {
   updatePhotoAssetStatus(id: number, status: string, errorMessage?: string): Promise<PhotoAsset>;
   getPhotoAssetsByStatus(status: string): Promise<PhotoAsset[]>;
   deletePhotoAssetsByToken(token: string): Promise<void>;
+  countPhotoAssetsByToken(token: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -677,6 +678,23 @@ export class DatabaseStorage implements IStorage {
     await executeWithRetry(async () => {
       await db.delete(photoAssets).where(eq(photoAssets.token, token));
     });
+  }
+
+  async countPhotoAssetsByToken(token: string): Promise<number> {
+    const result = await safeQuery(async () => {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(photoAssets)
+        .where(
+          and(
+            eq(photoAssets.token, token),
+            eq(photoAssets.status, 'available'),
+            eq(photoAssets.kind, 'photo')
+          )
+        );
+      return countResult?.count || 0;
+    });
+    return result || 0;
   }
 
   async createAdminUser(): Promise<User> {

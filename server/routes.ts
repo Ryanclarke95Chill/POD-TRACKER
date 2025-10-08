@@ -630,9 +630,6 @@ class PhotoScrapingQueue {
 
   private async scrapePhotos(token: string, force: boolean = false): Promise<{photos: string[], signaturePhotos: string[]}> {
     const normalizedToken = normalizeToken(token);
-    console.log(`📸 [SCRAPE DEBUG] Starting scrapePhotos for token: ${normalizedToken} (original: ${token})`);
-    console.log(`📸 [SCRAPE DEBUG] Tracking URL: https://live.axylog.com/${normalizedToken}`);
-    console.log(`📸 [SCRAPE DEBUG] Force refresh: ${force}`);
     
     // Check in-memory cache first (unless force refresh)
     if (!force) {
@@ -642,11 +639,7 @@ class PhotoScrapingQueue {
         const cacheDuration = isEmptyResult ? EMPTY_CACHE_DURATION : CACHE_DURATION;
         const cacheValid = Date.now() - cached.timestamp < cacheDuration;
         
-        console.log(`📸 [SCRAPE DEBUG] In-memory cache check - exists: true, empty: ${isEmptyResult}, valid: ${cacheValid}`);
-        console.log(`📸 [SCRAPE DEBUG] Cache age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s, max age: ${Math.round(cacheDuration / 1000)}s`);
-        
         if (cacheValid) {
-          console.log(`📸 [SCRAPE DEBUG] Using cached photos for token: ${normalizedToken} (${cached.photos.length} regular, ${cached.signaturePhotos.length} signature)`);
           return {
             photos: cached.photos,
             signaturePhotos: cached.signaturePhotos
@@ -655,7 +648,6 @@ class PhotoScrapingQueue {
       }
       
       // Check database if no valid cache, but prioritize fresh data for accuracy
-      console.log(`📸 [SCRAPE DEBUG] No valid cache, checking database age for token: ${normalizedToken}`);
       let shouldSkipDatabase = false;
       
       try {
@@ -672,8 +664,6 @@ class PhotoScrapingQueue {
           
           const dbAge = Date.now() - (mostRecentPhoto.fetchedAt ? new Date(mostRecentPhoto.fetchedAt).getTime() : 0);
           const dbAgeHours = dbAge / (1000 * 60 * 60);
-          
-          console.log(`📸 [SCRAPE DEBUG] Database photos are ${dbAgeHours.toFixed(1)} hours old`);
           
           // Only use database data if it's very recent (less than 15 minutes old)
           // This prevents stale data issues like showing 17 photos when only 1 exists
@@ -697,7 +687,6 @@ class PhotoScrapingQueue {
             
             return { photos, signaturePhotos };
           } else {
-            console.log(`📸 [SCRAPE DEBUG] Database data is stale (${dbAgeHours.toFixed(1)}h old), fetching fresh data`);
             shouldSkipDatabase = true;
           }
         } else if (dbPhotos.length > 0) {
@@ -1480,21 +1469,9 @@ function getRegionFromWarehouse(warehouseName: string): string {
 
 // Server-side POD analysis function (extracted from frontend)
 function analyzePOD(consignment: any): PODAnalysis {
-  // Count photos from various sources
-  let photoCount = 0;
-  const deliveryFileCount = parseInt(consignment.deliveryFileCount) || 0;
-  const pickupFileCount = parseInt(consignment.pickupFileCount) || 0;
-  
-  if (deliveryFileCount > 0 || pickupFileCount > 0) {
-    photoCount = deliveryFileCount + pickupFileCount;
-    // Subtract signatures from photo count
-    if (consignment.deliverySignatureName && deliveryFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-    if (consignment.pickupSignatureName && pickupFileCount > 0) photoCount = Math.max(0, photoCount - 1);
-  } else {
-    // Fallback: check file paths
-    if (consignment.deliveryPodFiles) photoCount += consignment.deliveryPodFiles.split(',').filter((f: string) => f.trim()).length;
-    if (consignment.receivedDeliveryPodFiles) photoCount += consignment.receivedDeliveryPodFiles.split(',').filter((f: string) => f.trim()).length;
-  }
+  // Use actualPhotoCount from photo_assets table (web scraped photos)
+  // This is the accurate count from the background photo ingestion worker
+  let photoCount = consignment.actualPhotoCount || 0;
 
   const hasSignature = Boolean(consignment.deliverySignatureName);
   const hasReceiverName = Boolean(consignment.deliverySignatureName && consignment.deliverySignatureName.trim().length > 1);
@@ -2507,7 +2484,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
       
-      res.json(result);
+      // Fetch actual photo counts for each consignment
+      const consignmentsToProcess = result.consignments || [];
+      const consignmentsWithPhotoCounts = await Promise.all(
+        consignmentsToProcess.map(async (consignment: any) => {
+          // Extract tracking token from the consignment's axylog URL
+          const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+          const axylogMatch = trackingLink?.match(/live\.axylog\.com\/([^/?]+)/);
+          const token = axylogMatch?.[1];
+          
+          let actualPhotoCount = 0;
+          if (token) {
+            actualPhotoCount = await storage.countPhotoAssetsByToken(token);
+          }
+          
+          return {
+            ...consignment,
+            actualPhotoCount
+          };
+        })
+      );
+      
+      res.json({
+        ...result,
+        consignments: consignmentsWithPhotoCounts
+      });
     } catch (error) {
       console.error("Error fetching consignments:", error);
       res.status(500).json({ message: "Server error" });
@@ -2593,20 +2594,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const token = axylogMatch[1];
       
-      // Add comprehensive logging for debugging
-      console.log(`📸 [PHOTO DEBUG] Fetching photos for token: ${token}`);
-      console.log(`📸 [PHOTO DEBUG] Consignment ID: ${consignmentId}`);
-      console.log(`📸 [PHOTO DEBUG] Tracking link: ${trackingLink}`);
-      
       // Get photos from database cache
-      console.log(`📸 [PHOTO DEBUG] Checking database cache for token: ${token}`);
       const cachedPhotos = await storage.getPhotoAssetsByToken(token);
-      console.log(`📸 [PHOTO DEBUG] Database cache returned ${cachedPhotos.length} photos`);
       
       // Serve cached photos if available, otherwise queue for background processing
       if (cachedPhotos.length === 0) {
         // No photos in cache - use background worker to fetch them
-        console.log(`📸 [PHOTO DEBUG] No cached photos found, using background worker`);
         const canUseWorker = true; // Enable background worker for optimal performance
         
         if (canUseWorker) {
@@ -2619,17 +2612,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Fallback to direct scraping when worker is unavailable
-        console.log(`📸 [PHOTO DEBUG] Background worker unavailable for token ${token}, using direct scraping fallback`);
-        console.log(`📸 [PHOTO DEBUG] About to call photoQueue.addRequest with token: ${token}`);
         try {
           const photoResult = await photoQueue.addRequest(token, 'high');
           
           // Apply filtering before sending response
           const filteredPhotos = filterFetchablePhotos(photoResult.photos || []);
           const filteredSignatures = filterFetchablePhotos(photoResult.signaturePhotos || []);
-          
-          console.log(`📸 [PHOTO DEBUG] photoQueue.addRequest completed. Pre-filter: ${photoResult.photos?.length || 0} photos, ${photoResult.signaturePhotos?.length || 0} signatures`);
-          console.log(`📸 [PHOTO DEBUG] Post-filter: ${filteredPhotos.length} photos, ${filteredSignatures.length} signatures`);
           
           return res.json({ 
             success: true, 
@@ -2660,8 +2648,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Return available photos (now accepting data URIs)
       let photos = availablePhotos.map(photo => photo.url);
-      
-      console.log(`🔍 [DIRECT DB] Photos returned: ${photos.length}`);
       
       return res.json({ 
         success: true, 
@@ -3499,6 +3485,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Reverse geocoding failed:', error);
       res.status(500).json({ location: 'Location unavailable' });
+    }
+  });
+
+  // Debug endpoint to test photo scraping for a specific tracking token
+  app.get('/api/debug/scrape/:token', async (req: Request, res: Response) => {
+    const token = req.params.token;
+    
+    console.log(`\n========== DEBUG SCRAPE START for token: ${token} ==========`);
+    
+    try {
+      const puppeteer = await import('puppeteer');
+      const browser = await puppeteer.default.launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      const page = await browser.newPage();
+      const trackingUrl = `https://live.axylog.com/${token}`;
+      
+      console.log(`[DEBUG] Loading URL: ${trackingUrl}`);
+      await page.goto(trackingUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Extract all images with full details
+      const images = await page.evaluate(() => {
+        const imgElements = Array.from(document.querySelectorAll('img'));
+        return imgElements.map(img => ({
+          src: img.src.substring(0, 150),
+          width: img.naturalWidth || img.width,
+          height: img.naturalHeight || img.height,
+          alt: img.alt || '',
+          className: img.className || ''
+        }));
+      });
+      
+      console.log(`[DEBUG] Found ${images.length} total images on page`);
+      images.forEach((img: any, i: number) => {
+        const shortSide = Math.min(img.width, img.height);
+        const longSide = Math.max(img.width, img.height);
+        const pixelArea = img.width * img.height;
+        const aspectRatio = img.width / Math.max(img.height, 1);
+        
+        console.log(`\n[DEBUG] Image ${i + 1}:`);
+        console.log(`  - Dimensions: ${img.width}x${img.height} (short=${shortSide}, long=${longSide})`);
+        console.log(`  - Pixel Area: ${pixelArea.toLocaleString()}`);
+        console.log(`  - Aspect Ratio: ${aspectRatio.toFixed(2)}`);
+        console.log(`  - URL: ${img.src}`);
+        console.log(`  - Alt: ${img.alt}`);
+        console.log(`  - Class: ${img.className}`);
+        
+        // Check against filters
+        const passesShortSide = shortSide >= 350;
+        const passesPixelArea = pixelArea >= 200000;
+        const passesAspectRatio = aspectRatio >= 0.45 && aspectRatio <= 1.9;
+        const passesLongSide = longSide >= 600;
+        
+        console.log(`  - Passes shortSide>=350: ${passesShortSide}`);
+        console.log(`  - Passes pixelArea>=200k: ${passesPixelArea}`);
+        console.log(`  - Passes aspectRatio 0.45-1.9: ${passesAspectRatio}`);
+        console.log(`  - Passes longSide>=600: ${passesLongSide}`);
+        console.log(`  - Would be KEPT: ${passesShortSide && passesPixelArea && passesAspectRatio && passesLongSide}`);
+      });
+      
+      await browser.close();
+      console.log(`\n========== DEBUG SCRAPE END ==========\n`);
+      
+      res.json({ success: true, images, total: images.length });
+    } catch (error) {
+      console.error(`[DEBUG] Error:`, error);
+      res.status(500).json({ success: false, error: String(error) });
     }
   });
 

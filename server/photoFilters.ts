@@ -169,13 +169,11 @@ export function filterFetchablePhotos(urls: string[]): string[] {
   
   for (const u of urls) {
     if (!u || typeof u !== 'string') {
-      console.log(`🔍 [FILTER] Skipping invalid URL (null or not string):`, typeof u);
       continue;
     }
     
     // Accept data URIs
     if (u.startsWith('data:image/')) {
-      console.log(`✅ [FILTER] Accepting data URI (length: ${u.length})`);
       if (!seen.has(u)) {
         seen.add(u);
         out.push(u);
@@ -187,18 +185,15 @@ export function filterFetchablePhotos(urls: string[]): string[] {
     try {
       const { protocol, hostname } = new URL(u);
       if (protocol !== 'http:' && protocol !== 'https:') {
-        console.log(`🔍 [FILTER] Rejecting non-HTTP URL: ${protocol}`);
         continue;
       }
       
       // Deduplicate
       if (!seen.has(u)) {
-        console.log(`✅ [FILTER] Accepting HTTP URL: ${hostname}`);
         seen.add(u);
         out.push(u);
       }
     } catch (e) {
-      console.log(`🔍 [FILTER] Invalid URL, skipping:`, u.substring(0, 100));
       continue;
     }
   }
