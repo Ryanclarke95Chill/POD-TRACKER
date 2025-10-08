@@ -185,12 +185,26 @@ export default function PODQualityDashboard() {
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+  
+  // Set default date filter to last 7 days
+  const getDefaultDates = () => {
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    return {
+      fromDate: sevenDaysAgo.toISOString().split('T')[0],
+      toDate: today.toISOString().split('T')[0]
+    };
+  };
+  
+  const defaultDates = getDefaultDates();
   const [filters, setFilters] = useState<Filters>({
     shipper: "all",
     warehouse: "all",
     driver: "all",
-    fromDate: "",
-    toDate: ""
+    fromDate: defaultDates.fromDate,
+    toDate: defaultDates.toDate
   });
   
   const [photoModal, setPhotoModal] = useState<{
@@ -632,6 +646,23 @@ export default function PODQualityDashboard() {
             Showing {sortedConsignments.length} of {consignments.length} deliveries (sorted by last synced)
             {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
           </p>
+          {filters.fromDate && (
+            <p className="text-xs text-gray-500 mt-1">
+              📅 Filtering: {filters.fromDate} to {filters.toDate || 'today'}
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="ml-2 p-0 h-auto text-xs"
+                onClick={() => setFilters({
+                  ...filters,
+                  fromDate: '2024-10-06', // Show all data from Oct 6th
+                  toDate: new Date().toISOString().split('T')[0]
+                })}
+              >
+                Show all from Oct 6th
+              </Button>
+            </p>
+          )}
         </div>
       </div>
       
