@@ -173,7 +173,12 @@ export class LiveSyncWorker {
         if (toUpdate.length > 0) {
           console.log(`[LiveSync] Updating ${toUpdate.length} existing consignments`);
           for (const consignment of toUpdate) {
-            await storage.updateConsignment({ ...consignment, userId: 1 });
+            if (consignment.consignmentNo) {
+              await storage.updateConsignmentByNumber(consignment.consignmentNo, {
+                ...consignment,
+                userId: 1
+              });
+            }
           }
           totalProcessed += toUpdate.length;
 

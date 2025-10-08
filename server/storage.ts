@@ -26,6 +26,7 @@ export interface IStorage {
   createConsignment(consignment: Omit<Consignment, "id">): Promise<Consignment>;
   createConsignmentsBatch(consignments: Omit<Consignment, "id">[]): Promise<Consignment[]>;
   updateConsignment(consignment: Consignment): Promise<Consignment>;
+  updateConsignmentByNumber(consignmentNo: string, updates: Omit<Consignment, "id">): Promise<Consignment | undefined>;
   seedDemoConsignments(userId: number): Promise<void>;
   clearAllConsignments(): Promise<void>;
   clearUserConsignments(userId: number): Promise<void>;
@@ -437,6 +438,17 @@ export class DatabaseStorage implements IStorage {
         .update(consignments)
         .set(consignment)
         .where(eq(consignments.id, consignment.id))
+        .returning();
+      return updatedConsignment;
+    });
+  }
+
+  async updateConsignmentByNumber(consignmentNo: string, updates: Omit<Consignment, "id">): Promise<Consignment | undefined> {
+    return await executeWithRetry(async () => {
+      const [updatedConsignment] = await db
+        .update(consignments)
+        .set(updates)
+        .where(eq(consignments.consignmentNo, consignmentNo))
         .returning();
       return updatedConsignment;
     });
