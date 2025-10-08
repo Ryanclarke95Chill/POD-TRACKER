@@ -839,7 +839,12 @@ export default function PODQualityDashboard() {
             {showFilters && (
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">Filters</h3>
+                  <div>
+                    <h3 className="font-medium">Filters</h3>
+                    {!hasFiltersApplied && (
+                      <p className="text-sm text-amber-600 mt-1">Please select date range to load data</p>
+                    )}
+                  </div>
                   <Button size="sm" variant="ghost" onClick={resetFilters}>
                     <X className="h-4 w-4 mr-1" />
                     Clear All
@@ -892,20 +897,28 @@ export default function PODQualityDashboard() {
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium mb-1 block">From Date</label>
+                    <label className="text-sm font-medium mb-1 block">
+                      From Date <span className="text-red-500">*</span>
+                    </label>
                     <Input
                       type="date"
                       value={filters.fromDate}
                       onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
+                      className={!filters.fromDate && !filters.toDate ? 'border-amber-500' : ''}
+                      placeholder="Required"
                     />
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium mb-1 block">To Date</label>
+                    <label className="text-sm font-medium mb-1 block">
+                      To Date <span className="text-red-500">*</span>
+                    </label>
                     <Input
                       type="date"
                       value={filters.toDate}
                       onChange={(e) => setFilters({...filters, toDate: e.target.value})}
+                      className={!filters.fromDate && !filters.toDate ? 'border-amber-500' : ''}
+                      placeholder="Required"
                     />
                   </div>
                 </div>
