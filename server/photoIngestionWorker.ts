@@ -197,11 +197,11 @@ export class PhotoIngestionWorker {
         await page.setViewport({ width: 1280, height: 720 });
         
         await page.goto(trackingUrl, { 
-          waitUntil: 'domcontentloaded', // Faster loading, avoids waiting for blocked connections
-          timeout: 15000 // Reduced timeout since we're not waiting for network idle
+          waitUntil: 'networkidle2', // Wait for network to be idle (better for dynamic content)
+          timeout: 20000 // Increased timeout for slower pages
         });
         
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait time for dynamic content
         
         try {
           await page.waitForSelector('img', { timeout: 8000 });
@@ -514,18 +514,14 @@ export class PhotoIngestionWorker {
   }
   
   // Method to bulk enqueue jobs from consignments  
-  // Only enqueues first 50 deliveries for fast loading of top visible items
   async enqueueFromConsignments(): Promise<void> {
     try {
       const consignments = await storage.getAllConsignments();
       console.log(`[Worker] Found ${consignments.length} consignments for photo ingestion`);
       
-      // PERFORMANCE OPTIMIZATION: Only queue first 50 deliveries (top of list that user sees first)
-      // Other deliveries will be loaded on-demand when user clicks "View Photos"
-      const topConsignments = consignments.slice(0, 50);
-      console.log(`[Worker] Prioritizing first ${topConsignments.length} consignments for fast loading`);
-      
-      for (const consignment of topConsignments) {
+      // Process ALL consignments to ensure complete photo coverage
+      // Photos that already exist will be skipped by the enqueueJob method
+      for (const consignment of consignments) {
         // Extract token from delivery tracking link
         if (consignment.deliveryLiveTrackLink) {
           const token = this.extractTokenFromUrl(consignment.deliveryLiveTrackLink);
@@ -543,7 +539,7 @@ export class PhotoIngestionWorker {
         }
       }
       
-      console.log(`[Worker] Enqueued ${this.jobQueue.length} photo ingestion jobs for top consignments`);
+      console.log(`[Worker] Enqueued ${this.jobQueue.length} photo ingestion jobs for all consignments`);
     } catch (error) {
       console.error('[Worker] Error enqueuing jobs from consignments:', error);
     }

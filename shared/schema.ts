@@ -79,6 +79,17 @@ export const insertDataSyncLogSchema = createInsertSchema(dataSyncLog).pick({
 export type DataSyncLog = typeof dataSyncLog.$inferSelect;
 export type InsertDataSyncLog = z.infer<typeof insertDataSyncLogSchema>;
 
+// Axylog Live Sync State - tracks cursor for incremental syncing
+export const axylogSyncState = pgTable("axylog_sync_state", {
+  id: serial("id").primaryKey(),
+  lastSyncTimestamp: timestamp("last_sync_timestamp").notNull(),
+  lastConsignmentId: text("last_consignment_id"), // Optional: track last synced consignment
+  isPolling: boolean("is_polling").default(false), // Track if polling worker is active
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AxylogSyncState = typeof axylogSyncState.$inferSelect;
+
 // Define temperature zones
 export const temperatureZones = [
   "Dry",

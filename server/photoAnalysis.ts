@@ -1,8 +1,17 @@
 import OpenAI from "openai";
 import axios from "axios";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it to use photo analysis features.');
+    }
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
 
 export interface PhotoAnalysisResult {
   clarity: {
@@ -51,8 +60,9 @@ export class PhotoAnalysisService {
   async analyzePhoto(imageUrl: string): Promise<PhotoAnalysisResult> {
     try {
       const base64Image = await this.downloadImageAsBase64(imageUrl);
+      const client = getOpenAIClient();
       
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025
         messages: [
           {

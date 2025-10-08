@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { photoWorker } from "./photoIngestionWorker";
+import { liveSyncWorker } from "./liveSyncWorker";
 import axylogProxy from "./axylog-proxy";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -145,9 +146,19 @@ app.use((req, res, next) => {
       // Enqueue existing consignments for background processing
       await photoWorker.enqueueFromConsignments();
       
-      console.log('Background photo ingestion worker started successfully');
+      console.log('Photo ingestion worker started successfully');
     } catch (error) {
       console.error('Failed to start photo ingestion worker:', error);
+      // Continue running server even if worker fails to start
+    }
+
+    // Start live sync worker for real-time Axylog integration
+    try {
+      console.log('Starting live Axylog sync worker...');
+      await liveSyncWorker.start();
+      console.log('Live sync worker started successfully');
+    } catch (error) {
+      console.error('Failed to start live sync worker:', error);
       // Continue running server even if worker fails to start
     }
   });
