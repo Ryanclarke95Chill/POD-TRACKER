@@ -186,25 +186,12 @@ export default function PODQualityDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
   
-  // Set default date filter to last 7 days
-  const getDefaultDates = () => {
-    const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
-    
-    return {
-      fromDate: sevenDaysAgo.toISOString().split('T')[0],
-      toDate: today.toISOString().split('T')[0]
-    };
-  };
-  
-  const defaultDates = getDefaultDates();
   const [filters, setFilters] = useState<Filters>({
     shipper: "all",
     warehouse: "all",
     driver: "all",
-    fromDate: defaultDates.fromDate,
-    toDate: defaultDates.toDate
+    fromDate: "",
+    toDate: ""
   });
   
   const [photoModal, setPhotoModal] = useState<{
@@ -218,14 +205,17 @@ export default function PODQualityDashboard() {
   const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string>>(new Map());
   const { toast } = useToast();
   
+  // Check if filters are applied (require at least date filter)
+  const hasFiltersApplied = !!(filters.fromDate || filters.toDate);
+  
   // Fetch consignments
   const { data: consignmentsData, isLoading, refetch } = useQuery<{
     consignments: ConsignmentWithPhotoCount[];
     totalCount: number;
   }>({
     queryKey: ["/api/consignments/stats"],
-    enabled: true,
-    refetchInterval: 60000, // Refresh every minute
+    enabled: hasFiltersApplied,  // Only fetch when filters are applied
+    refetchInterval: hasFiltersApplied ? 60000 : false, // Refresh every minute only when enabled
   });
   
   const consignments = consignmentsData?.consignments || [];
@@ -627,7 +617,7 @@ export default function PODQualityDashboard() {
           <p className="text-gray-600">Monitor proof of delivery quality and compliance</p>
         </div>
         <div className="flex gap-3">
-          <Button onClick={() => refetch()} variant="outline">
+          <Button onClick={() => refetch()} variant="outline" disabled={!hasFiltersApplied}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -643,26 +633,15 @@ export default function PODQualityDashboard() {
         <div>
           <h2 className="text-xl font-semibold">Summary</h2>
           <p className="text-sm text-gray-600">
-            Showing {sortedConsignments.length} of {consignments.length} deliveries (sorted by last synced)
-            {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
+            {hasFiltersApplied ? (
+              <>
+                Showing {sortedConsignments.length} of {consignments.length} deliveries (sorted by last synced)
+                {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
+              </>
+            ) : (
+              <span className="text-amber-600">Please select a date range to load consignments</span>
+            )}
           </p>
-          {filters.fromDate && (
-            <p className="text-xs text-gray-500 mt-1">
-              📅 Filtering: {filters.fromDate} to {filters.toDate || 'today'}
-              <Button 
-                variant="link" 
-                size="sm" 
-                className="ml-2 p-0 h-auto text-xs"
-                onClick={() => setFilters({
-                  ...filters,
-                  fromDate: '2024-10-06', // Show all data from Oct 6th
-                  toDate: new Date().toISOString().split('T')[0]
-                })}
-              >
-                Show all from Oct 6th
-              </Button>
-            </p>
-          )}
         </div>
       </div>
       
