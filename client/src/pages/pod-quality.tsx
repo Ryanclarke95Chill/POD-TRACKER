@@ -427,7 +427,7 @@ export default function PODQualityDashboard() {
     })).sort((a, b) => b.avgScore - a.avgScore);
   }, [filteredConsignments]);
   
-  // Load photos for a consignment with improved retry logic
+  // Load photos for a consignment using thumbnail-first strategy
   const loadPhotos = async (consignment: Consignment) => {
     const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
     if (!trackingLink) {
@@ -439,60 +439,86 @@ export default function PODQualityDashboard() {
       return;
     }
     
-    // Extract token from tracking link - the token is the last part of the URL
-    const token = trackingLink.split('/').pop() || trackingLink;
-    
     setLoadingPhotos(consignment.id);
     const currentRetries = photoLoadRetries.get(consignment.id) || 0;
     
     try {
-      // Use web scraping for fast, reliable photo retrieval
-      const response = await apiRequest('GET', `/api/pod-photos?trackingToken=${encodeURIComponent(token)}&priority=high`);
-      const data = await response.json();
+      // Step 1: Get thumbnails first (fast)
+      const thumbnailResponse = await apiRequest('GET', `/api/consignments/${consignment.id}/photos`);
+      const thumbnailData = await thumbnailResponse.json();
       
-      if (data.success) {
-        if ((data.status === 'preparing' || (!data.photos?.length && !data.signaturePhotos?.length)) && currentRetries < 5) {
-          // Increment retry count
-          setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, currentRetries + 1)));
-          
-          // Show loading toast only on first retry
-          if (currentRetries === 0) {
-            toast({
-              title: "Loading photos...",
-              description: "Photos are being processed, this may take a moment",
-            });
-          }
-          
-          // Retry with exponential backoff
-          const delay = Math.min(1000 * Math.pow(1.5, currentRetries), 5000);
-          setTimeout(() => loadPhotos(consignment), delay);
-          return;
-        }
-        
-        // Reset retry count on success
-        setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, 0)));
-        
-        if ((!data.photos || data.photos.length === 0) && (!data.signaturePhotos || data.signaturePhotos.length === 0)) {
-          toast({
-            title: "No photos available",
-            description: "No photos found for this consignment. They may not have been uploaded yet.",
-            variant: "destructive"
-          });
-        } else {
-          setPhotoModal({
-            isOpen: true,
-            photos: data.photos || [],
-            signatures: data.signaturePhotos || [],
-            consignmentNo: consignment.consignmentNo || consignment.orderNumberRef || ""
-          });
-        }
-      } else {
+      if (!thumbnailData.success) {
         toast({
           title: "Failed to load photos",
-          description: data.error || "An error occurred while loading photos",
+          description: thumbnailData.error || "An error occurred while loading photos",
           variant: "destructive"
         });
+        return;
       }
+      
+      // Check if thumbnails are being prepared
+      if (thumbnailData.status === 'preparing' && currentRetries < 5) {
+        setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, currentRetries + 1)));
+        
+        if (currentRetries === 0) {
+          toast({
+            title: "Loading photos...",
+            description: "Photos are being processed, this may take a moment",
+          });
+        }
+        
+        const delay = Math.min(1000 * Math.pow(1.5, currentRetries), 5000);
+        setTimeout(() => loadPhotos(consignment), delay);
+        return;
+      }
+      
+      // Reset retry count
+      setPhotoLoadRetries(new Map(photoLoadRetries.set(consignment.id, 0)));
+      
+      if ((!thumbnailData.photos || thumbnailData.photos.length === 0) && 
+          (!thumbnailData.signatures || thumbnailData.signatures.length === 0)) {
+        toast({
+          title: "No photos available",
+          description: "No photos found for this consignment. They may not have been uploaded yet.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Show modal with thumbnails immediately
+      const currentConsignmentNo = consignment.consignmentNo || consignment.orderNumberRef || "";
+      setPhotoModal({
+        isOpen: true,
+        photos: thumbnailData.photos || [],
+        signatures: thumbnailData.signatures || [],
+        consignmentNo: currentConsignmentNo
+      });
+      
+      // Step 2: Trigger full-res loading in background
+      apiRequest('GET', `/api/consignments/${consignment.id}/photos/full-res`)
+        .then(async fullResResponse => {
+          const fullResData = await fullResResponse.json();
+          if (fullResData.success && (fullResData.photos?.length > 0 || fullResData.signatures?.length > 0)) {
+            // Only update if this consignment is still the active modal
+            setPhotoModal(prev => {
+              // Verify this full-res response matches the currently open modal
+              if (prev.consignmentNo === currentConsignmentNo && prev.isOpen) {
+                return {
+                  ...prev,
+                  photos: fullResData.photos || prev.photos,
+                  signatures: fullResData.signatures || prev.signatures
+                };
+              }
+              // Stale response, ignore it
+              return prev;
+            });
+          }
+        })
+        .catch(error => {
+          console.log('Full-res loading skipped or failed:', error);
+          // Silent fail - thumbnails are already displayed
+        });
+        
     } catch (error) {
       console.error('Photo loading error:', error);
       toast({
