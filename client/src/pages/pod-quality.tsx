@@ -32,7 +32,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
-import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature } from "@/utils/podMetrics";
+import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature, parseRequiredTemperature } from "@/utils/podMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -1012,7 +1012,12 @@ export default function PODQualityDashboard() {
               const tier = getQualityTier(metrics.qualityScore);
               const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
               const actualTemp = getActualTemperature(consignment);
-              const expectedTemp = consignment.expectedTemperature;
+              
+              // Parse expected temperature from document_note
+              const tempRange = parseRequiredTemperature(consignment.documentNote);
+              const expectedTemp = tempRange ? `${tempRange.min}°C to ${tempRange.max}°C` : 
+                                   (consignment.documentNote?.toLowerCase().includes('dry') ? 'Dry' : null);
+              
               const thumbnail = photoThumbnails.get(consignment.id);
               
               return (
