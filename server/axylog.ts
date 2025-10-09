@@ -92,6 +92,11 @@ export class AxylogAPI {
     }
   }
 
+  // Public getter for credentials
+  getCredentials(): AxylogCredentials | null {
+    return this.credentials;
+  }
+
   // Get deliveries (consignments) from Axylog for a specific user email
   async getDeliveries(userEmail: string): Promise<Omit<Consignment, "id" | "syncedAt">[]> {
     try {

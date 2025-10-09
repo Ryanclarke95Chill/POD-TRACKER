@@ -47,6 +47,7 @@ export interface IStorage {
   createPhotoAsset(asset: Omit<PhotoAsset, "id" | "fetchedAt">): Promise<PhotoAsset>;
   createPhotoAssetsBatch(assets: Omit<PhotoAsset, "id" | "fetchedAt">[]): Promise<PhotoAsset[]>;
   updatePhotoAssetStatus(id: number, status: string, errorMessage?: string): Promise<PhotoAsset>;
+  updatePhotoAsset(id: number, updates: Partial<Omit<PhotoAsset, "id" | "fetchedAt">>): Promise<PhotoAsset>;
   getPhotoAssetsByStatus(status: string): Promise<PhotoAsset[]>;
   deletePhotoAssetsByToken(token: string): Promise<void>;
   countPhotoAssetsByToken(token: string): Promise<number>;
@@ -666,6 +667,21 @@ export class DatabaseStorage implements IStorage {
         updates.errorMessage = errorMessage;
       }
       
+      const [updated] = await db
+        .update(photoAssets)
+        .set(updates)
+        .where(eq(photoAssets.id, id))
+        .returning();
+      
+      if (!updated) {
+        throw new Error(`PhotoAsset with id ${id} not found`);
+      }
+      return updated;
+    });
+  }
+
+  async updatePhotoAsset(id: number, updates: Partial<Omit<PhotoAsset, "id" | "fetchedAt">>): Promise<PhotoAsset> {
+    return await executeWithRetry(async () => {
       const [updated] = await db
         .update(photoAssets)
         .set(updates)

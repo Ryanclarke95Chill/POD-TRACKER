@@ -2662,6 +2662,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Full-resolution photos endpoint - triggers on-demand full-res extraction
+  app.get('/api/consignments/:id/photos/full-res', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      const consignmentId = parseInt(req.params.id);
+      const consignment = await storage.getConsignmentById(consignmentId);
+      
+      if (!consignment) {
+        return res.status(404).json({ success: false, error: 'Consignment not found' });
+      }
+
+      // Extract tracking token
+      const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+      const axylogMatch = trackingLink?.match(/live\.axylog\.com\/([^/?]+)/);
+      if (!axylogMatch || !axylogMatch[1]) {
+        return res.json({ success: true, photos: [], status: 'no_tracking' });
+      }
+
+      const token = axylogMatch[1];
+      
+      // Get photo assets from database
+      const photoAssets = await storage.getPhotoAssetsByToken(token);
+      
+      if (photoAssets.length === 0) {
+        return res.json({ success: true, photos: [], status: 'no_photos' });
+      }
+      
+      // Check if full-res images are already available
+      const fullResReady = photoAssets.filter(asset => asset.fullResStatus === 'available');
+      
+      if (fullResReady.length > 0) {
+        // Return existing full-res images
+        const fullResPhotos = fullResReady
+          .filter(asset => asset.fullResUrl)
+          .map(asset => asset.fullResUrl as string);
+        
+        return res.json({
+          success: true,
+          photos: fullResPhotos,
+          count: fullResPhotos.length,
+          status: 'ready'
+        });
+      }
+      
+      // Trigger full-res extraction if not already processing
+      const fullResPending = photoAssets.filter(asset => asset.fullResStatus === 'pending');
+      
+      if (fullResPending.length > 0) {
+        // Queue full-res extraction job
+        try {
+          await (photoWorker as any).enqueueFullResJob(token);
+          return res.json({ success: true, photos: [], status: 'processing' });
+        } catch (error) {
+          console.error('Failed to queue full-res job:', error);
+          return res.json({ success: true, photos: [], status: 'failed' });
+        }
+      }
+      
+      // No full-res available and none pending
+      return res.json({ success: true, photos: [], status: 'unavailable' });
+      
+    } catch (error) {
+      console.error('Error fetching full-res photos:', error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch full-res photos' });
+    }
+  });
+
   // Axylog sync endpoint (admin only) - multiple routes for compatibility
   const axylogSyncHandler = async (req: AuthRequest, res: Response) => {
     console.log("=== AXYLOG SYNC ENDPOINT ===");
@@ -2715,7 +2781,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (axylogConsignments.length > 0) {
           const consignmentsToInsert = axylogConsignments.map(consignment => ({
             ...consignment,
-            userId: req.user!.id
+            userId: req.user!.id,
+            syncedAt: new Date()
           }));
           
           // Debug temperature data and file counts in first consignment
@@ -2849,7 +2916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // Get year, code, prog from consignment reference or Axylog API
-        const credentials = axylogAPI.credentials;
+        const credentials = axylogAPI.getCredentials();
         
         if (!credentials) {
           throw new Error('Failed to get Axylog credentials');
@@ -3091,8 +3158,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...photoResult.photos.map(url => ({ 
                 token: normalizedToken, 
                 url, 
+                fullResUrl: null,
                 kind: 'photo' as const, 
                 status: 'available' as const,
+                fullResStatus: 'pending' as const,
                 width: null,
                 height: null,
                 hash: null,
@@ -3101,8 +3170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...photoResult.signaturePhotos.map(url => ({ 
                 token: normalizedToken, 
                 url, 
+                fullResUrl: null,
                 kind: 'signature' as const, 
                 status: 'available' as const,
+                fullResStatus: 'pending' as const,
                 width: null,
                 height: null,
                 hash: null,

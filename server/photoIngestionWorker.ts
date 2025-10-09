@@ -55,6 +55,7 @@ export class PhotoIngestionWorker {
   private cluster: Cluster | null = null;
   private jobQueue: PhotoIngestionJob[] = [];
   private activeJobs = new Set<string>();
+  private activeFullResJobs = new Set<string>(); // Track full-res jobs to prevent race conditions
   private isProcessing = false;
   private readonly maxRetries = 3;
   private readonly batchSize = 5;
@@ -276,6 +277,124 @@ export class PhotoIngestionWorker {
     }
     
     console.log(`[Worker] Enqueued job for token ${token} with priority ${priority}`);
+  }
+  
+  async enqueueFullResJob(token: string): Promise<void> {
+    // CRITICAL: Check and add to Set FIRST to prevent race conditions
+    if (this.activeFullResJobs.has(token)) {
+      console.log(`[Worker] Full-res job already processing for token ${token}, skipping`);
+      return;
+    }
+    
+    // Mark as processing immediately, before any async work
+    this.activeFullResJobs.add(token);
+    
+    try {
+      // Check if full-res images already exist
+      const existingPhotos = await storage.getPhotoAssetsByToken(token);
+      const fullResReady = existingPhotos.some(p => p.fullResStatus === 'available');
+      if (fullResReady) {
+        this.activeFullResJobs.delete(token); // Clean up if skipping
+        return; // Already have full-res images
+      }
+      
+      console.log(`[Worker] Enqueued full-res job for token ${token}`);
+      
+      // Start full-res extraction in background
+      this.processFullResJob(token)
+        .catch(error => {
+          console.error(`[Worker] Error processing full-res job for token ${token}:`, error);
+        })
+        .finally(() => {
+          // Remove from active set when done
+          this.activeFullResJobs.delete(token);
+        });
+        
+    } catch (error) {
+      // Clean up on error
+      this.activeFullResJobs.delete(token);
+      throw error;
+    }
+  }
+  
+  private async processFullResJob(token: string): Promise<void> {
+    try {
+      console.log(`[Worker] Extracting full-res photos for token ${token}`);
+      
+      // Import required modules
+      const { extractFullResolution } = await import('./photoFilters');
+      const puppeteer = await import('puppeteer');
+      
+      // Launch browser for full-res extraction
+      const browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      try {
+        const page = await browser.newPage();
+        const url = `https://live.axylog.com/${token}`;
+        
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        
+        // Extract all images from the page
+        const images = await page.evaluate(() => {
+          const imgs = Array.from(document.querySelectorAll('img'));
+          return imgs.map(img => ({
+            url: img.src,
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            alt: img.alt || '',
+            className: img.className || ''
+          }));
+        });
+        
+        // Use extractFullResolution to filter for high-res images
+        const fullResPhotos = extractFullResolution(images);
+        
+        console.log(`[Worker] Extracted ${fullResPhotos.length} full-res photos from ${images.length} raw images`);
+        
+        // Process extracted photos
+        if (fullResPhotos && fullResPhotos.length > 0) {
+          // Update existing photo assets with full-res URLs
+          const existingPhotos = await storage.getPhotoAssetsByToken(token);
+          
+          for (let i = 0; i < Math.min(existingPhotos.length, fullResPhotos.length); i++) {
+            const photoAsset = existingPhotos[i];
+            const fullResPhoto = fullResPhotos[i];
+            
+            await storage.updatePhotoAsset(photoAsset.id, {
+              fullResUrl: fullResPhoto.url,
+              fullResStatus: 'available'
+            });
+          }
+          
+          console.log(`[Worker] Updated ${Math.min(existingPhotos.length, fullResPhotos.length)} photos with full-res URLs for token ${token}`);
+        } else {
+          // Mark as no full-res available
+          const existingPhotos = await storage.getPhotoAssetsByToken(token);
+          for (const photoAsset of existingPhotos) {
+            await storage.updatePhotoAsset(photoAsset.id, {
+              fullResStatus: 'unavailable'
+            });
+          }
+          console.log(`[Worker] No full-res photos found for token ${token}`);
+        }
+      } finally {
+        await browser.close();
+      }
+      
+    } catch (error: any) {
+      console.error(`[Worker] Error extracting full-res for token ${token}:`, error);
+      
+      // Mark as failed
+      const existingPhotos = await storage.getPhotoAssetsByToken(token);
+      for (const photoAsset of existingPhotos) {
+        await storage.updatePhotoAsset(photoAsset.id, {
+          fullResStatus: 'failed'
+        });
+      }
+    }
   }
   
   private async startProcessing(): Promise<void> {
