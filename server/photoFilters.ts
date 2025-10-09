@@ -34,6 +34,12 @@ export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
     if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
     if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
     
+    // Skip Chill logo/branding images
+    const srcLower = img.src.toLowerCase();
+    const altLower = (img.alt || '').toLowerCase();
+    if (srcLower.includes('chill') && (srcLower.includes('logo') || srcLower.includes('brand') || srcLower.includes('watermark'))) continue;
+    if (altLower.includes('chill') && (altLower.includes('logo') || altLower.includes('brand'))) continue;
+    
     const shortSide = Math.min(img.width, img.height);
     const longSide = Math.max(img.width, img.height);
     const pixelArea = img.width * img.height;
@@ -171,6 +177,12 @@ export function filterAndClassifyPhotos(images: PhotoCandidate[]): FilteredPhoto
     // Skip obvious UI elements
     if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
     if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
+    
+    // Skip Chill logo/branding images
+    const srcLower = img.src.toLowerCase();
+    const altLower = (img.alt || '').toLowerCase();
+    if (srcLower.includes('chill') && (srcLower.includes('logo') || srcLower.includes('brand') || srcLower.includes('watermark'))) continue;
+    if (altLower.includes('chill') && (altLower.includes('logo') || altLower.includes('brand'))) continue;
     
     // Calculate dimensions for filtering
     const shortSide = Math.min(img.width, img.height);
