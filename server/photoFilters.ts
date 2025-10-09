@@ -16,6 +16,136 @@ export interface FilteredPhoto {
   kind: 'photo' | 'signature';
   width: number;
   height: number;
+  isThumbnail?: boolean; // true if this is a thumbnail-sized image
+}
+
+/**
+ * Extract thumbnail-sized images for fast initial loading
+ * Prioritizes smaller images (200-500px) for quick page display
+ */
+export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
+  const filtered: FilteredPhoto[] = [];
+  
+  for (const img of images) {
+    // Basic validation
+    if (!img.src || img.width < 50 || img.height < 50) continue;
+    
+    // Skip obvious UI elements
+    if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
+    if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
+    
+    const shortSide = Math.min(img.width, img.height);
+    const longSide = Math.max(img.width, img.height);
+    const pixelArea = img.width * img.height;
+    const aspectRatio = img.width / Math.max(img.height, 1);
+    
+    // Check for signatures
+    const text = ((img.alt || '') + ' ' + (img.className || '')).toLowerCase();
+    const isDimensionSignature = 
+      img.height <= 220 && 
+      aspectRatio >= 3.0 && 
+      img.width >= 300 && 
+      img.width <= 1200 &&
+      pixelArea <= 120000;
+    const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+    const isSignature = (isDimensionSignature && isTextSignature) || (isDimensionSignature && img.height <= 180);
+    
+    if (isSignature) {
+      if (shortSide >= 120 && pixelArea <= 120000 && isValidPhotoUrl(img.src)) {
+        filtered.push({
+          url: img.src,
+          kind: 'signature',
+          width: img.width,
+          height: img.height,
+          isThumbnail: true
+        });
+      }
+      continue;
+    }
+    
+    // THUMBNAIL CRITERIA: Smaller images for fast loading
+    // - Short side: 200-500px (good balance of quality and speed)
+    // - Pixel area: 50k-250k (small enough to load fast)
+    // - Aspect ratio: 0.45-1.9 (normal photo ratios)
+    // - At least one side >= 300px
+    
+    if (shortSide >= 200 && shortSide <= 500 &&
+        pixelArea >= 50000 && pixelArea <= 250000 &&
+        aspectRatio >= 0.45 && aspectRatio <= 1.9 &&
+        longSide >= 300 &&
+        isValidPhotoUrl(img.src)) {
+      filtered.push({
+        url: img.src,
+        kind: 'photo',
+        width: img.width,
+        height: img.height,
+        isThumbnail: true
+      });
+    }
+  }
+  
+  return filtered;
+}
+
+/**
+ * Extract full-resolution images for detailed viewing
+ * Targets larger images (600px+) for modal display
+ */
+export function extractFullResolution(images: PhotoCandidate[]): FilteredPhoto[] {
+  const filtered: FilteredPhoto[] = [];
+  
+  for (const img of images) {
+    if (!img.src || img.width < 50 || img.height < 50) continue;
+    if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
+    if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
+    
+    const shortSide = Math.min(img.width, img.height);
+    const longSide = Math.max(img.width, img.height);
+    const pixelArea = img.width * img.height;
+    const aspectRatio = img.width / Math.max(img.height, 1);
+    
+    // Check for signatures
+    const text = ((img.alt || '') + ' ' + (img.className || '')).toLowerCase();
+    const isDimensionSignature = 
+      img.height <= 220 && aspectRatio >= 3.0 && 
+      img.width >= 300 && img.width <= 1200 && pixelArea <= 120000;
+    const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
+    const isSignature = (isDimensionSignature && isTextSignature) || (isDimensionSignature && img.height <= 180);
+    
+    if (isSignature) {
+      if (shortSide >= 120 && pixelArea <= 120000 && isValidPhotoUrl(img.src)) {
+        filtered.push({
+          url: img.src,
+          kind: 'signature',
+          width: img.width,
+          height: img.height,
+          isThumbnail: false
+        });
+      }
+      continue;
+    }
+    
+    // FULL-RES CRITERIA: Larger images for quality viewing
+    // - Short side >= 350px
+    // - Pixel area >= 200k
+    // - Long side >= 600px
+    // - Normal aspect ratio
+    
+    if (shortSide >= 350 && pixelArea >= 200000 &&
+        aspectRatio >= 0.45 && aspectRatio <= 1.9 &&
+        longSide >= 600 &&
+        isValidPhotoUrl(img.src)) {
+      filtered.push({
+        url: img.src,
+        kind: 'photo',
+        width: img.width,
+        height: img.height,
+        isThumbnail: false
+      });
+    }
+  }
+  
+  return filtered;
 }
 
 /**

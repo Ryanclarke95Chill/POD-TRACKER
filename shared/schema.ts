@@ -370,12 +370,14 @@ export type ConsignmentEvent = {
 export const photoAssets = pgTable("photo_assets", {
   id: serial("id").primaryKey(),
   token: text("token").notNull(), // Axylog tracking token
-  url: text("url").notNull(), // Photo URL
+  url: text("url").notNull(), // Photo URL (full-resolution or thumbnail initially)
+  fullResUrl: text("full_res_url"), // Full-resolution URL (fetched on-demand)
   kind: text("kind").notNull(), // 'photo' | 'signature'
   width: integer("width"), // Image width (optional metadata)
   height: integer("height"), // Image height (optional metadata)
   hash: text("hash"), // Content hash for deduplication
   status: text("status").notNull().default('pending'), // 'pending' | 'available' | 'failed'
+  fullResStatus: text("full_res_status").default('pending'), // 'pending' | 'available' | 'failed' for full-res
   fetchedAt: timestamp("fetched_at").defaultNow(),
   errorMessage: text("error_message"), // If status is 'failed'
 }, (table) => ({
@@ -389,11 +391,13 @@ export const photoAssets = pgTable("photo_assets", {
 export const insertPhotoAssetSchema = createInsertSchema(photoAssets).pick({
   token: true,
   url: true,
+  fullResUrl: true,
   kind: true,
   width: true,
   height: true,
   hash: true,
   status: true,
+  fullResStatus: true,
   errorMessage: true,
 });
 

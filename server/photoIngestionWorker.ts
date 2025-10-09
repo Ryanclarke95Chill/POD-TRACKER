@@ -2,7 +2,7 @@ import { Cluster } from 'puppeteer-cluster';
 import { storage } from './storage';
 import { createHash } from 'crypto';
 import { invalidatePhotoCache, normalizeToken } from './routes';
-import { filterAndClassifyPhotos, type PhotoCandidate } from './photoFilters';
+import { filterAndClassifyPhotos, extractThumbnails, extractFullResolution, type PhotoCandidate } from './photoFilters';
 
 // Security-aware browser arguments based on environment
 function getSecureBrowserArgs(): string[] {
@@ -223,10 +223,10 @@ export class PhotoIngestionWorker {
         
         console.log(`[Worker] Extracted ${images.length} raw images from page for token ${token}`);
         
-        // Apply smart filtering to exclude UI elements, social icons, banners, etc.
-        const filteredPhotos = filterAndClassifyPhotos(images);
+        // THUMBNAIL-FIRST STRATEGY: Extract smaller images for fast loading
+        const filteredPhotos = extractThumbnails(images);
         
-        console.log(`[Worker] After filtering: ${filteredPhotos.length} valid photos (${filteredPhotos.filter(p => p.kind === 'photo').length} delivery photos, ${filteredPhotos.filter(p => p.kind === 'signature').length} signatures) from ${images.length} raw images`);
+        console.log(`[Worker] After thumbnail extraction: ${filteredPhotos.length} thumbnails (${filteredPhotos.filter(p => p.kind === 'photo').length} delivery photos, ${filteredPhotos.filter(p => p.kind === 'signature').length} signatures) from ${images.length} raw images`);
         
         // Convert to ExtractedPhoto format
         const extractedPhotos: ExtractedPhoto[] = filteredPhotos.map(photo => ({
@@ -255,10 +255,12 @@ export class PhotoIngestionWorker {
       return;
     }
     
-    // Check if we already have processed photos for this token
+    // Check if we already have delivery photos (kind='photo') for this token
+    // Note: We don't skip if we only have signatures - we need delivery photos too!
     const existingPhotos = await storage.getPhotoAssetsByToken(token);
-    if (existingPhotos.length > 0 && existingPhotos.some(p => p.status === 'available')) {
-      return; // Already have photos
+    const hasDeliveryPhotos = existingPhotos.some(p => p.status === 'available' && p.kind === 'photo');
+    if (hasDeliveryPhotos) {
+      return; // Already have delivery photos
     }
     
     // Remove any existing jobs for this token and add new one
@@ -363,11 +365,13 @@ export class PhotoIngestionWorker {
       await storage.createPhotoAsset({
         token,
         url: '', // Placeholder
+        fullResUrl: null,
         kind: 'photo',
         width: null,
         height: null,
         hash: null,
         status: 'pending',
+        fullResStatus: 'pending',
         errorMessage: null
       });
     } catch (error) {
@@ -390,11 +394,13 @@ export class PhotoIngestionWorker {
       await storage.createPhotoAsset({
         token,
         url: '', // Empty URL for no-photos marker
+        fullResUrl: null,
         kind: 'photo',
         width: null,
         height: null,
         hash: null,
         status: 'failed',
+        fullResStatus: 'failed',
         errorMessage: 'No photos found in tracking page'
       });
     }
@@ -415,11 +421,13 @@ export class PhotoIngestionWorker {
       await storage.createPhotoAsset({
         token,
         url: '', // Empty URL for failed marker
+        fullResUrl: null,
         kind: 'photo',
         width: null,
         height: null,
         hash: null,
         status: 'failed',
+        fullResStatus: 'failed',
         errorMessage
       });
     }
@@ -433,11 +441,13 @@ export class PhotoIngestionWorker {
         return {
           token,
           url: photo.url,
+          fullResUrl: null, // Full-res will be fetched on-demand
           kind: photo.kind,
           width: photo.width || null,
           height: photo.height || null,
           hash,
           status: 'available' as const,
+          fullResStatus: 'pending' as const, // Full-res pending until requested
           errorMessage: null
         };
       })
@@ -463,11 +473,13 @@ export class PhotoIngestionWorker {
           await storage.createPhotoAssetsBatch(nonPendingAssets.map(asset => ({
             token: asset.token,
             url: asset.url,
+            fullResUrl: asset.fullResUrl || null,
             kind: asset.kind,
             width: asset.width,
             height: asset.height,
             hash: asset.hash,
             status: asset.status,
+            fullResStatus: asset.fullResStatus || 'pending',
             errorMessage: asset.errorMessage
           })));
         }

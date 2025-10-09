@@ -182,7 +182,6 @@ type ConsignmentWithPhotoCount = Consignment & { actualPhotoCount?: number };
 export default function PODQualityDashboard() {
   const user = getUser();
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
   
@@ -193,6 +192,8 @@ export default function PODQualityDashboard() {
     fromDate: "",
     toDate: ""
   });
+  
+  const [dataLoaded, setDataLoaded] = useState(false); // Track if user triggered load
   
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
@@ -214,8 +215,8 @@ export default function PODQualityDashboard() {
     totalCount: number;
   }>({
     queryKey: ["/api/consignments/stats"],
-    enabled: hasFiltersApplied,  // Only fetch when filters are applied
-    refetchInterval: hasFiltersApplied ? 60000 : false, // Refresh every minute only when enabled
+    enabled: dataLoaded && hasFiltersApplied,  // Only fetch when user clicks load button AND filters are applied
+    refetchInterval: dataLoaded && hasFiltersApplied ? 60000 : false, // Refresh every minute only when enabled
   });
   
   const consignments = consignmentsData?.consignments || [];
@@ -538,6 +539,13 @@ export default function PODQualityDashboard() {
       toDate: ""
     });
     setSearchTerm("");
+    setDataLoaded(false); // Reset data load state
+  };
+  
+  // Handler to update filters and reset data loaded state
+  const updateFilter = (key: keyof Filters, value: string) => {
+    setFilters({...filters, [key]: value});
+    setDataLoaded(false); // Reset when filters change
   };
   
   const activeFilterCount = [
@@ -583,9 +591,9 @@ export default function PODQualityDashboard() {
   }
   
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="gradient-primary shadow-header z-10">
+      <header className="gradient-primary shadow-lg z-10 sticky top-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
@@ -608,42 +616,199 @@ export default function PODQualityDashboard() {
         </div>
       </header>
       
+      {/* FILTERS SECTION - TOP PRIORITY */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Filter className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Filter Consignments</h2>
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  {activeFilterCount} active
+                </Badge>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              {activeFilterCount > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetFilters}
+                  data-testid="button-reset-filters"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
+              <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} size="sm" variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Sync
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            {/* Date From */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                From Date <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="date"
+                value={filters.fromDate}
+                onChange={(e) => updateFilter("fromDate", e.target.value)}
+                className="w-full"
+                data-testid="input-date-from"
+              />
+            </div>
+
+            {/* Date To */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                To Date <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="date"
+                value={filters.toDate}
+                onChange={(e) => updateFilter("toDate", e.target.value)}
+                className="w-full"
+                data-testid="input-date-to"
+              />
+            </div>
+
+            {/* Shipper */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Shipper</label>
+              <Select value={filters.shipper} onValueChange={(val) => updateFilter("shipper", val)}>
+                <SelectTrigger data-testid="select-shipper">
+                  <SelectValue placeholder="All Shippers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Shippers</SelectItem>
+                  {uniqueShippers.map((shipper) => (
+                    <SelectItem key={shipper} value={shipper}>{shipper}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Warehouse */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Warehouse</label>
+              <Select value={filters.warehouse} onValueChange={(val) => updateFilter("warehouse", val)}>
+                <SelectTrigger data-testid="select-warehouse">
+                  <SelectValue placeholder="All Warehouses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  {uniqueWarehouses.map((warehouse) => (
+                    <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Driver */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Driver</label>
+              <Select value={filters.driver} onValueChange={(val) => updateFilter("driver", val)}>
+                <SelectTrigger data-testid="select-driver">
+                  <SelectValue placeholder="All Drivers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Drivers</SelectItem>
+                  {uniqueDrivers.map((driver) => (
+                    <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Search and Load Button */}
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by consignment, order, driver, customer, city..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={() => {
+                if (!hasFiltersApplied) {
+                  toast({
+                    title: "Please select a date range",
+                    description: "Select at least a 'From Date' or 'To Date' to load data",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                setDataLoaded(true);
+              }}
+              className="gradient-accent text-white h-10 px-8 font-semibold"
+              disabled={!hasFiltersApplied || dataLoaded}
+              data-testid="button-load-data"
+            >
+              {dataLoaded ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Data Loaded
+                </>
+              ) : (
+                <>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Load Data
+                </>
+              )}
+            </Button>
+
+            <Button onClick={() => refetch()} variant="outline" disabled={!dataLoaded || !hasFiltersApplied} className="h-10">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Status Message */}
+          {!hasFiltersApplied && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Please select at least a date range to load consignments
+              </p>
+            </div>
+          )}
+          {hasFiltersApplied && !dataLoaded && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Filters selected. Click "Load Data" to fetch consignments
+              </p>
+            </div>
+          )}
+          {dataLoaded && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Showing {sortedConsignments.length} of {consignments.length} deliveries
+                {activeFilterCount > 0 && <span className="ml-1">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">POD Quality Dashboard</h2>
-          <p className="text-gray-600">Monitor proof of delivery quality and compliance</p>
-        </div>
-        <div className="flex gap-3">
-          <Button onClick={() => refetch()} variant="outline" disabled={!hasFiltersApplied}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
-            <Download className="h-4 w-4 mr-2" />
-            Sync Axylog
-          </Button>
-        </div>
-      </div>
-      
-      {/* Dynamic Summary Header */}
-      <div className="flex items-center justify-between border-b pb-3">
-        <div>
-          <h2 className="text-xl font-semibold">Summary</h2>
-          <p className="text-sm text-gray-600">
-            {hasFiltersApplied ? (
-              <>
-                Showing {sortedConsignments.length} of {consignments.length} deliveries (sorted by last synced)
-                {activeFilterCount > 0 && <span className="ml-1 text-blue-600">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
-              </>
-            ) : (
-              <span className="text-amber-600">Please select a date range to load consignments</span>
-            )}
-          </p>
-        </div>
-      </div>
       
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -803,132 +968,15 @@ export default function PODQualityDashboard() {
       {/* Consignments Table */}
       <Card>
         <CardHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Consignments</CardTitle>
-                <CardDescription>Detailed POD quality scores</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <div className="w-72">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search consignments..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="relative"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <Badge className="ml-2 bg-blue-500 text-white">{activeFilterCount}</Badge>
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            {/* Filter Panel */}
-            {showFilters && (
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-medium">Filters</h3>
-                    {!hasFiltersApplied && (
-                      <p className="text-sm text-amber-600 mt-1">Please select date range to load data</p>
-                    )}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={resetFilters}>
-                    <X className="h-4 w-4 mr-1" />
-                    Clear All
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Shipper</label>
-                    <Select value={filters.shipper} onValueChange={(v) => setFilters({...filters, shipper: v})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All shippers" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All shippers</SelectItem>
-                        {uniqueShippers.map(shipper => (
-                          <SelectItem key={shipper} value={shipper}>{shipper}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Warehouse</label>
-                    <Select value={filters.warehouse} onValueChange={(v) => setFilters({...filters, warehouse: v})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All warehouses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All warehouses</SelectItem>
-                        {uniqueWarehouses.map(warehouse => (
-                          <SelectItem key={warehouse} value={warehouse}>{warehouse}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Driver</label>
-                    <Select value={filters.driver} onValueChange={(v) => setFilters({...filters, driver: v})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All drivers" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All drivers</SelectItem>
-                        {uniqueDrivers.map(driver => (
-                          <SelectItem key={driver} value={driver}>{driver}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">
-                      From Date <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="date"
-                      value={filters.fromDate}
-                      onChange={(e) => setFilters({...filters, fromDate: e.target.value})}
-                      className={!filters.fromDate && !filters.toDate ? 'border-amber-500' : ''}
-                      placeholder="Required"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">
-                      To Date <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="date"
-                      value={filters.toDate}
-                      onChange={(e) => setFilters({...filters, toDate: e.target.value})}
-                      className={!filters.fromDate && !filters.toDate ? 'border-amber-500' : ''}
-                      placeholder="Required"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <CardTitle>Consignments</CardTitle>
+          <CardDescription>
+            Detailed POD quality scores for {sortedConsignments.length} deliveries
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {paginatedConsignments.map((consignment: ConsignmentWithPhotoCount) => {
+          {dataLoaded && (
+            <div className="space-y-3">
+              {paginatedConsignments.map((consignment: ConsignmentWithPhotoCount) => {
               const metrics = calculatePODScore(consignment, consignment.actualPhotoCount);
               const tier = getQualityTier(metrics.qualityScore);
               const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
@@ -1092,9 +1140,10 @@ export default function PODQualityDashboard() {
               </div>
             )}
           </div>
+          )}
           
           {/* Pagination Controls */}
-          {totalPages > 1 && (
+          {dataLoaded && totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between border-t pt-4">
               <div className="text-sm text-gray-600">
                 Showing {startIndex + 1} to {Math.min(endIndex, filteredConsignments.length)} of {filteredConsignments.length} consignments
