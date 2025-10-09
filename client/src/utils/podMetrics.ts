@@ -38,8 +38,21 @@ export function getDriverTemperatures(consignment: Consignment): number[] {
 export function parseRequiredTemperature(documentNote: string | null): { min: number; max: number } | null {
   if (!documentNote) return null;
   
-  // Match patterns like:
-  // "Frozen -18C to -20C" or "Chiller 0C to +4C" or "Frozen -18°C to -20°C"
+  const noteUpper = documentNote.toUpperCase();
+  
+  // Check for standard temperature zones with fixed ranges
+  if (noteUpper.includes('FROZEN')) {
+    // Frozen: -15°C to -25°C (anywhere in this range is compliant)
+    return { min: -25, max: -15 };
+  }
+  
+  if (noteUpper.includes('CHILL')) {
+    // Chiller: 0°C to 5°C
+    return { min: 0, max: 5 };
+  }
+  
+  // For other temperature types, parse the actual values from the note
+  // Match patterns like: "-18C to -20C" or "0C to +4C" or "-18°C to -20°C"
   const rangePattern = /(-?\d+\.?\d*)\s*°?C?\s+to\s+([+-]?\d+\.?\d*)\s*°?C?/i;
   const match = documentNote.match(rangePattern);
   
@@ -55,7 +68,7 @@ export function parseRequiredTemperature(documentNote: string | null): { min: nu
     }
   }
   
-  // Single temperature pattern: "Frozen -18C" or "Chiller +4C"
+  // Single temperature pattern: "-18C" or "+4C"
   const singlePattern = /(-?\+?\d+\.?\d*)\s*°?C/i;
   const singleMatch = documentNote.match(singlePattern);
   
@@ -135,13 +148,13 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     total: 0
   };
   
-  // Photo count (30 base points + up to 5 bonus points for 4-8+ photos)
+  // Photo count (40 base points + up to 10 bonus points for 4-13+ photos)
   const photoCount = actualPhotoCount ?? getPhotoCount(consignment);
   if (photoCount >= 3) {
-    // Base 30 points for meeting minimum 3 photos
-    // +1 point for each additional photo (4th, 5th, 6th, 7th, 8th+), capped at +5
-    const bonusPhotos = Math.min(photoCount - 3, 5);
-    const totalPoints = 30 + bonusPhotos;
+    // Base 40 points for meeting minimum 3 photos
+    // +1 point for each additional photo (4th through 13th), capped at +10
+    const bonusPhotos = Math.min(photoCount - 3, 10);
+    const totalPoints = 40 + bonusPhotos;
     scoreBreakdown.photos = { 
       points: totalPoints, 
       reason: photoCount === 3 ? "3 photos (minimum met)" : `${photoCount} photos (+${bonusPhotos} bonus)`, 
@@ -149,13 +162,13 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   } else if (photoCount >= 2) {
     scoreBreakdown.photos = { 
-      points: 20, 
+      points: 25, 
       reason: `${photoCount} photos (3 minimum required)`, 
       status: "partial" 
     };
   } else if (photoCount >= 1) {
     scoreBreakdown.photos = { 
-      points: 10, 
+      points: 15, 
       reason: `Only ${photoCount} photo (3 minimum required)`, 
       status: "partial" 
     };
@@ -167,27 +180,19 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Signature (25 points)
+  // Signature - NOT COUNTED (required field in Axylog, always present)
   const hasSignature = !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
-  if (hasSignature) {
-    scoreBreakdown.signature = { 
-      points: 25, 
-      reason: "Signature captured", 
-      status: "pass" 
-    };
-  } else {
-    scoreBreakdown.signature = { 
-      points: 0, 
-      reason: "No signature captured", 
-      status: "fail" 
-    };
-  }
+  scoreBreakdown.signature = { 
+    points: 0, 
+    reason: hasSignature ? "Signature present (required)" : "No signature", 
+    status: hasSignature ? "pass" : "fail" 
+  };
   
-  // Receiver name (20 points)
+  // Receiver name (25 points)
   const hasReceiverName = !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
   if (hasReceiverName) {
     scoreBreakdown.receiverName = { 
-      points: 20, 
+      points: 25, 
       reason: "Receiver name recorded", 
       status: "pass" 
     };
@@ -233,10 +238,9 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     status: "pending"
   };
   
-  // Calculate total score
+  // Calculate total score (signature excluded - it's required in Axylog)
   scoreBreakdown.total = 
     scoreBreakdown.photos.points +
-    scoreBreakdown.signature.points +
     scoreBreakdown.receiverName.points +
     scoreBreakdown.temperature.points;
   

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Download,
   TrendingUp,
   Users,
@@ -27,7 +28,9 @@ import {
   X,
   BarChart3,
   ArrowUpDown,
-  LogOut
+  LogOut,
+  Lightbulb,
+  TrendingDown
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -194,6 +197,7 @@ export default function PODQualityDashboard() {
   });
   
   const [dataLoaded, setDataLoaded] = useState(false); // Track if user triggered load
+  const [insightsExpanded, setInsightsExpanded] = useState(true); // Track insights section expansion
   
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
@@ -397,6 +401,7 @@ export default function PODQualityDashboard() {
       totalPhotos: number;
       signaturesCount: number;
       tempCompliantCount: number;
+      receiverNameCount: number;
     }>();
     
     filteredConsignments.forEach((c: ConsignmentWithPhotoCount) => {
@@ -410,7 +415,8 @@ export default function PODQualityDashboard() {
           totalScore: 0,
           totalPhotos: 0,
           signaturesCount: 0,
-          tempCompliantCount: 0
+          tempCompliantCount: 0,
+          receiverNameCount: 0
         });
       }
       
@@ -420,6 +426,7 @@ export default function PODQualityDashboard() {
       data.totalPhotos += metrics.photoCount;
       if (metrics.hasSignature) data.signaturesCount++;
       if (metrics.temperatureCompliant) data.tempCompliantCount++;
+      if (metrics.hasReceiverName) data.receiverNameCount++;
     });
     
     return Array.from(warehouseMap.values()).map(w => ({
@@ -428,9 +435,77 @@ export default function PODQualityDashboard() {
       avgScore: Math.round(w.totalScore / w.deliveryCount),
       photoRate: Math.round((w.totalPhotos / w.deliveryCount) * 10) / 10,
       signatureRate: Math.round((w.signaturesCount / w.deliveryCount) * 100),
-      tempComplianceRate: Math.round((w.tempCompliantCount / w.deliveryCount) * 100)
+      tempComplianceRate: Math.round((w.tempCompliantCount / w.deliveryCount) * 100),
+      receiverNameRate: Math.round((w.receiverNameCount / w.deliveryCount) * 100)
     })).sort((a, b) => b.avgScore - a.avgScore);
   }, [filteredConsignments]);
+  
+  // Calculate driver performance data
+  const driverPerformance = useMemo(() => {
+    const driverMap = new Map<string, {
+      driver: string;
+      deliveryCount: number;
+      totalScore: number;
+      totalPhotos: number;
+      receiverNameCount: number;
+      tempCompliantCount: number;
+    }>();
+    
+    filteredConsignments.forEach((c: ConsignmentWithPhotoCount) => {
+      const driver = c.driverName || "Unknown Driver";
+      const metrics = calculatePODScore(c, c.actualPhotoCount);
+      
+      if (!driverMap.has(driver)) {
+        driverMap.set(driver, {
+          driver,
+          deliveryCount: 0,
+          totalScore: 0,
+          totalPhotos: 0,
+          receiverNameCount: 0,
+          tempCompliantCount: 0
+        });
+      }
+      
+      const data = driverMap.get(driver)!;
+      data.deliveryCount++;
+      data.totalScore += metrics.qualityScore;
+      data.totalPhotos += metrics.photoCount;
+      if (metrics.hasReceiverName) data.receiverNameCount++;
+      if (metrics.temperatureCompliant) data.tempCompliantCount++;
+    });
+    
+    return Array.from(driverMap.values()).map(d => ({
+      driver: d.driver,
+      deliveryCount: d.deliveryCount,
+      avgScore: Math.round(d.totalScore / d.deliveryCount),
+      photoRate: Math.round((d.totalPhotos / d.deliveryCount) * 10) / 10,
+      receiverNameRate: Math.round((d.receiverNameCount / d.deliveryCount) * 100),
+      tempComplianceRate: Math.round((d.tempCompliantCount / d.deliveryCount) * 100)
+    })).sort((a, b) => b.avgScore - a.avgScore);
+  }, [filteredConsignments]);
+  
+  // Generate warehouse-specific insights
+  const warehouseInsights = useMemo(() => {
+    return warehouseComparison.map(w => {
+      const issues: string[] = [];
+      
+      if (w.photoRate < 2) {
+        issues.push(`Low photo coverage (${w.photoRate} avg photos/delivery)`);
+      }
+      if (w.receiverNameRate < 80) {
+        issues.push(`Receiver names missing in ${100 - w.receiverNameRate}% of deliveries`);
+      }
+      if (w.tempComplianceRate < 85) {
+        issues.push(`Temperature compliance at ${w.tempComplianceRate}%`);
+      }
+      
+      return {
+        warehouse: w.warehouse,
+        avgScore: w.avgScore,
+        issues: issues.length > 0 ? issues : ['All metrics performing well']
+      };
+    });
+  }, [warehouseComparison]);
   
   // Load photos for a consignment using thumbnail-first strategy
   const loadPhotos = async (consignment: Consignment) => {
@@ -873,12 +948,12 @@ export default function PODQualityDashboard() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <FileSignature className="h-4 w-4" />
-              Signature Rate
+              Receiver Name
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.signatureRate}%</div>
-            <p className="text-xs text-gray-500">Signatures captured</p>
+            <p className="text-xs text-gray-500">Receiver name recorded</p>
           </CardContent>
         </Card>
         
@@ -950,7 +1025,7 @@ export default function PODQualityDashboard() {
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="avgScore" fill="#3b82f6" name="Avg Score (%)" />
-                    <Bar dataKey="signatureRate" fill="#10b981" name="Signature Rate (%)" />
+                    <Bar dataKey="signatureRate" fill="#10b981" name="Receiver Name (%)" />
                     <Bar dataKey="tempComplianceRate" fill="#f59e0b" name="Temp Compliance (%)" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -965,7 +1040,7 @@ export default function PODQualityDashboard() {
                       <th className="text-center p-3 font-medium text-gray-700">Deliveries</th>
                       <th className="text-center p-3 font-medium text-gray-700">Avg Score</th>
                       <th className="text-center p-3 font-medium text-gray-700">Photos/Delivery</th>
-                      <th className="text-center p-3 font-medium text-gray-700">Signature %</th>
+                      <th className="text-center p-3 font-medium text-gray-700">Receiver Name %</th>
                       <th className="text-center p-3 font-medium text-gray-700">Temp Compliance %</th>
                     </tr>
                   </thead>
@@ -993,6 +1068,135 @@ export default function PODQualityDashboard() {
               </div>
             </div>
           </CardContent>
+        </Card>
+      )}
+      
+      {/* Insights Section */}
+      {filteredConsignments.length > 0 && (
+        <Card>
+          <CardHeader 
+            className="cursor-pointer hover:bg-gray-50 transition-colors" 
+            onClick={() => setInsightsExpanded(!insightsExpanded)}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  Performance Insights
+                </CardTitle>
+                <CardDescription>Driver rankings and warehouse improvement areas</CardDescription>
+              </div>
+              <ChevronDown className={`h-5 w-5 transition-transform ${insightsExpanded ? 'rotate-180' : ''}`} />
+            </div>
+          </CardHeader>
+          
+          {insightsExpanded && (
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Driver Performance */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Driver Performance
+                  </h3>
+                  
+                  {/* Top Performers */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4" />
+                      Top Performers
+                    </h4>
+                    <div className="space-y-2">
+                      {driverPerformance.slice(0, 3).map((driver, idx) => (
+                        <div key={driver.driver} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{driver.driver}</div>
+                            <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${
+                              driver.avgScore >= 90 ? 'text-green-600' :
+                              driver.avgScore >= 75 ? 'text-blue-600' :
+                              'text-yellow-600'
+                            }`}>
+                              {driver.avgScore}%
+                            </div>
+                            <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Low Performers */}
+                  {driverPerformance.length > 3 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
+                        <TrendingDown className="h-4 w-4" />
+                        Needs Improvement
+                      </h4>
+                      <div className="space-y-2">
+                        {driverPerformance.slice(-3).reverse().map((driver, idx) => (
+                          <div key={driver.driver} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{driver.driver}</div>
+                              <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`text-lg font-bold ${
+                                driver.avgScore >= 75 ? 'text-blue-600' :
+                                driver.avgScore >= 60 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {driver.avgScore}%
+                              </div>
+                              <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Warehouse Improvement Areas */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Warehouse Improvement Areas
+                  </h3>
+                  <div className="space-y-3">
+                    {warehouseInsights.map((insight) => (
+                      <div key={insight.warehouse} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{insight.warehouse}</h4>
+                          <span className={`text-sm font-semibold ${
+                            insight.avgScore >= 90 ? 'text-green-600' :
+                            insight.avgScore >= 75 ? 'text-blue-600' :
+                            insight.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {insight.avgScore}%
+                          </span>
+                        </div>
+                        <ul className="space-y-1">
+                          {insight.issues.map((issue, idx) => (
+                            <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                              <span className={`mt-1 ${
+                                issue.includes('well') ? 'text-green-500' : 'text-amber-500'
+                              }`}>
+                                {issue.includes('well') ? '✓' : '•'}
+                              </span>
+                              <span>{issue}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
       
@@ -1093,10 +1297,10 @@ export default function PODQualityDashboard() {
                             </div>
                           </div>
                           
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.hasSignature ? 'bg-green-50' : 'bg-red-50'}`}>
-                            <FileSignature className={`h-4 w-4 ${metrics.hasSignature ? 'text-green-600' : 'text-red-600'}`} />
-                            <span className={`text-sm font-medium ${metrics.hasSignature ? 'text-green-700' : 'text-red-700'}`}>
-                              {metrics.hasSignature ? 'Signature ✓' : 'No signature'}
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.hasReceiverName ? 'bg-green-50' : 'bg-red-50'}`}>
+                            <FileSignature className={`h-4 w-4 ${metrics.hasReceiverName ? 'text-green-600' : 'text-red-600'}`} />
+                            <span className={`text-sm font-medium ${metrics.hasReceiverName ? 'text-green-700' : 'text-red-700'}`}>
+                              {metrics.hasReceiverName ? 'Receiver name ✓' : 'No receiver name'}
                             </span>
                           </div>
                           
