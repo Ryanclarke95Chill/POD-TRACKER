@@ -448,8 +448,15 @@ export class PhotoIngestionWorker {
       
       if (extractedPhotos && extractedPhotos.length > 0) {
         // Store photos in database
-        await this.storePhotos(token, extractedPhotos);
+        const newPhotosStored = await this.storePhotos(token, extractedPhotos);
         console.log(`[Worker] Successfully processed ${extractedPhotos.length} photos for token ${token}`);
+        
+        // Pre-fetch full-res images in background ONLY if new photos were stored
+        if (newPhotosStored) {
+          this.enqueueFullResJob(token).catch(error => {
+            console.log(`[Worker] Could not enqueue full-res pre-fetch for token ${token}:`, error.message);
+          });
+        }
       } else {
         // No photos found, still mark as processed
         await this.markTokenAsNoPhotos(token);
@@ -552,7 +559,7 @@ export class PhotoIngestionWorker {
     }
   }
   
-  private async storePhotos(token: string, photos: ExtractedPhoto[]): Promise<void> {
+  private async storePhotos(token: string, photos: ExtractedPhoto[]): Promise<boolean> {
     // Create photo assets with proper deduplication
     const photoAssets = await Promise.all(
       photos.map(async photo => {
@@ -622,10 +629,13 @@ export class PhotoIngestionWorker {
         } catch (error) {
           console.error(`[Worker] Failed to invalidate cache for token ${token}:`, error);
         }
+        return true; // New photos were stored
       } else {
         console.log(`[Worker] All ${photoAssets.length} photos for token ${token} were duplicates, none stored`);
+        return false; // No new photos stored
       }
     }
+    return false; // No assets to process
   }
   
   private generatePhotoHash(url: string): string {
