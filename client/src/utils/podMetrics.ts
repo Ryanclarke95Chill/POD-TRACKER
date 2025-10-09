@@ -11,21 +11,60 @@ export interface PODMetrics {
   scoreBreakdown: ScoreBreakdown;
 }
 
-// Get actual temperature reading from consignment
-export function getActualTemperature(consignment: Consignment): string | null {
-  // Primary source: paymentMethod field
+// Get driver-recorded temperatures from consignment
+export function getDriverTemperatures(consignment: Consignment): number[] {
+  const temps: number[] = [];
+  
+  // Driver temp 1: payment_method field
   if (consignment.paymentMethod && consignment.paymentMethod !== "null") {
-    return consignment.paymentMethod;
+    const temp = parseFloat(consignment.paymentMethod);
+    if (!isNaN(temp)) {
+      temps.push(temp);
+    }
   }
   
-  // Backup source: amountToCollect field
-  if (consignment.amountToCollect && consignment.amountToCollect !== "null") {
-    return consignment.amountToCollect;
-  }
-  
-  // Backup source: amountCollected field
+  // Driver temp 2: amount_collected field
   if (consignment.amountCollected && consignment.amountCollected !== "null") {
-    return consignment.amountCollected;
+    const temp = parseFloat(consignment.amountCollected);
+    if (!isNaN(temp)) {
+      temps.push(temp);
+    }
+  }
+  
+  return temps;
+}
+
+// Parse required temperature range from document_note field
+export function parseRequiredTemperature(documentNote: string | null): { min: number; max: number } | null {
+  if (!documentNote) return null;
+  
+  // Match patterns like:
+  // "Frozen -18C to -20C" or "Chiller 0C to +4C" or "Frozen -18°C to -20°C"
+  const rangePattern = /(-?\d+\.?\d*)\s*°?C?\s+to\s+([+-]?\d+\.?\d*)\s*°?C?/i;
+  const match = documentNote.match(rangePattern);
+  
+  if (match) {
+    const temp1 = parseFloat(match[1]);
+    const temp2 = parseFloat(match[2]);
+    
+    if (!isNaN(temp1) && !isNaN(temp2)) {
+      return {
+        min: Math.min(temp1, temp2),
+        max: Math.max(temp1, temp2)
+      };
+    }
+  }
+  
+  // Single temperature pattern: "Frozen -18C" or "Chiller +4C"
+  const singlePattern = /(-?\+?\d+\.?\d*)\s*°?C/i;
+  const singleMatch = documentNote.match(singlePattern);
+  
+  if (singleMatch) {
+    const temp = parseFloat(singleMatch[1]);
+    if (!isNaN(temp)) {
+      // Use ±2°C tolerance for single temp values
+      return { min: temp - 2, max: temp + 2 };
+    }
   }
   
   return null;
@@ -33,42 +72,38 @@ export function getActualTemperature(consignment: Consignment): string | null {
 
 // Check if temperature reading is compliant with expected temperature zone
 export function checkTemperatureCompliance(consignment: Consignment): boolean {
-  const expectedTemp = consignment.expectedTemperature;
+  // Parse required temperature from document_note
+  const requiredTemp = parseRequiredTemperature(consignment.documentNote);
   
   // No temperature requirement = always compliant
-  if (!expectedTemp || expectedTemp === "Dry") {
+  if (!requiredTemp) {
     return true;
   }
   
-  // Get actual temperature reading
-  const actualTemp = getActualTemperature(consignment);
+  // Get driver-recorded temperatures
+  const driverTemps = getDriverTemperatures(consignment);
   
-  // No temperature reading = not compliant if temperature is required
-  if (!actualTemp) {
+  // No temperature readings = not compliant if temperature is required
+  if (driverTemps.length === 0) {
     return false;
   }
   
-  // Parse temperature value
-  const tempValue = parseFloat(actualTemp);
-  if (isNaN(tempValue)) {
-    return false;
+  // PASS if at least ONE driver temp falls within the required range
+  const isCompliant = driverTemps.some(temp => 
+    temp >= requiredTemp.min && temp <= requiredTemp.max
+  );
+  
+  return isCompliant;
+}
+
+// Get actual temperature reading for display (backward compatibility)
+export function getActualTemperature(consignment: Consignment): string | null {
+  const temps = getDriverTemperatures(consignment);
+  if (temps.length > 0) {
+    // Return both temps if available
+    return temps.join(', ');
   }
-  
-  // Check compliance based on expected zone
-  const tempRanges: Record<string, [number, number]> = {
-    "Chiller (0–4°C)": [0, 4],
-    "Freezer (-20°C)": [-25, -15],
-    "Wine (14°C)": [12, 16],
-    "Confectionery (15–20°C)": [15, 20],
-    "Pharma (2–8°C)": [2, 8],
-  };
-  
-  const range = tempRanges[expectedTemp];
-  if (!range) {
-    return true; // Unknown zone = assume compliant
-  }
-  
-  return tempValue >= range[0] && tempValue <= range[1];
+  return null;
 }
 
 // Get photo count from file count fields

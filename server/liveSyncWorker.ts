@@ -122,12 +122,15 @@ export class LiveSyncWorker {
 
       // Fetch consignments that were completed/closed since last sync (but not before Oct 6th)
       // Use a date range from the later of (last sync or Oct 6th) to now
-      const newConsignments = await this.axylogAPI.getConsignmentsWithFilters({
+      const allConsignments = await this.axylogAPI.getConsignmentsWithFilters({
         pickupDateFrom: fromDate.toISOString().split('T')[0],
         pickupDateTo: now.toISOString().split('T')[0],
       });
 
-      console.log(`[LiveSync] Found ${newConsignments.length} consignments in date range`);
+      // Filter to only include consignments with Positive delivery outcome
+      const newConsignments = allConsignments.filter(c => c.delivery_OutcomeEnum === 'Positive');
+
+      console.log(`[LiveSync] Found ${newConsignments.length} consignments with Positive outcome (${allConsignments.length} total in date range)`);
 
       if (newConsignments.length > 0) {
         // Get existing consignment numbers efficiently (just IDs, not full records)

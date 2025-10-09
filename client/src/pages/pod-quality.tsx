@@ -203,7 +203,7 @@ export default function PODQualityDashboard() {
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
-  const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string>>(new Map());
+  const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string[]>>(new Map());
   const { toast } = useToast();
   
   // Check if filters are applied (require at least date filter)
@@ -228,6 +228,11 @@ export default function PODQualityDashboard() {
   
   // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
+    // Only show Positive delivery outcomes
+    if ((c as any).delivery_OutcomeEnum !== 'Positive') {
+      return false;
+    }
+    
     // Exclude internal depot transfers where CUSTOMER is a Chill depot/location
     // Legitimate deliveries have real customers delivered TO Chill depots (warehouse)
     const customerName = (c.shipToCompanyName || '').toLowerCase().trim();
@@ -332,7 +337,7 @@ export default function PODQualityDashboard() {
           );
           const data = await res.json() as { photos: string[]; signatures: string[] };
           if (data.photos && data.photos.length > 0) {
-            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, data.photos[0]));
+            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, data.photos));
           }
         } catch (error) {
           // Silently fail for thumbnails
@@ -1090,13 +1095,19 @@ export default function PODQualityDashboard() {
                             </span>
                           </div>
                           
-                          {expectedTemp && expectedTemp !== "Dry" && (
+                          {(consignment.documentNote || actualTemp) && (
                             <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.temperatureCompliant ? 'bg-green-50' : 'bg-red-50'}`}>
                               <Thermometer className={`h-4 w-4 ${metrics.temperatureCompliant ? 'text-green-600' : 'text-red-600'}`} />
-                              <span className={`text-sm font-medium ${metrics.temperatureCompliant ? 'text-green-700' : 'text-red-700'}`}>
-                                {actualTemp ? `${actualTemp}°C` : 'No temp'} 
-                                <span className="text-xs ml-1">({expectedTemp})</span>
-                              </span>
+                              <div className={`text-xs font-medium ${metrics.temperatureCompliant ? 'text-green-700' : 'text-red-700'}`}>
+                                <div className="flex items-center gap-1">
+                                  <span className="opacity-70">Expected:</span>
+                                  <span>{expectedTemp || '-'}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="opacity-70">Recorded:</span>
+                                  <span>{actualTemp ? `${actualTemp}°C` : '-'}</span>
+                                </div>
+                              </div>
                             </div>
                           )}
                           
@@ -1138,19 +1149,24 @@ export default function PODQualityDashboard() {
                         </div>
                       </div>
                       
-                      {/* Photo Thumbnail Section */}
-                      {thumbnail && (
+                      {/* Photo Thumbnails Section */}
+                      {thumbnail && Array.isArray(thumbnail) && thumbnail.length > 0 && (
                         <div className="border-t pt-3">
-                          <div 
-                            className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
-                            onClick={() => loadPhotos(consignment)}
-                          >
-                            <img 
-                              src={thumbnail} 
-                              alt="Delivery photo" 
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
+                          <div className="flex gap-2 flex-wrap">
+                            {thumbnail.map((photo, index) => (
+                              <div 
+                                key={index}
+                                className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
+                                onClick={() => loadPhotos(consignment)}
+                              >
+                                <img 
+                                  src={photo} 
+                                  alt={`Delivery photo ${index + 1}`} 
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
