@@ -2378,30 +2378,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allConsignments = await storage.getConsignmentsByUserId(user.id);
       }
       
-      const extractTrackingToken = (consignment: any): string | null => {
-        const url = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
-        if (!url) return null;
-        const match = url.match(/\/([^/]+)$/);
-        return match ? match[1] : null;
-      };
-      
-      const photoCounts: Record<number, number> = {};
-      
-      await Promise.all(allConsignments.map(async (consignment: any) => {
-        const token = extractTrackingToken(consignment);
-        if (token) {
-          const photos = await storage.getPhotoAssetsByTokenAndKind(token, 'photo');
-          const availablePhotos = photos.filter(p => p.status === 'available');
-          photoCounts[consignment.id] = availablePhotos.length;
-        } else {
-          photoCounts[consignment.id] = 0;
+      // Use Axylog's file count data which is already stored in the database
+      // This is reliable even when photo scraping auth expires
+      const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => {
+        const deliveryFileCount = consignment.deliveryReceivedFileCount || 0;
+        const pickupFileCount = consignment.pickupReceivedFileCount || 0;
+        let photoCount = deliveryFileCount + pickupFileCount;
+        
+        // Subtract signatures from file count since they're included in the total
+        if (consignment.deliverySignatureName && deliveryFileCount > 0) {
+          photoCount = Math.max(0, photoCount - 1);
         }
-      }));
-      
-      const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => ({
-        ...consignment,
-        actualPhotoCount: photoCounts[consignment.id] || 0
-      }));
+        if (consignment.pickupSignatureName && pickupFileCount > 0) {
+          photoCount = Math.max(0, photoCount - 1);
+        }
+        
+        return {
+          ...consignment,
+          actualPhotoCount: photoCount
+        };
+      });
       
       res.json({
         consignments: consignmentsWithPhotoCounts,
@@ -2589,7 +2585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
       const axylogMatch = trackingLink?.match(/live\.axylog\.com\/([^/?]+)/);
       if (!axylogMatch || !axylogMatch[1]) {
-        return res.json({ success: true, photos: [], status: 'no_tracking' });
+        return res.json({ success: true, photos: [], signatures: [], status: 'no_tracking' });
       }
 
       const token = axylogMatch[1];
@@ -2622,14 +2618,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ 
             success: true, 
             photos: filteredPhotos,
-            signaturePhotos: filteredSignatures,
+            signatures: filteredSignatures,
             count: filteredPhotos.length,
             signatureCount: filteredSignatures.length,
             status: 'ready'
           });
         } catch (error) {
           console.error('Direct scraping fallback failed:', error);
-          return res.json({ success: true, photos: [], status: 'failed' });
+          return res.json({ success: true, photos: [], signatures: [], status: 'failed' });
         }
       }
       
@@ -2639,19 +2635,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingPhotos = cachedPhotos.filter(photo => photo.status === 'pending');
       
       if (pendingPhotos.length > 0) {
-        return res.json({ success: true, photos: [], status: 'preparing' });
+        return res.json({ success: true, photos: [], signatures: [], status: 'preparing' });
       }
       
       if (availablePhotos.length === 0 && failedPhotos.length > 0) {
-        return res.json({ success: true, photos: [], status: 'failed' });
+        return res.json({ success: true, photos: [], signatures: [], status: 'failed' });
       }
       
-      // Return available photos (now accepting data URIs)
-      let photos = availablePhotos.map(photo => photo.url);
+      // Separate photos and signatures by kind
+      const photos = availablePhotos
+        .filter(photo => photo.kind === 'photo')
+        .map(photo => photo.url);
+      
+      const signatures = availablePhotos
+        .filter(photo => photo.kind === 'signature')
+        .map(photo => photo.url);
       
       return res.json({ 
         success: true, 
         photos, 
+        signatures,
         count: photos.length,
         status: 'ready' 
       });
@@ -2676,7 +2679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
       const axylogMatch = trackingLink?.match(/live\.axylog\.com\/([^/?]+)/);
       if (!axylogMatch || !axylogMatch[1]) {
-        return res.json({ success: true, photos: [], status: 'no_tracking' });
+        return res.json({ success: true, photos: [], signatures: [], status: 'no_tracking' });
       }
 
       const token = axylogMatch[1];
@@ -2685,21 +2688,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const photoAssets = await storage.getPhotoAssetsByToken(token);
       
       if (photoAssets.length === 0) {
-        return res.json({ success: true, photos: [], status: 'no_photos' });
+        return res.json({ success: true, photos: [], signatures: [], status: 'no_photos' });
       }
       
       // Check if full-res images are already available
       const fullResReady = photoAssets.filter(asset => asset.fullResStatus === 'available');
       
       if (fullResReady.length > 0) {
-        // Return existing full-res images
+        // Separate photos and signatures
         const fullResPhotos = fullResReady
-          .filter(asset => asset.fullResUrl)
+          .filter(asset => asset.fullResUrl && asset.kind === 'photo')
+          .map(asset => asset.fullResUrl as string);
+        
+        const fullResSignatures = fullResReady
+          .filter(asset => asset.fullResUrl && asset.kind === 'signature')
           .map(asset => asset.fullResUrl as string);
         
         return res.json({
           success: true,
           photos: fullResPhotos,
+          signatures: fullResSignatures,
           count: fullResPhotos.length,
           status: 'ready'
         });
@@ -2712,15 +2720,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Queue full-res extraction job
         try {
           await (photoWorker as any).enqueueFullResJob(token);
-          return res.json({ success: true, photos: [], status: 'processing' });
+          return res.json({ success: true, photos: [], signatures: [], status: 'processing' });
         } catch (error) {
           console.error('Failed to queue full-res job:', error);
-          return res.json({ success: true, photos: [], status: 'failed' });
+          return res.json({ success: true, photos: [], signatures: [], status: 'failed' });
         }
       }
       
       // No full-res available and none pending
-      return res.json({ success: true, photos: [], status: 'unavailable' });
+      return res.json({ success: true, photos: [], signatures: [], status: 'unavailable' });
       
     } catch (error) {
       console.error('Error fetching full-res photos:', error);

@@ -45,16 +45,17 @@ export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
     const pixelArea = img.width * img.height;
     const aspectRatio = img.width / Math.max(img.height, 1);
     
-    // Check for signatures
+    // Check for signatures - only if explicitly marked or very small height
     const text = ((img.alt || '') + ' ' + (img.className || '')).toLowerCase();
     const isDimensionSignature = 
-      img.height <= 220 && 
+      img.height <= 200 && 
       aspectRatio >= 3.0 && 
       img.width >= 300 && 
       img.width <= 1200 &&
       pixelArea <= 120000;
     const isTextSignature = text.includes('signature') || text.includes('firma') || text.includes('sign');
-    const isSignature = (isDimensionSignature && isTextSignature) || (isDimensionSignature && img.height <= 180);
+    // Only classify as signature if it has signature text OR is extremely thin (height <= 150)
+    const isSignature = (isDimensionSignature && isTextSignature) || (isDimensionSignature && img.height <= 150);
     
     if (isSignature) {
       if (shortSide >= 120 && pixelArea <= 120000 && isValidPhotoUrl(img.src)) {
@@ -69,16 +70,16 @@ export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
       continue;
     }
     
-    // THUMBNAIL CRITERIA: Smaller images for fast loading
-    // - Short side: 200-500px (good balance of quality and speed)
-    // - Pixel area: 50k-250k (small enough to load fast)
-    // - Aspect ratio: 0.45-1.9 (normal photo ratios)
-    // - At least one side >= 300px
+    // THUMBNAIL CRITERIA: Accept a wide range of photo sizes
+    // - Short side: >= 150px (minimum for quality)
+    // - Pixel area: >= 40k (minimum for usable photos)
+    // - Aspect ratio: 0.4-2.5 (normal photo ratios)
+    // - Long side: >= 200px
     
-    if (shortSide >= 200 && shortSide <= 500 &&
-        pixelArea >= 50000 && pixelArea <= 250000 &&
-        aspectRatio >= 0.45 && aspectRatio <= 1.9 &&
-        longSide >= 300 &&
+    if (shortSide >= 150 &&
+        pixelArea >= 40000 &&
+        aspectRatio >= 0.4 && aspectRatio <= 2.5 &&
+        longSide >= 200 &&
         isValidPhotoUrl(img.src)) {
       filtered.push({
         url: img.src,
