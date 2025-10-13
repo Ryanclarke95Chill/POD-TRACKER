@@ -26,7 +26,6 @@ interface AxylogCredentials {
   userId: string;
   companyId: string;
   contextOwnerId: string;
-  authenticatedAt: number; // Timestamp when authenticated
 }
 
 // Interface for Axylog delivery (consignment)
@@ -55,17 +54,9 @@ export class AxylogAPI {
   // Authenticate with Axylog API
   async authenticate(): Promise<boolean> {
     try {
-      // Check if we have credentials and if they're still valid
-      // Axylog tokens typically expire after 24 hours, so refresh if older than 23 hours
-      const TOKEN_MAX_AGE = 23 * 60 * 60 * 1000; // 23 hours in milliseconds
-      
+      // Skip if we already have valid credentials
       if (this.credentials) {
-        const age = Date.now() - this.credentials.authenticatedAt;
-        if (age < TOKEN_MAX_AGE) {
-          return true; // Token is still valid
-        }
-        console.log('Axylog token expired, re-authenticating...');
-        this.credentials = null; // Clear expired credentials
+        return true;
       }
 
       // Check if we have the required credentials
@@ -90,8 +81,7 @@ export class AxylogAPI {
         token: authData.token,
         userId: authData.userTree.userId,
         companyId: authData.userTree.companiesOwners[0].company,
-        contextOwnerId: authData.userTree.companiesOwners[0].contextOwners[0].contextOwner,
-        authenticatedAt: Date.now()
+        contextOwnerId: authData.userTree.companiesOwners[0].contextOwners[0].contextOwner
       };
 
       console.log("Successfully authenticated with Axylog API");

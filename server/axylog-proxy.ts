@@ -9,20 +9,9 @@ router.post('/auth', async (req: Request, res: Response) => {
   try {
     console.log('=== AXYLOG PROXY AUTH ===');
     
-    const username = process.env.AXYLOG_USERNAME;
-    const password = process.env.AXYLOG_PASSWORD;
-    
-    if (!username || !password) {
-      console.error('AXYLOG credentials missing from environment');
-      return res.status(500).json({
-        success: false,
-        error: 'AXYLOG credentials not configured. Please set AXYLOG_USERNAME and AXYLOG_PASSWORD environment variables.'
-      });
-    }
-    
     const response = await axios.post('https://api.axylog.com/authentication/service', {
-      username,
-      password
+      username: process.env.AXYLOG_USERNAME || 'api.chill@axylog.com',
+      password: process.env.AXYLOG_PASSWORD || '5#j{M):H){yD'
     });
 
     const { token, userTree } = response.data;

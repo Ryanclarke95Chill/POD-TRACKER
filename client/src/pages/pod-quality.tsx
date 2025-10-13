@@ -30,12 +30,11 @@ import {
   ArrowUpDown,
   LogOut,
   Lightbulb,
-  TrendingDown,
-  Trophy
+  TrendingDown
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Consignment, ScoreBreakdown } from "@shared/schema";
+import { Consignment } from "@shared/schema";
 import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature, parseRequiredTemperature } from "@/utils/podMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -181,104 +180,6 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
   );
 }
 
-interface ScoreBreakdownModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  breakdown: ScoreBreakdown | null;
-  consignmentNo: string;
-}
-
-function ScoreBreakdownModal({ isOpen, onClose, breakdown, consignmentNo }: ScoreBreakdownModalProps) {
-  if (!breakdown) return null;
-  
-  const getStatusIcon = (status: string) => {
-    if (status === 'pass') return <CheckCircle className="h-5 w-5 text-green-600" />;
-    if (status === 'partial') return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-    if (status === 'fail') return <XCircle className="h-5 w-5 text-red-600" />;
-    return null;
-  };
-  
-  const getStatusColor = (status: string) => {
-    if (status === 'pass') return 'bg-green-50 border-green-200';
-    if (status === 'partial') return 'bg-yellow-50 border-yellow-200';
-    if (status === 'fail') return 'bg-red-50 border-red-200';
-    return 'bg-gray-50 border-gray-200';
-  };
-  
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Score Breakdown - {consignmentNo}</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Total Score */}
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-blue-900">Total Quality Score</span>
-              <span className="text-3xl font-bold text-blue-600">{breakdown.total}%</span>
-            </div>
-          </div>
-          
-          {/* Photos */}
-          <div className={`p-4 rounded-lg border ${getStatusColor(breakdown.photos.status)}`}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(breakdown.photos.status)}
-                <span className="font-semibold">Photos</span>
-              </div>
-              <span className="text-xl font-bold">{breakdown.photos.points} pts</span>
-            </div>
-            <p className="text-sm text-gray-600 ml-7">{breakdown.photos.reason}</p>
-            <p className="text-xs text-gray-500 mt-1 ml-7">Max: 50 points (40 base + 10 bonus)</p>
-          </div>
-          
-          {/* Receiver Name */}
-          <div className={`p-4 rounded-lg border ${getStatusColor(breakdown.receiverName.status)}`}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(breakdown.receiverName.status)}
-                <span className="font-semibold">Receiver Name</span>
-              </div>
-              <span className="text-xl font-bold">{breakdown.receiverName.points} pts</span>
-            </div>
-            <p className="text-sm text-gray-600 ml-7">{breakdown.receiverName.reason}</p>
-            <p className="text-xs text-gray-500 mt-1 ml-7">Max: 25 points</p>
-          </div>
-          
-          {/* Temperature */}
-          <div className={`p-4 rounded-lg border ${getStatusColor(breakdown.temperature.status)}`}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(breakdown.temperature.status)}
-                <span className="font-semibold">Temperature Compliance</span>
-              </div>
-              <span className="text-xl font-bold">{breakdown.temperature.points} pts</span>
-            </div>
-            <p className="text-sm text-gray-600 ml-7">{breakdown.temperature.reason}</p>
-            <p className="text-xs text-gray-500 mt-1 ml-7">Max: 25 points</p>
-          </div>
-          
-          {/* Signature - not counted */}
-          <div className="p-4 rounded-lg border bg-gray-50 border-gray-200 opacity-60">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <FileSignature className="h-5 w-5 text-gray-400" />
-                <span className="font-semibold text-gray-600">Signature</span>
-                <Badge variant="outline" className="text-xs">Not Scored</Badge>
-              </div>
-              <span className="text-xl font-bold text-gray-500">{breakdown.signature.points} pts</span>
-            </div>
-            <p className="text-sm text-gray-500 ml-7">{breakdown.signature.reason}</p>
-            <p className="text-xs text-gray-400 mt-1 ml-7">Required in Axylog, not included in quality score</p>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 type ConsignmentWithPhotoCount = Consignment & { actualPhotoCount?: number };
 
 export default function PODQualityDashboard() {
@@ -296,7 +197,7 @@ export default function PODQualityDashboard() {
   });
   
   const [dataLoaded, setDataLoaded] = useState(false); // Track if user triggered load
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null); // Track selected warehouse for insights
+  const [insightsExpanded, setInsightsExpanded] = useState(true); // Track insights section expansion
   
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
@@ -304,13 +205,6 @@ export default function PODQualityDashboard() {
     signatures: string[];
     consignmentNo: string;
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
-  
-  const [scoreBreakdownModal, setScoreBreakdownModal] = useState<{
-    isOpen: boolean;
-    breakdown: ScoreBreakdown | null;
-    consignmentNo: string;
-  }>({ isOpen: false, breakdown: null, consignmentNo: "" });
-  
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
   const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string[]>>(new Map());
@@ -446,10 +340,8 @@ export default function PODQualityDashboard() {
             `/api/consignments/${consignment.id}/photos`
           );
           const data = await res.json() as { photos: string[]; signatures: string[] };
-          // Combine both photos and signatures for thumbnail display
-          const allThumbnails = [...(data.photos || []), ...(data.signatures || [])];
-          if (allThumbnails.length > 0) {
-            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, allThumbnails));
+          if (data.photos && data.photos.length > 0) {
+            setPhotoThumbnails(prev => new Map(prev).set(consignment.id, data.photos));
           }
         } catch (error) {
           // Silently fail for thumbnails
@@ -592,102 +484,27 @@ export default function PODQualityDashboard() {
     })).sort((a, b) => b.avgScore - a.avgScore);
   }, [filteredConsignments]);
   
-  // Get drivers for a specific warehouse
-  const getWarehouseDrivers = useMemo(() => {
-    return (warehouseName: string) => {
-      const warehouseConsignments = filteredConsignments.filter(
-        c => c.warehouseCompanyName === warehouseName
-      );
-      
-      const driverMap = new Map<string, {
-        driver: string;
-        deliveryCount: number;
-        totalScore: number;
-        totalPhotos: number;
-        receiverNameCount: number;
-        tempCompliantCount: number;
-      }>();
-      
-      warehouseConsignments.forEach(c => {
-        const metrics = calculatePODScore(c, c.actualPhotoCount);
-        const driver = c.driverName || 'Unknown Driver';
-        
-        if (!driverMap.has(driver)) {
-          driverMap.set(driver, {
-            driver,
-            deliveryCount: 0,
-            totalScore: 0,
-            totalPhotos: 0,
-            receiverNameCount: 0,
-            tempCompliantCount: 0
-          });
-        }
-        
-        const data = driverMap.get(driver)!;
-        data.deliveryCount++;
-        data.totalScore += metrics.qualityScore;
-        data.totalPhotos += metrics.photoCount;
-        if (metrics.hasReceiverName) data.receiverNameCount++;
-        if (metrics.temperatureCompliant) data.tempCompliantCount++;
-      });
-      
-      return Array.from(driverMap.values()).map(d => ({
-        driver: d.driver,
-        deliveryCount: d.deliveryCount,
-        avgScore: Math.round(d.totalScore / d.deliveryCount),
-        photoRate: Math.round((d.totalPhotos / d.deliveryCount) * 10) / 10,
-        receiverNameRate: Math.round((d.receiverNameCount / d.deliveryCount) * 100),
-        tempComplianceRate: Math.round((d.tempCompliantCount / d.deliveryCount) * 100)
-      })).sort((a, b) => b.avgScore - a.avgScore);
-    };
-  }, [filteredConsignments]);
-  
   // Generate warehouse-specific insights
-  const getWarehouseInsights = useMemo(() => {
-    return (warehouseName: string) => {
-      const warehouse = warehouseComparison.find(w => w.warehouse === warehouseName);
-      if (!warehouse) return { issues: [], avgScore: 0 };
-      
+  const warehouseInsights = useMemo(() => {
+    return warehouseComparison.map(w => {
       const issues: string[] = [];
-      const pointsLost = 100 - warehouse.avgScore;
       
-      // Always provide specific feedback on what's preventing 100%
-      if (warehouse.avgScore < 100) {
-        // Photo coverage analysis (worth 50 points)
-        if (warehouse.photoRate < 3) {
-          const photoGap = 3 - warehouse.photoRate;
-          issues.push(`📸 Need ${photoGap.toFixed(1)} more photos per delivery (currently ${warehouse.photoRate} avg, target: 3+)`);
-        } else if (warehouse.photoRate >= 3 && warehouse.photoRate < 4) {
-          issues.push(`📸 Good photo coverage (${warehouse.photoRate} avg), bonus points available with 4+ photos`);
-        }
-        
-        // Receiver name analysis (worth 25 points)
-        if (warehouse.receiverNameRate < 100) {
-          const missingRate = 100 - warehouse.receiverNameRate;
-          issues.push(`✍️ Receiver names missing in ${missingRate}% of deliveries (${warehouse.receiverNameRate}% captured)`);
-        }
-        
-        // Temperature compliance analysis (worth 25 points)
-        if (warehouse.tempComplianceRate < 100) {
-          const tempIssueRate = 100 - warehouse.tempComplianceRate;
-          issues.push(`🌡️ Temperature non-compliance in ${tempIssueRate}% of deliveries (${warehouse.tempComplianceRate}% compliant)`);
-        }
-        
-        // Summary
-        issues.push(`💡 ${pointsLost} points from perfect score - focus on ${
-          warehouse.photoRate < 3 ? 'photo coverage' :
-          warehouse.receiverNameRate < 100 ? 'receiver name capture' :
-          warehouse.tempComplianceRate < 100 ? 'temperature compliance' : 'incremental improvements'
-        }`);
-      } else {
-        issues.push('✨ Perfect score - all metrics at 100%!');
+      if (w.photoRate < 2) {
+        issues.push(`Low photo coverage (${w.photoRate} avg photos/delivery)`);
+      }
+      if (w.receiverNameRate < 80) {
+        issues.push(`Receiver names missing in ${100 - w.receiverNameRate}% of deliveries`);
+      }
+      if (w.tempComplianceRate < 85) {
+        issues.push(`Temperature compliance at ${w.tempComplianceRate}%`);
       }
       
       return {
-        avgScore: warehouse.avgScore,
-        issues
+        warehouse: w.warehouse,
+        avgScore: w.avgScore,
+        issues: issues.length > 0 ? issues : ['All metrics performing well']
       };
-    };
+    });
   }, [warehouseComparison]);
   
   // Load photos for a consignment using thumbnail-first strategy
@@ -1225,7 +1042,6 @@ export default function PODQualityDashboard() {
                       <th className="text-center p-3 font-medium text-gray-700">Photos/Delivery</th>
                       <th className="text-center p-3 font-medium text-gray-700">Receiver Name %</th>
                       <th className="text-center p-3 font-medium text-gray-700">Temp Compliance %</th>
-                      <th className="text-center p-3 font-medium text-gray-700">Insights</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1245,17 +1061,6 @@ export default function PODQualityDashboard() {
                         <td className="p-3 text-center text-gray-700">{w.photoRate}</td>
                         <td className="p-3 text-center text-gray-700">{w.signatureRate}%</td>
                         <td className="p-3 text-center text-gray-700">{w.tempComplianceRate}%</td>
-                        <td className="p-3 text-center">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setSelectedWarehouse(w.warehouse)}
-                            data-testid={`button-insights-${w.warehouse}`}
-                          >
-                            <Lightbulb className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1263,6 +1068,135 @@ export default function PODQualityDashboard() {
               </div>
             </div>
           </CardContent>
+        </Card>
+      )}
+      
+      {/* Insights Section */}
+      {filteredConsignments.length > 0 && (
+        <Card>
+          <CardHeader 
+            className="cursor-pointer hover:bg-gray-50 transition-colors" 
+            onClick={() => setInsightsExpanded(!insightsExpanded)}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  Performance Insights
+                </CardTitle>
+                <CardDescription>Driver rankings and warehouse improvement areas</CardDescription>
+              </div>
+              <ChevronDown className={`h-5 w-5 transition-transform ${insightsExpanded ? 'rotate-180' : ''}`} />
+            </div>
+          </CardHeader>
+          
+          {insightsExpanded && (
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Driver Performance */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Driver Performance
+                  </h3>
+                  
+                  {/* Top Performers */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4" />
+                      Top Performers
+                    </h4>
+                    <div className="space-y-2">
+                      {driverPerformance.slice(0, 3).map((driver, idx) => (
+                        <div key={driver.driver} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{driver.driver}</div>
+                            <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${
+                              driver.avgScore >= 90 ? 'text-green-600' :
+                              driver.avgScore >= 75 ? 'text-blue-600' :
+                              'text-yellow-600'
+                            }`}>
+                              {driver.avgScore}%
+                            </div>
+                            <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Low Performers */}
+                  {driverPerformance.length > 3 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
+                        <TrendingDown className="h-4 w-4" />
+                        Needs Improvement
+                      </h4>
+                      <div className="space-y-2">
+                        {driverPerformance.slice(-3).reverse().map((driver, idx) => (
+                          <div key={driver.driver} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{driver.driver}</div>
+                              <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`text-lg font-bold ${
+                                driver.avgScore >= 75 ? 'text-blue-600' :
+                                driver.avgScore >= 60 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {driver.avgScore}%
+                              </div>
+                              <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Warehouse Improvement Areas */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Warehouse Improvement Areas
+                  </h3>
+                  <div className="space-y-3">
+                    {warehouseInsights.map((insight) => (
+                      <div key={insight.warehouse} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{insight.warehouse}</h4>
+                          <span className={`text-sm font-semibold ${
+                            insight.avgScore >= 90 ? 'text-green-600' :
+                            insight.avgScore >= 75 ? 'text-blue-600' :
+                            insight.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {insight.avgScore}%
+                          </span>
+                        </div>
+                        <ul className="space-y-1">
+                          {insight.issues.map((issue, idx) => (
+                            <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                              <span className={`mt-1 ${
+                                issue.includes('well') ? 'text-green-500' : 'text-amber-500'
+                              }`}>
+                                {issue.includes('well') ? '✓' : '•'}
+                              </span>
+                              <span>{issue}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
       
@@ -1323,24 +1257,15 @@ export default function PODQualityDashboard() {
                               <div className="text-xs text-gray-500 ml-6">{consignment.consignmentNo}</div>
                             )}
                           </div>
-                          <div 
-                            className={`px-3 py-1 rounded-full font-semibold text-lg cursor-pointer hover:opacity-80 transition-opacity ${
-                              metrics.qualityScore >= 90 
-                                ? "bg-green-100 text-green-800"
-                                : metrics.qualityScore >= 75
-                                ? "bg-blue-100 text-blue-800"
-                                : metrics.qualityScore >= 60
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`} 
-                            data-testid={`badge-score-${consignment.id}`}
-                            onClick={() => setScoreBreakdownModal({
-                              isOpen: true,
-                              breakdown: metrics.scoreBreakdown,
-                              consignmentNo: consignment.orderNumberRef || consignment.consignmentNo || ''
-                            })}
-                            title="Click to view score breakdown"
-                          >
+                          <div className={`px-3 py-1 rounded-full font-semibold text-lg ${
+                            metrics.qualityScore >= 90 
+                              ? "bg-green-100 text-green-800"
+                              : metrics.qualityScore >= 75
+                              ? "bg-blue-100 text-blue-800"
+                              : metrics.qualityScore >= 60
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                          }`} data-testid={`badge-score-${consignment.id}`}>
                             {metrics.qualityScore}%
                           </div>
                         </div>
@@ -1375,7 +1300,7 @@ export default function PODQualityDashboard() {
                           <div className={`flex items-center gap-1 px-2 py-1 rounded ${metrics.hasReceiverName ? 'bg-green-50' : 'bg-red-50'}`}>
                             <FileSignature className={`h-4 w-4 ${metrics.hasReceiverName ? 'text-green-600' : 'text-red-600'}`} />
                             <span className={`text-sm font-medium ${metrics.hasReceiverName ? 'text-green-700' : 'text-red-700'}`}>
-                              {metrics.hasReceiverName ? `${consignment.deliverySignatureName || consignment.pickupSignatureName}` : 'No receiver name'}
+                              {metrics.hasReceiverName ? 'Receiver name ✓' : 'No receiver name'}
                             </span>
                           </div>
                           
@@ -1538,129 +1463,6 @@ export default function PODQualityDashboard() {
         signatures={photoModal.signatures}
         consignmentNo={photoModal.consignmentNo}
       />
-      
-      {/* Score Breakdown Modal */}
-      <ScoreBreakdownModal
-        isOpen={scoreBreakdownModal.isOpen}
-        onClose={() => setScoreBreakdownModal({ ...scoreBreakdownModal, isOpen: false })}
-        breakdown={scoreBreakdownModal.breakdown}
-        consignmentNo={scoreBreakdownModal.consignmentNo}
-      />
-      
-      {/* Warehouse-Specific Insights Modal */}
-      <Dialog open={!!selectedWarehouse} onOpenChange={(open) => !open && setSelectedWarehouse(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              {selectedWarehouse} - Performance Insights
-            </DialogTitle>
-          </DialogHeader>
-          {selectedWarehouse && (
-            <div className="space-y-6 mt-4">
-              {/* Warehouse Improvement Areas */}
-              <div>
-                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Improvement Areas
-                </h3>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">{selectedWarehouse}</h4>
-                    <span className={`text-lg font-semibold ${
-                      getWarehouseInsights(selectedWarehouse).avgScore >= 90 ? 'text-green-600' :
-                      getWarehouseInsights(selectedWarehouse).avgScore >= 75 ? 'text-blue-600' :
-                      getWarehouseInsights(selectedWarehouse).avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {getWarehouseInsights(selectedWarehouse).avgScore}%
-                    </span>
-                  </div>
-                  <ul className="space-y-2">
-                    {getWarehouseInsights(selectedWarehouse).issues.map((issue, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start gap-2 p-2 bg-white rounded">
-                        <span>{issue}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              
-              {/* Driver Performance */}
-              <div>
-                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Driver Performance
-                </h3>
-                {(() => {
-                  const drivers = getWarehouseDrivers(selectedWarehouse);
-                  if (drivers.length === 0) {
-                    return <p className="text-gray-500 text-sm">No drivers found for this warehouse</p>;
-                  }
-                  
-                  const topDrivers = drivers.slice(0, 3);
-                  const bottomDrivers = drivers.length > 3 ? drivers.slice(-3).reverse() : [];
-                  
-                  return (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {topDrivers.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wide flex items-center gap-2">
-                            <Trophy className="h-4 w-4 text-green-600" />
-                            Top Performers
-                          </h4>
-                          <div className="space-y-2">
-                            {topDrivers.map((driver) => (
-                              <div key={driver.driver} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{driver.driver}</div>
-                                  <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-lg font-bold text-green-600">{driver.avgScore}%</div>
-                                  <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {bottomDrivers.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wide flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                            Needs Improvement
-                          </h4>
-                          <div className="space-y-2">
-                            {bottomDrivers.map((driver) => (
-                              <div key={driver.driver} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{driver.driver}</div>
-                                  <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-lg font-bold ${
-                                    driver.avgScore >= 75 ? 'text-blue-600' :
-                                    driver.avgScore >= 60 ? 'text-yellow-600' :
-                                    'text-red-600'
-                                  }`}>
-                                    {driver.avgScore}%
-                                  </div>
-                                  <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
       </main>
     </div>
   );
