@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { photoWorker } from "./photoIngestionWorker";
 import { liveSyncWorker } from "./liveSyncWorker";
 import axylogProxy from "./axylog-proxy";
+import { setupCacheHeaders } from "./lib/cache-middleware";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +70,9 @@ app.use((req, res, next) => {
 (async () => {
   // Mount axylog proxy routes FIRST to bypass all middleware
   app.use('/axylog-proxy', axylogProxy);
+  
+  // Setup cache headers for static assets
+  setupCacheHeaders(app);
   
   // Register all other API routes
   const server = await registerRoutes(app);

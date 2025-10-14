@@ -34,11 +34,17 @@ export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
     if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
     if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
     
-    // Skip Chill logo/branding images
+    // Skip Chill logo/branding images - MORE COMPREHENSIVE
     const srcLower = img.src.toLowerCase();
     const altLower = (img.alt || '').toLowerCase();
-    if (srcLower.includes('chill') && (srcLower.includes('logo') || srcLower.includes('brand') || srcLower.includes('watermark'))) continue;
-    if (altLower.includes('chill') && (altLower.includes('logo') || altLower.includes('brand'))) continue;
+    const classLower = (img.className || '').toLowerCase();
+    
+    // Filter out ANY Chill-related image (not just logos)
+    if (srcLower.includes('chill') || altLower.includes('chill') || classLower.includes('chill')) continue;
+    
+    // Skip small square placeholder images (often 150x150 or similar)
+    const isSmallSquare = img.width === img.height && img.width <= 200;
+    if (isSmallSquare) continue;
     
     const shortSide = Math.min(img.width, img.height);
     const longSide = Math.max(img.width, img.height);
@@ -179,11 +185,17 @@ export function filterAndClassifyPhotos(images: PhotoCandidate[]): FilteredPhoto
     if (img.src.includes('ghost.svg') || img.src.includes('loading')) continue;
     if (img.alt?.toLowerCase().includes('logo') || img.className?.includes('logo')) continue;
     
-    // Skip Chill logo/branding images
+    // Skip Chill logo/branding images - MORE COMPREHENSIVE
     const srcLower = img.src.toLowerCase();
     const altLower = (img.alt || '').toLowerCase();
-    if (srcLower.includes('chill') && (srcLower.includes('logo') || srcLower.includes('brand') || srcLower.includes('watermark'))) continue;
-    if (altLower.includes('chill') && (altLower.includes('logo') || altLower.includes('brand'))) continue;
+    const classLower = (img.className || '').toLowerCase();
+    
+    // Filter out ANY Chill-related image (not just logos)
+    if (srcLower.includes('chill') || altLower.includes('chill') || classLower.includes('chill')) continue;
+    
+    // Skip small square placeholder images (often 150x150 or similar)
+    const isSmallSquare = img.width === img.height && img.width <= 200;
+    if (isSmallSquare) continue;
     
     // Calculate dimensions for filtering
     const shortSide = Math.min(img.width, img.height);

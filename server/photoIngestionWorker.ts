@@ -341,7 +341,7 @@ export class PhotoIngestionWorker {
         const images = await page.evaluate(() => {
           const imgs = Array.from(document.querySelectorAll('img'));
           return imgs.map(img => ({
-            url: img.src,
+            src: img.src,
             width: img.naturalWidth,
             height: img.naturalHeight,
             alt: img.alt || '',

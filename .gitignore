@@ -4,3 +4,17 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment and logs
+.env
+*.log
+
+# Build artifacts
+/build
+/.cache
+
+# Photo assets (generated)
+public/photos/
+public/thumbs/
+assets/raw/
+axylog_files_*.json

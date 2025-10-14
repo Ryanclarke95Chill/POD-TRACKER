@@ -1,0 +1,104 @@
+Goal: Make the POD photo feature work properly, and load FAST.
+Why: We need correct “photo” counts (not generic file counts), smooth infinite scrolling with quick thumbnails, and full-resolution images only when a thumbnail is clicked.
+
+Do the following ADDITIVELY (don’t break existing behavior):
+
+A) DISCOVER + ECHO
+1) Detect the framework (Next.js / Vite / CRA / custom Express) and package manager.
+2) Detect existing photo- and POD-related code (ingestion, gallery view, API calls).
+3) Echo findings and planned file edits before you modify.
+
+B) DATA SOURCE: Axylog /files for photos only
+1) Create a small Axylog client utility (e.g., src/lib/axylog.ts or similar) that uses an env var token (AXYLOG_TOKEN) and exposes:
+   - getFiles(year: number, code: number, prog: number): Promise<Array<{ fileName: string; type: string; url?: string }>>
+   NOTE: Reuse existing fetch headers if already present in the project.
+
+2) Clarify “photo” vs other files:
+   - Treat only items where type === "photo" OR fileName extension is jpg/jpeg/png/webp as a “photo”
+   - Ignore signatures and PDFs when counting photos.
+
+C) MANIFEST: one fetch per page, zero per image
+1) Build or extend a script (tools/build-manifest.js) that:
+   - Iterates over a list of recent deliveries (if we already have it) OR reads a local JSON of recent jobs (if available).
+   - For each {year, code, prog}, calls getFiles and filters to photos only.
+   - Creates a manifest object keyed by `${year}-${code}-${prog}`:
+     {
+       "2025-143727-2": {
+         "photoCount": 12,
+         "items": [
+           { "thumb": "/thumbs/2025/143727/2/photo_0001.webp", "full": "https://.../photo_0001.jpg" },
+           { "thumb": "/thumbs/2025/143727/2/photo_0002.webp", "full": "https://.../photo_0002.jpg" }
+         ]
+       },
+       ...
+     }
+
+   - Save to public/manifest.json.
+   - Be tolerant: if a delivery has 0 photos, don’t add it.
+
+2) If we do not have direct full URLs from Axylog, keep "full" as a local route you already use (or a placeholder). Otherwise, capture the real URL from the files endpoint if available.
+
+D) THUMBNAILS: generate & cache (fast grid)
+1) Use sharp to generate 360px WebP thumbnails from originals (or from downloaded images if originals are local). Create if missing:
+   - tools/make-thumbs.js
+   - Input: public/photos/** (or the existing images dir)
+   - Output: public/thumbs/{year}/{code}/{prog}/{originalName}.webp
+   - EXIF rotate, quality 70
+   - If source folder is missing, print a warning and continue.
+
+2) Create or extend tools/build-images.js to run:
+   - npm run thumbs (generate thumbnails)
+   - npm run manifest (build manifest from /files responses)
+   Add package.json scripts if missing:
+   - "thumbs": "node tools/make-thumbs.js"
+   - "manifest": "node tools/build-manifest.js"
+   - "build:images": "npm run thumbs && npm run manifest"
+
+E) CACHING HEADERS (respect framework)
+1) If Next.js: add headers() in next.config.js
+   - /thumbs/: Cache-Control: public, max-age=31536000, immutable
+   - /manifest.json: Cache-Control: public, max-age=300
+2) If custom Express: create server/cache-static.js exporting mountStatic(app) to serve:
+   - /thumbs with Cache-Control: public, max-age=31536000, immutable
+   - /manifest.json with Cache-Control: public, max-age=300
+   Import and call mountStatic(app) in the main server entry.
+3) If Vite/CRA only: keep assets in public/ and DO NOT break dev server; document headers in output.
+
+F) FRONTEND: fast grid + correct counts + full-res on click
+1) Create (only if missing) a reusable <Thumb/> component with:
+   - IntersectionObserver lazy-load
+   - Concurrency cap = 8 for network image loads (queue)
+   - Props: thumbSrc (required), alt?, placeholder?
+2) Create or extend a <Gallery/> for a delivery key (e.g., “2025-143727-2”):
+   - On mount, fetch /manifest.json once and memoize.
+   - Render thumbnails from manifest[key].items[].thumb using <Thumb/>.
+   - Show a photo count badge using manifest[key].photoCount (this is the TRUE count).
+   - On thumbnail click: open a simple lightbox that loads the “full” image URL (not the thumbnail). Only fetch full when opened.
+   - Support infinite scroll / virtualization if the grid can be very large (optional: react-window, but keep changes small if stack doesn’t have it).
+
+3) DO NOT remove existing behavior; add a “manifest mode” that is used if /manifest.json is present, else fall back to current code paths.
+
+G) REPO HYGIENE (don’t bloat Git)
+1) Merge into .gitignore (preserve existing lines):
+   node_modules/
+   .env
+   .DS_Store
+   *.log
+   /build
+   /dist
+   /.cache
+   public/photos/
+   assets/raw/
+   axylog_files_*.json
+2) If images must be kept for demo, keep them <50MB or consider Git LFS (do not enable LFS by default here).
+
+H) RUN + OUTPUT
+1) Run: npm run build:images
+   - If no photos found, do not fail the build; just print a warning.
+2) Print a concise summary:
+   - Framework + package manager detected
+   - Number of deliveries included in manifest
+   - Total thumbnails generated
+   - Where <Thumb/> and <Gallery/> were added and how to use them
+   - How to render a specific delivery: example code snippet
+   - Reminder: serve /thumbs with CDN and long cache headers
