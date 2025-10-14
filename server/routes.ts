@@ -2385,22 +2385,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return match ? match[1] : null;
       };
       
-      const photoCounts: Record<number, number> = {};
-      
-      await Promise.all(allConsignments.map(async (consignment: any) => {
-        const token = extractTrackingToken(consignment);
-        if (token) {
-          const photos = await storage.getPhotoAssetsByTokenAndKind(token, 'photo');
-          const availablePhotos = photos.filter(p => p.status === 'available');
-          photoCounts[consignment.id] = availablePhotos.length;
-        } else {
-          photoCounts[consignment.id] = 0;
-        }
-      }));
-      
+      // Use the actual file counts from Axylog which are already stored in the database
+      // These counts represent the actual number of photos (excluding signatures)
       const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => ({
         ...consignment,
-        actualPhotoCount: photoCounts[consignment.id] || 0
+        // The deliveryReceivedFileCount and pickupReceivedFileCount already contain
+        // the actual photo counts from Axylog (signatures are not included in these counts)
+        actualPhotoCount: (consignment.deliveryReceivedFileCount || 0) + (consignment.pickupReceivedFileCount || 0)
       }));
       
       res.json({

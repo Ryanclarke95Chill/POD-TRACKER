@@ -208,6 +208,7 @@ export default function PODQualityDashboard() {
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
   const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string[]>>(new Map());
+  const [loadedThumbnails, setLoadedThumbnails] = useState<Set<number>>(new Set()); // Track which thumbnails we've already tried to load
   const { toast } = useToast();
   
   // Check if filters are applied (require at least date filter)
@@ -507,6 +508,44 @@ export default function PODQualityDashboard() {
     });
   }, [warehouseComparison]);
   
+  // Load thumbnails for a consignment (for display in table)
+  const loadThumbnails = async (consignment: Consignment, retryCount = 0) => {
+    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+    if (!trackingLink) {
+      // Mark as loaded since there's nothing to load
+      setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
+      return;
+    }
+    
+    try {
+      // Use priority=low for background thumbnail loading
+      const response = await apiRequest('GET', `/api/consignments/${consignment.id}/photos?priority=low`);
+      const data = await response.json();
+      
+      if (data.success && data.photos && data.photos.length > 0) {
+        // Success - save thumbnails and mark as loaded
+        setPhotoThumbnails(prev => new Map(prev).set(consignment.id, data.photos.slice(0, 4))); // Show max 4 thumbnails
+        setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
+      } else if (data.status === 'preparing' && retryCount < 3) {
+        // Photos are being prepared, retry with exponential backoff
+        const delay = Math.min(2000 * Math.pow(1.5, retryCount), 8000);
+        setTimeout(() => {
+          loadThumbnails(consignment, retryCount + 1);
+        }, delay);
+      } else {
+        // Either max retries reached or another error - mark as loaded to prevent infinite retries
+        setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
+        if (data.error) {
+          console.error('Failed to load thumbnails for consignment', consignment.id, data.error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load thumbnails for consignment', consignment.id, error);
+      // Mark as loaded to prevent infinite retries on network errors
+      setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
+    }
+  };
+
   // Load photos for a consignment using thumbnail-first strategy
   const loadPhotos = async (consignment: Consignment) => {
     const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
@@ -653,6 +692,28 @@ export default function PODQualityDashboard() {
     setFilters({...filters, [key]: value});
     setDataLoaded(false); // Reset when filters change
   };
+  
+  // Automatically load thumbnails for visible consignments
+  useEffect(() => {
+    if (!paginatedConsignments || paginatedConsignments.length === 0) return;
+    
+    // Load thumbnails for each visible consignment that hasn't been loaded yet
+    paginatedConsignments.forEach(async (consignment) => {
+      // Skip if we've already tried to load thumbnails for this consignment
+      if (loadedThumbnails.has(consignment.id)) return;
+      
+      // Skip if no photo count
+      const photoCount = (consignment as ConsignmentWithPhotoCount).actualPhotoCount;
+      if (!photoCount || photoCount === 0) {
+        // Mark as loaded for consignments with no photos
+        setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
+        return;
+      }
+      
+      // Load thumbnails in the background (loadThumbnails will mark as loaded when complete)
+      await loadThumbnails(consignment);
+    });
+  }, [paginatedConsignments]);
   
   const activeFilterCount = [
     filters.shipper !== "all",
@@ -1361,21 +1422,46 @@ export default function PODQualityDashboard() {
                       {/* Photo Thumbnails Section */}
                       {thumbnail && Array.isArray(thumbnail) && thumbnail.length > 0 && (
                         <div className="border-t pt-3">
-                          <div className="flex gap-2 flex-wrap">
-                            {thumbnail.map((photo, index) => (
-                              <div 
-                                key={index}
-                                className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-colors"
-                                onClick={() => loadPhotos(consignment)}
-                              >
-                                <img 
-                                  src={photo} 
-                                  alt={`Delivery photo ${index + 1}`} 
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-2">
+                              {thumbnail.map((photo, index) => (
+                                <div 
+                                  key={index}
+                                  className="relative group cursor-pointer"
+                                  onClick={() => loadPhotos(consignment)}
+                                >
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-all hover:scale-105">
+                                    <img 
+                                      src={`/api/image?src=${encodeURIComponent(photo)}&w=128&h=128&q=75&fmt=webp`} 
+                                      alt={`Photo ${index + 1}`} 
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        // Fallback to original URL if proxy fails
+                                        target.src = photo;
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-opacity flex items-center justify-center">
+                                    <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {metrics.photoCount > 4 && (
+                              <span className="text-sm text-gray-500 ml-2">
+                                +{metrics.photoCount - 4} more
+                              </span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => loadPhotos(consignment)}
+                              className="ml-auto text-xs"
+                            >
+                              View all
+                            </Button>
                           </div>
                         </div>
                       )}

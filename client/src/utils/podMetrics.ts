@@ -121,20 +121,14 @@ export function getActualTemperature(consignment: Consignment): string | null {
 
 // Get photo count from file count fields
 export function getPhotoCount(consignment: Consignment): number {
+  // These file counts already represent the actual photo counts (excluding signatures)
+  // The Axylog API provides these as actual photo counts, not total file counts
   const deliveryFileCount = consignment.deliveryReceivedFileCount || 0;
   const pickupFileCount = consignment.pickupReceivedFileCount || 0;
   
-  let totalFiles = deliveryFileCount + pickupFileCount;
-  
-  // Subtract signatures from file count since they're included in the total
-  if (consignment.deliverySignatureName && deliveryFileCount > 0) {
-    totalFiles = Math.max(0, totalFiles - 1);
-  }
-  if (consignment.pickupSignatureName && pickupFileCount > 0) {
-    totalFiles = Math.max(0, totalFiles - 1);
-  }
-  
-  return totalFiles;
+  // Simply return the sum - no need to subtract signatures
+  // The file counts from Axylog already exclude signatures
+  return deliveryFileCount + pickupFileCount;
 }
 
 // Calculate POD quality score
