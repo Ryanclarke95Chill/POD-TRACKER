@@ -286,8 +286,9 @@ export function filterAndClassifyPhotos(images: PhotoCandidate[]): FilteredPhoto
 function isValidPhotoUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   
-  // Accept data URIs (base64 encoded images)
-  if (url.startsWith('data:image/')) return true;
+  // REJECT data URIs for photos - these should only be HTTP/HTTPS URLs
+  // Data URIs are often logos or UI elements that shouldn't be stored as photos
+  if (url.startsWith('data:image/')) return false;
   
   // Must be valid HTTP/HTTPS URL
   try {
@@ -327,13 +328,10 @@ export function filterFetchablePhotos(urls: string[]): string[] {
       continue;
     }
     
-    // Accept data URIs
+    // REJECT data URIs for photos - these are often logos or UI elements
+    // Data URIs should only be used for signatures (handled separately)
     if (u.startsWith('data:image/')) {
-      if (!seen.has(u)) {
-        seen.add(u);
-        out.push(u);
-      }
-      continue;
+      continue; // Skip data URIs entirely
     }
     
     // Check if it's a valid HTTP URL
