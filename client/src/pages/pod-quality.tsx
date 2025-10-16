@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Camera, 
   Thermometer, 
@@ -263,7 +263,9 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl font-bold">Delivery Details</DialogTitle>
-              <p className="text-sm text-gray-500 mt-1">Consignment {consignment.consignmentNo}</p>
+              <DialogDescription className="text-sm text-gray-500 mt-1">
+                Consignment {consignment.consignmentNo} - {formatDriverName(consignment.driverName)}
+              </DialogDescription>
             </div>
             <Badge className={`${tierColor} text-lg px-4 py-2`}>
               {metrics.qualityScore} - {qualityTier.tier}
