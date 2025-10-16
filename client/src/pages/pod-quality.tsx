@@ -198,6 +198,8 @@ interface DeliveryDetailsModalProps {
 function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures }: DeliveryDetailsModalProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [viewingSignatures, setViewingSignatures] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const { toast } = useToast();
   
   useEffect(() => {
     if (consignment) {
@@ -224,6 +226,10 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
       setCurrentPhotoIndex(0);
     }
   }, [viewingSignatures, currentPhotoIndex, photos, signatures]);
+  
+  useEffect(() => {
+    setImageLoading(true);
+  }, [currentPhotoIndex, viewingSignatures]);
   
   if (!consignment) return null;
   
@@ -255,6 +261,59 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
     const parts = name.split(',').map(p => p.trim());
     return parts.length === 2 ? `${parts[1]} ${parts[0]}` : name;
   };
+  
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  
+  const handleDownloadReport = () => {
+    const reportData = {
+      consignment: consignment.consignmentNo,
+      driver: formatDriverName(consignment.driverName),
+      qualityScore: metrics.qualityScore,
+      scoreBreakdown: metrics.scoreBreakdown,
+      deliveryDate: formatDateTime(consignment.delivery_OutcomeDateTime),
+      customer: consignment.shipToCompanyName,
+      address: `${consignment.shipToAddress}, ${consignment.shipToCity}`
+    };
+    
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `delivery-report-${consignment.consignmentNo}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  
+  const handleFlagDelivery = () => {
+    toast({
+      title: "Delivery Flagged",
+      description: `Consignment ${consignment.consignmentNo} has been flagged for review`,
+    });
+  };
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === 'ArrowLeft') handlePrevPhoto();
+      if (e.key === 'ArrowRight') handleNextPhoto();
+      if (e.key === 'Escape') onClose();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, allImages.length]);
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -368,7 +427,7 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
               </div>
               <div>
                 <span className="font-medium text-gray-600">Delivery Date:</span>
-                <span className="ml-2">{consignment.delivery_OutcomeDateTime || 'N/A'}</span>
+                <span className="ml-2">{formatDateTime(consignment.delivery_OutcomeDateTime)}</span>
               </div>
               {requiredTemp && (
                 <div>
@@ -457,13 +516,20 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
             {allImages.length > 0 ? (
               <div className="relative">
                 <div className="relative bg-gray-100 min-h-[300px] flex items-center justify-center rounded-lg">
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+                    </div>
+                  )}
                   <img
                     src={`/api/image?src=${encodeURIComponent(currentImage)}&w=800&q=90`}
                     alt={`${viewingSignatures ? 'Signature' : 'Photo'} ${currentPhotoIndex + 1}`}
                     className="max-w-full h-auto max-h-[400px] object-contain"
+                    onLoad={() => setImageLoading(false)}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = currentImage;
+                      setImageLoading(false);
                     }}
                   />
                 </div>
@@ -529,11 +595,11 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
         
         {/* Action Buttons */}
         <div className="flex gap-3 mt-6">
-          <Button variant="outline" className="flex-1" data-testid="button-download-report">
+          <Button variant="outline" className="flex-1" onClick={handleDownloadReport} data-testid="button-download-report">
             <Download className="h-4 w-4 mr-2" />
             Download Report
           </Button>
-          <Button variant="outline" className="flex-1" data-testid="button-flag-review">
+          <Button variant="outline" className="flex-1" onClick={handleFlagDelivery} data-testid="button-flag-review">
             <AlertTriangle className="h-4 w-4 mr-2" />
             Flag for Review
           </Button>
