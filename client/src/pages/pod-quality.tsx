@@ -588,12 +588,16 @@ export default function PODQualityDashboard() {
       } else {
         // Either max retries reached or another error - mark as loaded to prevent infinite retries
         setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
-        if (data.error) {
+        // Only log unexpected errors (not "no tracking link" or "no photos found")
+        if (data.error && !data.error.includes?.('tracking link') && !data.error.includes?.('No photos found')) {
           console.error('Failed to load thumbnails for consignment', consignment.id, data.error);
         }
       }
     } catch (error) {
-      console.error('Failed to load thumbnails for consignment', consignment.id, error);
+      // Only log actual network/unexpected errors, not expected API responses
+      if (error instanceof Error && !error.message.includes('404')) {
+        console.error('Failed to load thumbnails for consignment', consignment.id, error);
+      }
       // Mark as loaded to prevent infinite retries on network errors
       setLoadedThumbnails(prev => new Set(prev).add(consignment.id));
     }
