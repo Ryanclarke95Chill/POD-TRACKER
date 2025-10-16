@@ -294,6 +294,11 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Report Downloaded",
+      description: `Delivery report for ${consignment.consignmentNo} has been downloaded`,
+    });
   };
   
   const handleFlagDelivery = () => {
