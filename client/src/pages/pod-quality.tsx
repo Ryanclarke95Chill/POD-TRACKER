@@ -30,7 +30,12 @@ import {
   ArrowUpDown,
   LogOut,
   Lightbulb,
-  TrendingDown
+  TrendingDown,
+  Trophy,
+  Award,
+  Medal,
+  Crown,
+  Star
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -39,6 +44,7 @@ import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature,
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
+import chillLogo from "@assets/Chill Logo CMYK Primary (1)_1760581487204.png";
 
 interface PhotoModalProps {
   isOpen: boolean;
@@ -54,6 +60,7 @@ interface Filters {
   driver: string;
   fromDate: string;
   toDate: string;
+  qualityTier: string;
 }
 
 function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: PhotoModalProps) {
@@ -193,7 +200,8 @@ export default function PODQualityDashboard() {
     warehouse: "all",
     driver: "all",
     fromDate: "",
-    toDate: ""
+    toDate: "",
+    qualityTier: "all"
   });
   
   const [dataLoaded, setDataLoaded] = useState(false); // Track if user triggered load
@@ -226,10 +234,42 @@ export default function PODQualityDashboard() {
   
   const consignments = consignmentsData?.consignments || [];
   
+  // Helper function to format driver name from "Last, First" to "First Last"
+  const formatDriverName = (driverName: string | null | undefined): string => {
+    if (!driverName) return "";
+    // Check if name is in "Last, First" format
+    if (driverName.includes(",")) {
+      const parts = driverName.split(",").map(p => p.trim());
+      if (parts.length === 2) {
+        return `${parts[1]} ${parts[0]}`; // "First Last"
+      }
+    }
+    return driverName;
+  };
+  
   // Get unique shippers, warehouses, and drivers for filter dropdowns
   const uniqueShippers = Array.from(new Set(consignments.map((c: Consignment) => (c as any).shipperCompanyName).filter((name): name is string => Boolean(name)))).sort();
   const uniqueWarehouses = Array.from(new Set(consignments.map((c: Consignment) => c.warehouseCompanyName).filter((name): name is string => Boolean(name)))).sort();
-  const uniqueDrivers = Array.from(new Set(consignments.map((c: Consignment) => c.driverName).filter((name): name is string => Boolean(name)))).sort();
+  
+  // Group drivers by warehouse
+  const driversByWarehouse = consignments.reduce((acc: Record<string, Set<string>>, c: Consignment) => {
+    const warehouse = c.warehouseCompanyName || "Unknown Warehouse";
+    const driver = c.driverName;
+    if (driver) {
+      if (!acc[warehouse]) {
+        acc[warehouse] = new Set();
+      }
+      acc[warehouse].add(driver);
+    }
+    return acc;
+  }, {});
+  
+  // Sort warehouses and drivers
+  const sortedWarehouses = Object.keys(driversByWarehouse).sort();
+  const driversGrouped = sortedWarehouses.map(warehouse => ({
+    warehouse,
+    drivers: Array.from(driversByWarehouse[warehouse]).sort()
+  }));
   
   // Filter consignments based on search and filters
   const filteredConsignments = consignments.filter((c: Consignment) => {
@@ -256,10 +296,12 @@ export default function PODQualityDashboard() {
     
     // Search filter
     const search = searchTerm.toLowerCase();
+    const formattedDriverName = formatDriverName(c.driverName);
     const matchesSearch = !searchTerm || (
       c.consignmentNo?.toLowerCase().includes(search) ||
       c.orderNumberRef?.toLowerCase().includes(search) ||
       c.driverName?.toLowerCase().includes(search) ||
+      formattedDriverName?.toLowerCase().includes(search) ||
       c.shipToCompanyName?.toLowerCase().includes(search) ||
       c.shipToCity?.toLowerCase().includes(search)
     );
@@ -304,7 +346,15 @@ export default function PODQualityDashboard() {
       return true;
     })();
     
-    return matchesSearch && matchesShipper && matchesWarehouse && matchesDriver && matchesDateRange;
+    // Quality tier filter
+    const matchesQualityTier = (() => {
+      if (filters.qualityTier === "all") return true;
+      const metrics = calculatePODScore(c, (c as ConsignmentWithPhotoCount).actualPhotoCount);
+      const tier = getQualityTier(metrics.qualityScore);
+      return tier.tier === filters.qualityTier;
+    })();
+    
+    return matchesSearch && matchesShipper && matchesWarehouse && matchesDriver && matchesDateRange && matchesQualityTier;
   });
   
   // Sort by syncedAt descending (most recent first)
@@ -357,6 +407,7 @@ export default function PODQualityDashboard() {
   const stats = {
     total: filteredConsignments.length,
     avgScore: 0,
+    outstandingCount: 0,
     goldCount: 0,
     silverCount: 0,
     bronzeCount: 0,
@@ -381,7 +432,8 @@ export default function PODQualityDashboard() {
       if (metrics.temperatureCompliant) tempCompliantCount++;
       
       const tier = getQualityTier(metrics.qualityScore);
-      if (tier.tier === "Excellent") stats.goldCount++;
+      if (tier.tier === "Outstanding") stats.outstandingCount++;
+      else if (tier.tier === "Excellent") stats.goldCount++;
       else if (tier.tier === "Good") stats.silverCount++;
       else if (tier.tier === "Fair") stats.bronzeCount++;
       else stats.needsImprovementCount++;
@@ -453,7 +505,8 @@ export default function PODQualityDashboard() {
     }>();
     
     filteredConsignments.forEach((c: ConsignmentWithPhotoCount) => {
-      const driver = c.driverName || "Unknown Driver";
+      const driverRaw = c.driverName || "Unknown Driver";
+      const driver = formatDriverName(driverRaw) || "Unknown Driver";
       const metrics = calculatePODScore(c, c.actualPhotoCount);
       
       if (!driverMap.has(driver)) {
@@ -681,7 +734,8 @@ export default function PODQualityDashboard() {
       warehouse: "all",
       driver: "all",
       fromDate: "",
-      toDate: ""
+      toDate: "",
+      qualityTier: "all"
     });
     setSearchTerm("");
     setDataLoaded(false); // Reset data load state
@@ -720,26 +774,31 @@ export default function PODQualityDashboard() {
     filters.warehouse !== "all",
     filters.driver !== "all",
     filters.fromDate !== "",
-    filters.toDate !== ""
+    filters.toDate !== "",
+    filters.qualityTier !== "all"
   ].filter(Boolean).length;
   
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col">
-        <header className="gradient-primary shadow-header z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
-              <span className="ml-3 text-blue-100 text-sm">POD Quality Dashboard</span>
+        <header className="bg-white border-b border-gray-200 shadow-sm z-10 sticky top-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <img 
+                src={chillLogo} 
+                alt="CHILL" 
+                className="h-10"
+              />
+              <span className="text-gray-600 text-sm font-medium font-montserrat">POD Quality Dashboard</span>
             </div>
             
             <div className="flex items-center space-x-3">
-              <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
-                <span>{user?.email}</span>
+              <div className="hidden md:flex items-center text-gray-600 text-sm mr-4 bg-gray-100 px-3 py-1 rounded-full">
+                <span className="font-montserrat">{user?.email}</span>
               </div>
 
               <Button 
-                className="gradient-accent hover:opacity-90 text-white border-0"
+                variant="outline"
                 onClick={logout}
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -760,24 +819,30 @@ export default function PODQualityDashboard() {
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="gradient-primary shadow-lg z-10 sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <h1 className="text-3xl font-bold text-white">ChillTrack</h1>
-            <span className="ml-3 text-blue-100 text-sm">POD Quality Dashboard</span>
+      <header className="bg-white border-b border-gray-200 shadow-sm z-10 sticky top-0">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <img 
+              src={chillLogo} 
+              alt="CHILL" 
+              className="h-8 sm:h-10"
+            />
+            <span className="text-gray-600 text-xs sm:text-sm font-medium font-montserrat hidden sm:block">POD Quality Dashboard</span>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <div className="hidden md:flex items-center text-white/90 text-sm mr-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
-              <span>{user?.email}</span>
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="hidden lg:flex items-center text-gray-600 text-sm mr-4 bg-gray-100 px-3 py-1 rounded-full">
+              <span className="font-montserrat">{user?.email}</span>
             </div>
 
             <Button 
-              className="gradient-accent hover:opacity-90 text-white border-0"
+              variant="outline"
               onClick={logout}
+              size="sm"
+              className="text-xs sm:text-sm"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <LogOut className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
@@ -785,13 +850,13 @@ export default function PODQualityDashboard() {
       
       {/* FILTERS SECTION - TOP PRIORITY */}
       <div className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Filter className="h-5 w-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Filter Consignments</h2>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Filter className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Filter Consignments</h2>
               {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
                   {activeFilterCount} active
                 </Badge>
               )}
@@ -804,13 +869,14 @@ export default function PODQualityDashboard() {
                   size="sm" 
                   onClick={resetFilters}
                   data-testid="button-reset-filters"
+                  className="text-xs sm:text-sm"
                 >
-                  <X className="h-4 w-4 mr-1" />
+                  <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   Clear All
                 </Button>
               )}
-              <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} size="sm" variant="outline">
-                <Download className="h-4 w-4 mr-2" />
+              <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} size="sm" variant="outline" className="text-xs sm:text-sm">
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                 Sync
               </Button>
             </div>
@@ -886,13 +952,42 @@ export default function PODQualityDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Drivers</SelectItem>
-                  {uniqueDrivers.map((driver) => (
-                    <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+                  {driversGrouped.map((group) => (
+                    <div key={group.warehouse}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                        {group.warehouse}
+                      </div>
+                      {group.drivers.map((driver: string) => (
+                        <SelectItem key={driver} value={driver} className="pl-6">
+                          {formatDriverName(driver)}
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {/* Active Quality Filter Badge */}
+          {filters.qualityTier !== "all" && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-gray-600">Quality Filter:</span>
+              <Badge 
+                variant="secondary" 
+                className={`cursor-pointer ${
+                  filters.qualityTier === "Excellent" ? "bg-green-100 text-green-700 border-green-300" :
+                  filters.qualityTier === "Good" ? "bg-blue-100 text-blue-700 border-blue-300" :
+                  filters.qualityTier === "Fair" ? "bg-yellow-100 text-yellow-700 border-yellow-300" :
+                  "bg-red-100 text-red-700 border-red-300"
+                }`}
+                onClick={() => setFilters({ ...filters, qualityTier: "all" })}
+              >
+                {filters.qualityTier}
+                <X className="h-3 w-3 ml-1" />
+              </Badge>
+            </div>
+          )}
 
           {/* Search and Load Button */}
           <div className="flex gap-3 items-end">
@@ -975,10 +1070,10 @@ export default function PODQualityDashboard() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
       
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
@@ -987,8 +1082,8 @@ export default function PODQualityDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgScore}%</div>
-            <p className="text-xs text-gray-500">Quality Score</p>
+            <div className="text-2xl font-bold">{stats.avgScore}</div>
+            <p className="text-xs text-gray-500">Avg quality score (100 = perfect)</p>
           </CardContent>
         </Card>
         
@@ -1036,30 +1131,62 @@ export default function PODQualityDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Quality Distribution</CardTitle>
-          <CardDescription>Breakdown by quality tier</CardDescription>
+          <CardDescription>Breakdown by quality tier (click to filter)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
-              <div className="text-3xl font-bold text-green-700 mb-1">{stats.goldCount}</div>
-              <div className="text-sm font-medium text-green-800">Excellent</div>
-              <div className="text-xs text-green-600">90-100%</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-blue-50 border border-blue-200">
-              <div className="text-3xl font-bold text-blue-700 mb-1">{stats.silverCount}</div>
-              <div className="text-sm font-medium text-blue-800">Good</div>
-              <div className="text-xs text-blue-600">75-89%</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-yellow-50 border border-yellow-200">
-              <div className="text-3xl font-bold text-yellow-700 mb-1">{stats.bronzeCount}</div>
-              <div className="text-sm font-medium text-yellow-800">Fair</div>
-              <div className="text-xs text-yellow-600">60-74%</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-red-50 border border-red-200">
-              <div className="text-3xl font-bold text-red-700 mb-1">{stats.needsImprovementCount}</div>
-              <div className="text-sm font-medium text-red-800">Poor</div>
-              <div className="text-xs text-red-600">&lt;60%</div>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <button
+              onClick={() => setFilters({ ...filters, qualityTier: filters.qualityTier === "Excellent" ? "all" : "Excellent" })}
+              className={`text-center p-3 sm:p-4 rounded-lg transition-all ${
+                filters.qualityTier === "Excellent" 
+                  ? "bg-green-100 border-2 border-green-500 shadow-md" 
+                  : "bg-green-50 border border-green-200 hover:bg-green-100"
+              }`}
+              data-testid="filter-excellent"
+            >
+              <div className="text-2xl sm:text-3xl font-bold text-green-700 mb-1">{stats.goldCount}</div>
+              <div className="text-xs sm:text-sm font-medium text-green-800">Excellent</div>
+              <div className="text-[10px] sm:text-xs text-green-600">90-100</div>
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, qualityTier: filters.qualityTier === "Good" ? "all" : "Good" })}
+              className={`text-center p-3 sm:p-4 rounded-lg transition-all ${
+                filters.qualityTier === "Good" 
+                  ? "bg-blue-100 border-2 border-blue-500 shadow-md" 
+                  : "bg-blue-50 border border-blue-200 hover:bg-blue-100"
+              }`}
+              data-testid="filter-good"
+            >
+              <div className="text-2xl sm:text-3xl font-bold text-blue-700 mb-1">{stats.silverCount}</div>
+              <div className="text-xs sm:text-sm font-medium text-blue-800">Good</div>
+              <div className="text-[10px] sm:text-xs text-blue-600">75-89</div>
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, qualityTier: filters.qualityTier === "Fair" ? "all" : "Fair" })}
+              className={`text-center p-3 sm:p-4 rounded-lg transition-all ${
+                filters.qualityTier === "Fair" 
+                  ? "bg-yellow-100 border-2 border-yellow-500 shadow-md" 
+                  : "bg-yellow-50 border border-yellow-200 hover:bg-yellow-100"
+              }`}
+              data-testid="filter-fair"
+            >
+              <div className="text-2xl sm:text-3xl font-bold text-yellow-700 mb-1">{stats.bronzeCount}</div>
+              <div className="text-xs sm:text-sm font-medium text-yellow-800">Fair</div>
+              <div className="text-[10px] sm:text-xs text-yellow-600">60-74</div>
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, qualityTier: filters.qualityTier === "Poor" ? "all" : "Poor" })}
+              className={`text-center p-3 sm:p-4 rounded-lg transition-all ${
+                filters.qualityTier === "Poor" 
+                  ? "bg-red-100 border-2 border-red-500 shadow-md" 
+                  : "bg-red-50 border border-red-200 hover:bg-red-100"
+              }`}
+              data-testid="filter-poor"
+            >
+              <div className="text-2xl sm:text-3xl font-bold text-red-700 mb-1">{stats.needsImprovementCount}</div>
+              <div className="text-xs sm:text-sm font-medium text-red-800">Poor</div>
+              <div className="text-[10px] sm:text-xs text-red-600">&lt;60</div>
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -1085,7 +1212,7 @@ export default function PODQualityDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="avgScore" fill="#3b82f6" name="Avg Score (%)" />
+                    <Bar dataKey="avgScore" fill="#3b82f6" name="Avg Score" />
                     <Bar dataKey="signatureRate" fill="#10b981" name="Receiver Name (%)" />
                     <Bar dataKey="tempComplianceRate" fill="#f59e0b" name="Temp Compliance (%)" />
                   </BarChart>
@@ -1116,7 +1243,7 @@ export default function PODQualityDashboard() {
                             w.avgScore >= 75 ? 'text-blue-600' :
                             w.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
                           }`}>
-                            {w.avgScore}%
+                            {w.avgScore}
                           </span>
                         </td>
                         <td className="p-3 text-center text-gray-700">{w.photoRate}</td>
@@ -1132,132 +1259,169 @@ export default function PODQualityDashboard() {
         </Card>
       )}
       
-      {/* Insights Section */}
-      {filteredConsignments.length > 0 && (
+      {/* Driver Leaderboard */}
+      {driverPerformance.length > 0 && (
         <Card>
-          <CardHeader 
-            className="cursor-pointer hover:bg-gray-50 transition-colors" 
-            onClick={() => setInsightsExpanded(!insightsExpanded)}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5" />
-                  Performance Insights
-                </CardTitle>
-                <CardDescription>Driver rankings and warehouse improvement areas</CardDescription>
-              </div>
-              <ChevronDown className={`h-5 w-5 transition-transform ${insightsExpanded ? 'rotate-180' : ''}`} />
-            </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              Driver Leaderboard
+            </CardTitle>
+            <CardDescription>Top performing drivers by POD quality score</CardDescription>
           </CardHeader>
-          
-          {insightsExpanded && (
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Driver Performance */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Driver Performance
-                  </h3>
-                  
-                  {/* Top Performers */}
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
-                      Top Performers
-                    </h4>
-                    <div className="space-y-2">
-                      {driverPerformance.slice(0, 3).map((driver, idx) => (
-                        <div key={driver.driver} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{driver.driver}</div>
-                            <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-lg font-bold ${
-                              driver.avgScore >= 90 ? 'text-green-600' :
-                              driver.avgScore >= 75 ? 'text-blue-600' :
-                              'text-yellow-600'
-                            }`}>
-                              {driver.avgScore}%
-                            </div>
-                            <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Low Performers */}
-                  {driverPerformance.length > 3 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
-                        <TrendingDown className="h-4 w-4" />
-                        Needs Improvement
-                      </h4>
-                      <div className="space-y-2">
-                        {driverPerformance.slice(-3).reverse().map((driver, idx) => (
-                          <div key={driver.driver} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">{driver.driver}</div>
-                              <div className="text-xs text-gray-600">{driver.deliveryCount} deliveries</div>
-                            </div>
-                            <div className="text-right">
-                              <div className={`text-lg font-bold ${
-                                driver.avgScore >= 75 ? 'text-blue-600' :
-                                driver.avgScore >= 60 ? 'text-yellow-600' :
-                                'text-red-600'
-                              }`}>
-                                {driver.avgScore}%
-                              </div>
-                              <div className="text-xs text-gray-500">{driver.photoRate} photos avg</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+          <CardContent>
+            <div className="space-y-3">
+              {driverPerformance.slice(0, 10).map((driver, index) => {
+                const isTop3 = index < 3;
+                const medalIcon = index === 0 ? <Crown className="h-5 w-5 text-yellow-500" /> :
+                                 index === 1 ? <Medal className="h-5 w-5 text-gray-400" /> :
+                                 index === 2 ? <Medal className="h-5 w-5 text-amber-600" /> :
+                                 <Star className="h-4 w-4 text-gray-400" />;
                 
-                {/* Warehouse Improvement Areas */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5" />
-                    Warehouse Improvement Areas
-                  </h3>
-                  <div className="space-y-3">
-                    {warehouseInsights.map((insight) => (
-                      <div key={insight.warehouse} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-gray-900">{insight.warehouse}</h4>
-                          <span className={`text-sm font-semibold ${
-                            insight.avgScore >= 90 ? 'text-green-600' :
-                            insight.avgScore >= 75 ? 'text-blue-600' :
-                            insight.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {insight.avgScore}%
-                          </span>
-                        </div>
-                        <ul className="space-y-1">
-                          {insight.issues.map((issue, idx) => (
-                            <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
-                              <span className={`mt-1 ${
-                                issue.includes('well') ? 'text-green-500' : 'text-amber-500'
-                              }`}>
-                                {issue.includes('well') ? '✓' : '•'}
-                              </span>
-                              <span>{issue}</span>
-                            </li>
-                          ))}
-                        </ul>
+                const bgColor = index === 0 ? "bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200" :
+                               index === 1 ? "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-300" :
+                               index === 2 ? "bg-gradient-to-r from-orange-50 to-amber-50 border-amber-300" :
+                               "bg-white border-gray-200";
+                
+                return (
+                  <div 
+                    key={driver.driver}
+                    className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border-2 transition-all hover:shadow-md ${bgColor}`}
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 font-bold text-gray-600">
+                      {isTop3 ? medalIcon : <span className="text-sm sm:text-base">#{index + 1}</span>}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm sm:text-base truncate">{driver.driver}</div>
+                      <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 text-xs text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          {driver.deliveryCount} deliveries
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Camera className="h-3 w-3" />
+                          {driver.photoRate} photos/del
+                        </span>
                       </div>
-                    ))}
+                    </div>
+                    
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={`text-xl sm:text-2xl font-bold ${
+                        driver.avgScore >= 90 ? 'text-green-600' :
+                        driver.avgScore >= 75 ? 'text-blue-600' :
+                        driver.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {driver.avgScore}
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-gray-500">score</div>
+                    </div>
+                    
+                    {isTop3 && (
+                      <div className="hidden sm:flex flex-col gap-1">
+                        {driver.receiverNameRate >= 90 && (
+                          <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-xs">
+                            <Award className="h-3 w-3 mr-1" />
+                            Receiver Pro
+                          </Badge>
+                        )}
+                        {driver.tempComplianceRate >= 95 && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+                            <Thermometer className="h-3 w-3 mr-1" />
+                            Temp Master
+                          </Badge>
+                        )}
+                        {driver.photoRate >= 3 && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                            <Camera className="h-3 w-3 mr-1" />
+                            Photo Expert
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          )}
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Warehouse Leaderboard */}
+      {warehouseComparison.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-blue-500" />
+              Warehouse Rankings
+            </CardTitle>
+            <CardDescription>Performance rankings by warehouse/depot</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {warehouseComparison.slice(0, 6).map((warehouse, index) => {
+                const isTop3 = index < 3;
+                const rankColor = index === 0 ? "text-yellow-600" :
+                                 index === 1 ? "text-gray-500" :
+                                 index === 2 ? "text-amber-600" : "text-gray-400";
+                
+                const bgGradient = index === 0 ? "from-yellow-50 to-amber-50" :
+                                  index === 1 ? "from-gray-50 to-slate-50" :
+                                  index === 2 ? "from-orange-50 to-amber-50" : "from-white to-gray-50";
+                
+                return (
+                  <div
+                    key={warehouse.warehouse}
+                    className={`p-4 rounded-lg border-2 bg-gradient-to-br ${bgGradient} ${
+                      isTop3 ? 'border-gray-300' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm truncate">{warehouse.warehouse}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{warehouse.deliveryCount} deliveries</div>
+                      </div>
+                      <div className={`text-2xl font-bold ${rankColor}`}>
+                        #{index + 1}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`text-3xl font-bold ${
+                        warehouse.avgScore >= 90 ? 'text-green-600' :
+                        warehouse.avgScore >= 75 ? 'text-blue-600' :
+                        warehouse.avgScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {warehouse.avgScore}
+                      </div>
+                      <div className="text-xs text-gray-500">avg score</div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1.5">
+                      {warehouse.photoRate >= 3 && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px]">
+                          <Camera className="h-2.5 w-2.5 mr-0.5" />
+                          Photos
+                        </Badge>
+                      )}
+                      {warehouse.signatureRate >= 85 && (
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-[10px]">
+                          <FileSignature className="h-2.5 w-2.5 mr-0.5" />
+                          Names
+                        </Badge>
+                      )}
+                      {warehouse.tempComplianceRate >= 90 && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[10px]">
+                          <Thermometer className="h-2.5 w-2.5 mr-0.5" />
+                          Temp
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
         </Card>
       )}
       
@@ -1319,7 +1483,9 @@ export default function PODQualityDashboard() {
                             )}
                           </div>
                           <div className={`px-3 py-1 rounded-full font-semibold text-lg ${
-                            metrics.qualityScore >= 90 
+                            metrics.qualityScore > 100
+                              ? "bg-purple-100 text-purple-800"
+                              : metrics.qualityScore >= 90 
                               ? "bg-green-100 text-green-800"
                               : metrics.qualityScore >= 75
                               ? "bg-blue-100 text-blue-800"
@@ -1327,7 +1493,7 @@ export default function PODQualityDashboard() {
                               ? "bg-yellow-100 text-yellow-800"
                               : "bg-red-100 text-red-800"
                           }`} data-testid={`badge-score-${consignment.id}`}>
-                            {metrics.qualityScore}%
+                            {metrics.qualityScore}
                           </div>
                         </div>
                         
@@ -1342,7 +1508,7 @@ export default function PODQualityDashboard() {
                             <div className="font-medium text-gray-900">{consignment.warehouseCompanyName || '-'}</div>
                             <div className="text-xs text-gray-500">
                               <Users className="h-3 w-3 inline mr-1" />
-                              {consignment.driverName || "No driver assigned"}
+                              {formatDriverName(consignment.driverName) || "No driver assigned"}
                             </div>
                           </div>
                         </div>
@@ -1382,27 +1548,6 @@ export default function PODQualityDashboard() {
                           )}
                           
                           <div className="ml-auto flex gap-2">
-                            {trackingLink && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => loadPhotos(consignment)}
-                                disabled={loadingPhotos === consignment.id}
-                                data-testid={`button-view-photos-${consignment.id}`}
-                              >
-                                {loadingPhotos === consignment.id ? (
-                                  <>
-                                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                    Loading...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Photos
-                                  </>
-                                )}
-                              </Button>
-                            )}
                             {trackingLink && (
                               <a
                                 href={trackingLink}

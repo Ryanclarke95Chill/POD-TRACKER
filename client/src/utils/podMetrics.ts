@@ -51,6 +51,11 @@ export function parseRequiredTemperature(documentNote: string | null): { min: nu
     return { min: 0, max: 5 };
   }
   
+  if (noteUpper.includes('AMBIENT')) {
+    // Ambient: 0°C to 40°C
+    return { min: 0, max: 40 };
+  }
+  
   // For other temperature types, parse the actual values from the note
   // Match patterns like: "-18C to -20C" or "0C to +4C" or "-18°C to -20°C"
   const rangePattern = /(-?\d+\.?\d*)\s*°?C?\s+to\s+([+-]?\d+\.?\d*)\s*°?C?/i;
@@ -121,14 +126,14 @@ export function getActualTemperature(consignment: Consignment): string | null {
 
 // Get photo count from file count fields
 export function getPhotoCount(consignment: Consignment): number {
-  // These file counts already represent the actual photo counts (excluding signatures)
-  // The Axylog API provides these as actual photo counts, not total file counts
+  // Axylog file counts include 1 extra photo that shouldn't be counted
   const deliveryFileCount = consignment.deliveryReceivedFileCount || 0;
   const pickupFileCount = consignment.pickupReceivedFileCount || 0;
   
-  // Simply return the sum - no need to subtract signatures
-  // The file counts from Axylog already exclude signatures
-  return deliveryFileCount + pickupFileCount;
+  const totalCount = deliveryFileCount + pickupFileCount;
+  
+  // Subtract 1 to correct for Axylog's extra count, but never go below 0
+  return Math.max(0, totalCount - 1);
 }
 
 // Calculate POD quality score
@@ -142,28 +147,24 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     total: 0
   };
   
-  // Photo count (40 base points + up to 10 bonus points for 4-13+ photos)
-  const photoCount = actualPhotoCount ?? getPhotoCount(consignment);
+  // Photo count (25 points for 3+ photos, no bonus)
+  const photoCount = actualPhotoCount !== undefined ? actualPhotoCount : getPhotoCount(consignment);
   if (photoCount >= 3) {
-    // Base 40 points for meeting minimum 3 photos
-    // +1 point for each additional photo (4th through 13th), capped at +10
-    const bonusPhotos = Math.min(photoCount - 3, 10);
-    const totalPoints = 40 + bonusPhotos;
     scoreBreakdown.photos = { 
-      points: totalPoints, 
-      reason: photoCount === 3 ? "3 photos (minimum met)" : `${photoCount} photos (+${bonusPhotos} bonus)`, 
+      points: 25, 
+      reason: `${photoCount} photos`, 
       status: "pass" 
     };
   } else if (photoCount >= 2) {
     scoreBreakdown.photos = { 
-      points: 25, 
-      reason: `${photoCount} photos (3 minimum required)`, 
+      points: 15, 
+      reason: `${photoCount} photos (3 required for full points)`, 
       status: "partial" 
     };
   } else if (photoCount >= 1) {
     scoreBreakdown.photos = { 
-      points: 15, 
-      reason: `Only ${photoCount} photo (3 minimum required)`, 
+      points: 8, 
+      reason: `Only ${photoCount} photo (3 required for full points)`, 
       status: "partial" 
     };
   } else {
@@ -174,19 +175,27 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Signature - NOT COUNTED (required field in Axylog, always present)
+  // Signature (15 points)
   const hasSignature = !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
-  scoreBreakdown.signature = { 
-    points: 0, 
-    reason: hasSignature ? "Signature present (required)" : "No signature", 
-    status: hasSignature ? "pass" : "fail" 
-  };
+  if (hasSignature) {
+    scoreBreakdown.signature = { 
+      points: 15, 
+      reason: "Signature captured", 
+      status: "pass" 
+    };
+  } else {
+    scoreBreakdown.signature = { 
+      points: 0, 
+      reason: "No signature", 
+      status: "fail" 
+    };
+  }
   
-  // Receiver name (25 points)
+  // Receiver name (20 points)
   const hasReceiverName = !!(consignment.deliverySignatureName || consignment.pickupSignatureName);
   if (hasReceiverName) {
     scoreBreakdown.receiverName = { 
-      points: 25, 
+      points: 20, 
       reason: "Receiver name recorded", 
       status: "pass" 
     };
@@ -198,20 +207,20 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     };
   }
   
-  // Temperature compliance (25 points)
+  // Temperature compliance (40 points)
   const tempCompliant = checkTemperatureCompliance(consignment);
   const actualTemp = getActualTemperature(consignment);
   
   if (tempCompliant) {
     if (consignment.expectedTemperature === "Dry") {
       scoreBreakdown.temperature = { 
-        points: 25, 
+        points: 40, 
         reason: "No temperature requirement", 
         status: "pass" 
       };
     } else {
       scoreBreakdown.temperature = { 
-        points: 25, 
+        points: 40, 
         reason: `Temperature compliant (${actualTemp}°C)`, 
         status: "pass" 
       };
@@ -232,9 +241,10 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
     status: "pending"
   };
   
-  // Calculate total score (signature excluded - it's required in Axylog)
+  // Calculate total score (all criteria included)
   scoreBreakdown.total = 
     scoreBreakdown.photos.points +
+    scoreBreakdown.signature.points +
     scoreBreakdown.receiverName.points +
     scoreBreakdown.temperature.points;
   
@@ -256,7 +266,9 @@ export function getQualityTier(score: number): {
   color: string;
   label: string;
 } {
-  if (score >= 90) {
+  if (score === 100) {
+    return { tier: "Excellent", color: "text-green-700", label: "Excellent" };
+  } else if (score >= 90) {
     return { tier: "Excellent", color: "text-green-700", label: "Excellent" };
   } else if (score >= 75) {
     return { tier: "Good", color: "text-blue-700", label: "Good" };

@@ -339,14 +339,57 @@ export class PhotoIngestionWorker {
         
         // Extract all images from the page
         const images = await page.evaluate(() => {
+          const results: any[] = [];
+          
+          // Get all img tags
           const imgs = Array.from(document.querySelectorAll('img'));
-          return imgs.map(img => ({
-            src: img.src,
-            width: img.naturalWidth,
-            height: img.naturalHeight,
-            alt: img.alt || '',
-            className: img.className || ''
-          }));
+          imgs.forEach(img => {
+            results.push({
+              src: img.src,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              alt: img.alt || '',
+              className: img.className || ''
+            });
+          });
+          
+          // Check for links to image files (Axylog might list files as links)
+          const links = Array.from(document.querySelectorAll('a'));
+          links.forEach(link => {
+            const href = link.href;
+            // Check if it's a direct link to an image file
+            if (href && /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(href)) {
+              results.push({
+                src: href,
+                width: 800, // Default size for linked images
+                height: 600,
+                alt: link.textContent || 'linked image',
+                className: 'file-link'
+              });
+            }
+            // Also check for Axylog file/download links that might be images
+            else if (href && (href.includes('/file/') || href.includes('/download/') || href.includes('/attachment/'))) {
+              // These might be image endpoints without extensions
+              results.push({
+                src: href,
+                width: 800,
+                height: 600,
+                alt: link.textContent || 'file link',
+                className: 'axylog-file-link'
+              });
+            }
+          });
+          
+          // Log what types of content we found for debugging
+          console.log(`Page scan: ${imgs.length} img tags, ${results.length - imgs.length} file links found`);
+          
+          // Also check if there's any indication of no photos
+          const pageText = document.body?.textContent || '';
+          if (pageText.includes('No files') || pageText.includes('No photos') || pageText.includes('No images')) {
+            console.log('Page indicates no photos available');
+          }
+          
+          return results;
         });
         
         // Use extractFullResolution to filter for high-res images

@@ -82,18 +82,26 @@ export function extractThumbnails(images: PhotoCandidate[]): FilteredPhoto[] {
     // - Aspect ratio: 0.4-2.5 (normal photo ratios)
     // - Long side: >= 200px
     
-    if (shortSide >= 150 &&
+    // Debug: Check what's being rejected
+    const meetsImageCriteria = shortSide >= 150 &&
         pixelArea >= 40000 &&
         aspectRatio >= 0.4 && aspectRatio <= 2.5 &&
-        longSide >= 200 &&
-        isValidPhotoUrl(img.src)) {
-      filtered.push({
-        url: img.src,
-        kind: 'photo',
-        width: img.width,
-        height: img.height,
-        isThumbnail: true
-      });
+        longSide >= 200;
+        
+    if (meetsImageCriteria) {
+      const isValidUrl = isValidPhotoUrl(img.src);
+      if (!isValidUrl) {
+        // Log URLs that pass image criteria but fail URL validation
+        console.log(`[PhotoFilter] Rejected URL (meets size criteria): ${img.src}`);
+      } else {
+        filtered.push({
+          url: img.src,
+          kind: 'photo',
+          width: img.width,
+          height: img.height,
+          isThumbnail: true
+        });
+      }
     }
   }
   
@@ -299,15 +307,118 @@ function isValidPhotoUrl(url: string): boolean {
       return false;
     }
     
-    // Prioritize Azure Blob Storage URLs (these are the real driver photos)
-    const isAzureBlob = urlObj.hostname.includes('blob.core.windows.net');
-    if (isAzureBlob) return true;
+    const hostname = urlObj.hostname;
+    const pathLower = urlObj.pathname.toLowerCase();
     
-    // Also accept Axylog domain URLs
-    const isAxylog = urlObj.hostname === 'live.axylog.com' || urlObj.hostname.endsWith('.axylog.com');
-    if (isAxylog) return true;
+    // REJECT known non-photo sources FIRST
+    // 1. OpenStreetMap/Map tiles
+    if (hostname.includes('openstreetmap.org') || hostname.includes('tile.osm.org') ||
+        hostname.includes('tiles.') || pathLower.includes('/tiles/')) {
+      return false;
+    }
     
-    // Reject other domains to avoid external resources
+    // 2. Map services
+    if (hostname.includes('maps.googleapis.com') || hostname.includes('mapbox.com')) {
+      return false;
+    }
+    
+    // 3. Analytics, tracking pixels, beacons
+    if (hostname.includes('google-analytics.com') || hostname.includes('googletagmanager.com') ||
+        hostname.includes('doubleclick.net') || hostname.includes('facebook.com') ||
+        pathLower.includes('/pixel') || pathLower.includes('/beacon') || pathLower.includes('/track')) {
+      return false;
+    }
+    
+    // 4. JavaScript, CSS, API endpoints
+    if (pathLower.includes('.js') || pathLower.includes('.css') || 
+        pathLower.includes('/api/') || pathLower.includes('/v1/') || pathLower.includes('/v2/')) {
+      return false;
+    }
+    
+    // 5. Icons and small images (favicon, logo files)
+    if (pathLower.includes('favicon') || pathLower.includes('/icon') || pathLower.includes('/logo')) {
+      return false;
+    }
+    
+    // ACCEPT legitimate photo sources:
+    
+    // 1. Azure Blob Storage URLs (real driver photos - HIGHEST PRIORITY)
+    if (hostname.includes('blob.core.windows.net')) {
+      return true;
+    }
+    
+    // 2. Axylog domain URLs - ACCEPT ALL POTENTIAL IMAGES from Axylog
+    // These are the POD photos we want! Be very permissive for Axylog
+    if (hostname === 'live.axylog.com' || hostname.endsWith('.axylog.com')) {
+      // Reject only known non-image paths
+      if (pathLower.includes('.js') || pathLower.includes('.css') || 
+          pathLower.includes('/api/') || pathLower.includes('/auth/')) {
+        return false;
+      }
+      
+      // Accept any path that could possibly be an image:
+      // - Has image-related keywords
+      if (pathLower.includes('image') || pathLower.includes('photo') || pathLower.includes('file') ||
+          pathLower.includes('attachment') || pathLower.includes('upload') || pathLower.includes('media') ||
+          pathLower.includes('download') || pathLower.includes('asset')) {
+        return true;
+      }
+      // - Has an image extension
+      if (/\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(urlObj.pathname)) {
+        return true;
+      }
+      // - Has a GUID/hash pattern (common for file storage)
+      if (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(pathLower) || 
+          /[0-9a-f]{32,}/i.test(pathLower)) {
+        return true;
+      }
+      // - Has numeric file ID pattern
+      if (/\/\d+/.test(pathLower)) {
+        return true;
+      }
+      // - Any other path that doesn't look like a page/route
+      // (Accept paths that don't have common page extensions)
+      if (!pathLower.includes('.html') && !pathLower.includes('.htm') && 
+          !pathLower.includes('.php') && !pathLower.includes('.aspx')) {
+        // If it's from Axylog and doesn't look like a page, assume it could be an image
+        return true;
+      }
+    }
+    
+    // 3. AWS S3 URLs (common for photo storage)
+    if (hostname.includes('s3.amazonaws.com') || hostname.includes('s3-') || 
+        hostname.includes('.amazonaws.com')) {
+      return true;
+    }
+    
+    // 4. Common image CDNs
+    if (hostname.includes('cloudinary.com') || hostname.includes('res.cloudinary.com') ||
+        hostname.includes('imgix.net') || hostname.includes('imagekit.io') ||
+        hostname.includes('fastly.net') || hostname.includes('cdn.')) {
+      // But exclude if it looks like a map or tracking pixel
+      if (!pathLower.includes('/tiles/') && !pathLower.includes('/pixel')) {
+        return true;
+      }
+    }
+    
+    // 5. Google Cloud Storage (but not maps)
+    if ((hostname.includes('storage.googleapis.com') || hostname.includes('googleusercontent.com')) &&
+        !pathLower.includes('/maps/')) {
+      return true;
+    }
+    
+    // 6. Any HTTPS URL with clear image extension (fallback for unknown CDNs)
+    // But be more permissive here to catch real photos
+    if (protocol === 'https:') {
+      const hasImageExtension = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(urlObj.pathname);
+      if (hasImageExtension) {
+        // Additional check: reject if too small (likely icon/logo)
+        // This will be handled by dimension filtering later
+        return true;
+      }
+    }
+    
+    // Default: Reject unknown URLs
     return false;
     
   } catch {

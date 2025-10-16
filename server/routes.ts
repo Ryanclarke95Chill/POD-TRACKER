@@ -2279,51 +2279,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
 
       if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+        return res.status(400).json({ message: "Username and password are required" });
       }
 
-      let user = await storage.getUserByEmail(email);
-      
-      // Also try to find user by username if email lookup fails
-      if (!user) {
-        user = await storage.getUserByUsername(email);
-      }
-      
-      if (!user) {
-        if (email === "demo@chill.com.au" && password === "demo123") {
-          const hashedPassword = await bcrypt.hash(password, 10);
+      // Single hardcoded user account - check credentials first
+      if (email === "Chill" && password === "Ch1ll5000!") {
+        let user = await storage.getUserByUsername("Chill");
+        
+        // If user exists, update password to match, otherwise create
+        const hashedPassword = await bcrypt.hash(password, 10);
+        if (!user) {
           user = await storage.createUser({
-            username: "demo",
-            email: email,
+            username: "Chill",
+            email: "chill@chill.com.au",
             password: hashedPassword,
-            name: "Demo User"
+            name: "Chill User",
+            role: "admin"
           });
-          
-          await storage.seedDemoConsignments(user.id);
         } else {
-          return res.status(401).json({ message: "Invalid credentials" });
+          // Update password and role to ensure they match
+          user = await storage.updateUser(user.id, { 
+            password: hashedPassword,
+            role: "admin"
+          });
         }
-      }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
+        const token = jwt.sign(
+          { id: user.id, email: user.email },
+          SECRET_KEY,
+          { expiresIn: "24h" }
+        );
+
+        res.json({
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name
+          }
+        });
+      } else {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-
-      const token = jwt.sign(
-        { id: user.id, email: user.email },
-        SECRET_KEY,
-        { expiresIn: "24h" }
-      );
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name
-        }
-      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Server error" });
@@ -2386,13 +2383,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Use the actual file counts from Axylog which are already stored in the database
-      // These counts represent the actual number of photos (excluding signatures)
-      const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => ({
-        ...consignment,
-        // The deliveryReceivedFileCount and pickupReceivedFileCount already contain
-        // the actual photo counts from Axylog (signatures are not included in these counts)
-        actualPhotoCount: (consignment.deliveryReceivedFileCount || 0) + (consignment.pickupReceivedFileCount || 0)
-      }));
+      // Axylog's counts include 1 extra photo that needs to be subtracted
+      const consignmentsWithPhotoCounts = allConsignments.map((consignment: any) => {
+        // Handle NULL values - treat NULL as 0
+        const deliveryCount = Number(consignment.deliveryReceivedFileCount) || 0;
+        const pickupCount = Number(consignment.pickupReceivedFileCount) || 0;
+        const totalCount = deliveryCount + pickupCount;
+        
+        return {
+          ...consignment,
+          // Subtract 1 to correct for Axylog's extra count, but never go below 0
+          actualPhotoCount: Math.max(0, totalCount - 1)
+        };
+      });
       
       res.json({
         consignments: consignmentsWithPhotoCounts,

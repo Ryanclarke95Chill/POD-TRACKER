@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form";
 
 const loginSchema = z.object({
-  email: z.string().min(1, { message: "Email or username is required" }),
+  email: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
 });
 
@@ -32,8 +32,8 @@ export default function Login() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "demo@chill.com.au",
-      password: "demo123",
+      email: "Chill",
+      password: "",
     },
   });
 
@@ -70,10 +70,10 @@ export default function Login() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-neutral-700">Email Address</FormLabel>
+                    <FormLabel className="text-neutral-700">Username</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="your@email.com" 
+                        placeholder="Username" 
                         {...field} 
                         className="border-neutral-300 focus:border-primary"
                       />
@@ -109,105 +109,6 @@ export default function Login() {
               >
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
-
-              <div className="text-center text-sm text-neutral-500 space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "demo@chill.com.au");
-                      form.setValue("password", "demo123");
-                    }}
-                    className="text-xs"
-                  >
-                    Demo User
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "admin");
-                      form.setValue("password", "admin123");
-                    }}
-                    className="text-xs"
-                  >
-                    Admin
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "manager");
-                      form.setValue("password", "manager123");
-                    }}
-                    className="text-xs"
-                  >
-                    Manager
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "supervisor");
-                      form.setValue("password", "super123");
-                    }}
-                    className="text-xs"
-                  >
-                    Supervisor
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "driver");
-                      form.setValue("password", "driver123");
-                    }}
-                    className="text-xs"
-                  >
-                    Driver
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "shipper");
-                      form.setValue("password", "shipper123");
-                    }}
-                    className="text-xs"
-                  >
-                    Shipper
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      form.setValue("email", "viewer");
-                      form.setValue("password", "viewer123");
-                    }}
-                    className="text-xs"
-                  >
-                    Viewer
-                  </Button>
-                </div>
-                
-                <div className="text-xs text-neutral-400 text-left">
-                  <div className="space-y-1">
-                    <div><strong>Admin:</strong> Full system control, user management</div>
-                    <div><strong>Manager:</strong> All analytics, driver management</div>
-                    <div><strong>Supervisor:</strong> Department analytics only</div>
-                    <div><strong>Driver:</strong> Own deliveries only</div>
-                    <div><strong>Viewer:</strong> Read-only analytics access</div>
-                  </div>
-                </div>
-              </div>
             </form>
           </Form>
         </CardContent>
