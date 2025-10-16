@@ -187,6 +187,326 @@ function PhotoModal({ isOpen, onClose, photos, signatures, consignmentNo }: Phot
   );
 }
 
+interface DeliveryDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  consignment: ConsignmentWithPhotoCount | null;
+  photos: string[];
+  signatures: string[];
+}
+
+function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures }: DeliveryDetailsModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [viewingSignatures, setViewingSignatures] = useState(false);
+  
+  if (!consignment) return null;
+  
+  const metrics = calculatePODScore(consignment);
+  const qualityTier = getQualityTier(metrics.qualityScore);
+  const photoCount = getPhotoCount(consignment);
+  const actualTemp = getActualTemperature(consignment);
+  const requiredTemp = parseRequiredTemperature(consignment.documentNote || '');
+  
+  const allImages = viewingSignatures ? signatures : photos;
+  const currentImage = allImages[currentPhotoIndex];
+  
+  const handlePrevPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+  };
+  
+  const handleNextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+  };
+  
+  const tierColor = qualityTier.tier === 'Excellent' ? 'bg-green-100 text-green-800' :
+                    qualityTier.tier === 'Good' ? 'bg-blue-100 text-blue-800' :
+                    qualityTier.tier === 'Fair' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+  
+  const formatDriverName = (name: string | null) => {
+    if (!name) return 'Unknown';
+    const parts = name.split(',').map(p => p.trim());
+    return parts.length === 2 ? `${parts[1]} ${parts[0]}` : name;
+  };
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <DialogTitle className="text-2xl font-bold">Delivery Details</DialogTitle>
+              <p className="text-sm text-gray-500 mt-1">Consignment {consignment.consignmentNo}</p>
+            </div>
+            <Badge className={`${tierColor} text-lg px-4 py-2`}>
+              {metrics.qualityScore} - {qualityTier.tier}
+            </Badge>
+          </div>
+        </DialogHeader>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+          {/* Score Breakdown Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Score Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Temperature */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Thermometer className={`h-5 w-5 ${metrics.scoreBreakdown.temperature.status === 'pass' ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium">Temperature Compliance</div>
+                    <div className="text-sm text-gray-600">{metrics.scoreBreakdown.temperature.reason}</div>
+                  </div>
+                </div>
+                <div className="text-xl font-bold">{metrics.scoreBreakdown.temperature.points}/40</div>
+              </div>
+              
+              {/* Photos */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Camera className={`h-5 w-5 ${metrics.scoreBreakdown.photos.status === 'pass' ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium">Photo Compliance</div>
+                    <div className="text-sm text-gray-600">{metrics.scoreBreakdown.photos.reason}</div>
+                  </div>
+                </div>
+                <div className="text-xl font-bold">{metrics.scoreBreakdown.photos.points}/25</div>
+              </div>
+              
+              {/* Receiver Name */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Users className={`h-5 w-5 ${metrics.scoreBreakdown.receiverName.status === 'pass' ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium">Receiver Name</div>
+                    <div className="text-sm text-gray-600">
+                      {consignment.deliverySignatureName || 'Missing'}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xl font-bold">{metrics.scoreBreakdown.receiverName.points}/20</div>
+              </div>
+              
+              {/* Signature */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <FileSignature className={`h-5 w-5 ${metrics.scoreBreakdown.signature.status === 'pass' ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium">Signature</div>
+                    <div className="text-sm text-gray-600">{metrics.scoreBreakdown.signature.reason}</div>
+                  </div>
+                </div>
+                <div className="text-xl font-bold">{metrics.scoreBreakdown.signature.points}/15</div>
+              </div>
+              
+              {/* Total */}
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                <div className="font-bold text-lg">Total Quality Score</div>
+                <div className="text-3xl font-bold text-blue-600">{metrics.qualityScore}/100</div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Delivery Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Delivery Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div>
+                <span className="font-medium text-gray-600">Driver:</span>
+                <span className="ml-2">{formatDriverName(consignment.driverName)}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Warehouse:</span>
+                <span className="ml-2">{consignment.shipFromCity || 'Unknown'}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Customer:</span>
+                <span className="ml-2">{consignment.shipToCompanyName || 'Unknown'}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Delivery Address:</span>
+                <span className="ml-2">{consignment.shipToAddress}, {consignment.shipToCity}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Delivery Date:</span>
+                <span className="ml-2">{consignment.delivery_OutcomeDateTime || 'N/A'}</span>
+              </div>
+              {requiredTemp && (
+                <div>
+                  <span className="font-medium text-gray-600">Required Temperature:</span>
+                  <span className="ml-2">{requiredTemp.min}°C to {requiredTemp.max}°C</span>
+                </div>
+              )}
+              {actualTemp && (
+                <div>
+                  <span className="font-medium text-gray-600">Actual Temperature:</span>
+                  <span className="ml-2 font-mono">{actualTemp}°C</span>
+                </div>
+              )}
+              
+              {/* Tracking Links */}
+              {(consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink) && (
+                <div className="pt-3 border-t">
+                  <span className="font-medium text-gray-600 block mb-2">Tracking:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {consignment.deliveryLiveTrackLink && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => window.open(consignment.deliveryLiveTrackLink!, '_blank')}
+                        className="text-xs"
+                        data-testid="button-delivery-tracking"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Delivery Tracking
+                      </Button>
+                    )}
+                    {consignment.pickupLiveTrackLink && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => window.open(consignment.pickupLiveTrackLink!, '_blank')}
+                        className="text-xs"
+                        data-testid="button-pickup-tracking"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Pickup Tracking
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Photo Gallery */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Photo Gallery
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={!viewingSignatures ? "default" : "outline"}
+                  onClick={() => { setViewingSignatures(false); setCurrentPhotoIndex(0); }}
+                  data-testid="button-view-photos"
+                >
+                  Photos ({photos.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewingSignatures ? "default" : "outline"}
+                  onClick={() => { setViewingSignatures(true); setCurrentPhotoIndex(0); }}
+                  data-testid="button-view-signatures"
+                >
+                  Signatures ({signatures.length})
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {allImages.length > 0 ? (
+              <div className="relative">
+                <div className="relative bg-gray-100 min-h-[300px] flex items-center justify-center rounded-lg">
+                  <img
+                    src={`/api/image?src=${encodeURIComponent(currentImage)}&w=800&q=90`}
+                    alt={`${viewingSignatures ? 'Signature' : 'Photo'} ${currentPhotoIndex + 1}`}
+                    className="max-w-full h-auto max-h-[400px] object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = currentImage;
+                    }}
+                  />
+                </div>
+                
+                {allImages.length > 1 && (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
+                      onClick={handlePrevPhoto}
+                      data-testid="button-prev-photo"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
+                      onClick={handleNextPhoto}
+                      data-testid="button-next-photo"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded">
+                      {currentPhotoIndex + 1} / {allImages.length}
+                    </div>
+                  </>
+                )}
+                
+                {/* Thumbnail strip */}
+                {allImages.length > 1 && (
+                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                    {allImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPhotoIndex(idx)}
+                        className={`flex-shrink-0 w-20 h-20 rounded border-2 overflow-hidden transition-all ${
+                          idx === currentPhotoIndex ? 'border-blue-500 scale-105' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        data-testid={`button-thumbnail-${idx}`}
+                      >
+                        <img
+                          src={`/api/image?src=${encodeURIComponent(img)}&w=100&q=70`}
+                          alt={`Thumbnail ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+                <Camera className="h-12 w-12 mb-2 text-gray-300" />
+                <p>No {viewingSignatures ? 'signatures' : 'photos'} available</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6">
+          <Button variant="outline" className="flex-1" data-testid="button-download-report">
+            <Download className="h-4 w-4 mr-2" />
+            Download Report
+          </Button>
+          <Button variant="outline" className="flex-1" data-testid="button-flag-review">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Flag for Review
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type ConsignmentWithPhotoCount = Consignment & { actualPhotoCount?: number };
 
 export default function PODQualityDashboard() {
