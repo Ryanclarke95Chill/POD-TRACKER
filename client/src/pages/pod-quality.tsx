@@ -533,6 +533,12 @@ export default function PODQualityDashboard() {
     signatures: string[];
     consignmentNo: string;
   }>({ isOpen: false, photos: [], signatures: [], consignmentNo: "" });
+  const [deliveryDetailsModal, setDeliveryDetailsModal] = useState<{
+    isOpen: boolean;
+    consignment: ConsignmentWithPhotoCount | null;
+    photos: string[];
+    signatures: string[];
+  }>({ isOpen: false, consignment: null, photos: [], signatures: [] });
   const [loadingPhotos, setLoadingPhotos] = useState<number | null>(null);
   const [photoLoadRetries, setPhotoLoadRetries] = useState<Map<number, number>>(new Map());
   const [photoThumbnails, setPhotoThumbnails] = useState<Map<number, string[]>>(new Map());
@@ -1024,6 +1030,40 @@ export default function PODQualityDashboard() {
       });
     } finally {
       setLoadingPhotos(null);
+    }
+  };
+  
+  // Open delivery details modal with full photo loading
+  const openDeliveryDetails = async (consignment: ConsignmentWithPhotoCount) => {
+    const trackingLink = consignment.deliveryLiveTrackLink || consignment.pickupLiveTrackLink;
+    
+    // Open modal immediately with consignment data
+    setDeliveryDetailsModal({
+      isOpen: true,
+      consignment,
+      photos: [],
+      signatures: []
+    });
+    
+    if (!trackingLink) {
+      return; // Modal opens with no photos
+    }
+    
+    try {
+      // Load photos in background
+      const response = await apiRequest('GET', `/api/consignments/${consignment.id}/photos`);
+      const data = await response.json();
+      
+      if (data.success && (data.photos?.length > 0 || data.signatures?.length > 0)) {
+        setDeliveryDetailsModal(prev => ({
+          ...prev,
+          photos: data.photos || [],
+          signatures: data.signatures || []
+        }));
+      }
+    } catch (error) {
+      console.log('Photo loading failed:', error);
+      // Modal still shows with delivery details, just no photos
     }
   };
   
@@ -1774,7 +1814,12 @@ export default function PODQualityDashboard() {
               const thumbnail = photoThumbnails.get(consignment.id);
               
               return (
-                <Card key={consignment.id} className="hover:shadow-md transition-shadow" data-testid={`card-consignment-${consignment.id}`}>
+                <Card 
+                  key={consignment.id} 
+                  className="hover:shadow-md transition-shadow cursor-pointer" 
+                  data-testid={`card-consignment-${consignment.id}`}
+                  onClick={() => openDeliveryDetails(consignment)}
+                >
                   <CardContent className="p-4">
                     <div className="flex flex-col gap-3">
                       {/* Main Information */}
@@ -2017,6 +2062,15 @@ export default function PODQualityDashboard() {
         photos={photoModal.photos}
         signatures={photoModal.signatures}
         consignmentNo={photoModal.consignmentNo}
+      />
+      
+      {/* Delivery Details Modal */}
+      <DeliveryDetailsModal
+        isOpen={deliveryDetailsModal.isOpen}
+        onClose={() => setDeliveryDetailsModal({ ...deliveryDetailsModal, isOpen: false })}
+        consignment={deliveryDetailsModal.consignment}
+        photos={deliveryDetailsModal.photos}
+        signatures={deliveryDetailsModal.signatures}
       />
       </main>
     </div>
