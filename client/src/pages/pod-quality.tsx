@@ -199,6 +199,32 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [viewingSignatures, setViewingSignatures] = useState(false);
   
+  useEffect(() => {
+    if (consignment) {
+      setCurrentPhotoIndex(0);
+      if (photos.length > 0) {
+        setViewingSignatures(false);
+      } else if (signatures.length > 0) {
+        setViewingSignatures(true);
+      } else {
+        setViewingSignatures(false);
+      }
+    }
+  }, [consignment, photos.length, signatures.length]);
+  
+  useEffect(() => {
+    const allImages = viewingSignatures ? signatures : photos;
+    if (allImages.length === 0) {
+      const otherImages = viewingSignatures ? photos : signatures;
+      if (otherImages.length > 0) {
+        setViewingSignatures(!viewingSignatures);
+        setCurrentPhotoIndex(0);
+      }
+    } else if (currentPhotoIndex >= allImages.length) {
+      setCurrentPhotoIndex(0);
+    }
+  }, [viewingSignatures, currentPhotoIndex, photos, signatures]);
+  
   if (!consignment) return null;
   
   const metrics = calculatePODScore(consignment);
@@ -211,10 +237,12 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
   const currentImage = allImages[currentPhotoIndex];
   
   const handlePrevPhoto = () => {
+    if (allImages.length === 0) return;
     setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
   };
   
   const handleNextPhoto = () => {
+    if (allImages.length === 0) return;
     setCurrentPhotoIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
   };
   
@@ -401,7 +429,10 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                 <Button
                   size="sm"
                   variant={!viewingSignatures ? "default" : "outline"}
-                  onClick={() => { setViewingSignatures(false); setCurrentPhotoIndex(0); }}
+                  onClick={() => { 
+                    setViewingSignatures(false); 
+                    setCurrentPhotoIndex(0);
+                  }}
                   data-testid="button-view-photos"
                 >
                   Photos ({photos.length})
@@ -409,7 +440,10 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                 <Button
                   size="sm"
                   variant={viewingSignatures ? "default" : "outline"}
-                  onClick={() => { setViewingSignatures(true); setCurrentPhotoIndex(0); }}
+                  onClick={() => { 
+                    setViewingSignatures(true); 
+                    setCurrentPhotoIndex(0);
+                  }}
                   data-testid="button-view-signatures"
                 >
                   Signatures ({signatures.length})
