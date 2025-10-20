@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Camera, 
   Thermometer, 
@@ -45,6 +47,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
 import chillLogo from "@assets/Chill Logo CMYK Primary (1)_1760581487204.png";
+import { LoadingScreen } from "@/components/loading-screen";
+import { SmartSearch } from "@/components/smart-search";
+import { DriverRankings } from "@/components/driver-rankings";
 
 interface PhotoModalProps {
   isOpen: boolean;
@@ -322,8 +327,8 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl font-bold">Delivery Details</DialogTitle>
@@ -337,16 +342,20 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
           </div>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-          {/* Score Breakdown Panel */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Score Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <Accordion type="single" collapsible className="space-y-2">
+          
+          {/* Score Breakdown - Collapsible */}
+          <AccordionItem value="score" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-3">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold text-lg">Score Breakdown</span>
+                <Badge variant="outline" className="ml-2">{metrics.qualityScore}/100</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-3 pb-4">
               {/* Temperature */}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
@@ -402,22 +411,24 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                 <div className="font-bold text-lg">Total Quality Score</div>
                 <div className="text-3xl font-bold text-blue-600">{metrics.qualityScore}/100</div>
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* Delivery Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Delivery Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div>
-                <span className="font-medium text-gray-600">Driver:</span>
-                <span className="ml-2">{formatDriverName(consignment.driverName)}</span>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+          
+          {/* Delivery Information - Collapsible */}
+          <AccordionItem value="delivery" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-green-600" />
+                <span className="font-semibold text-lg">Delivery Information</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-3 pb-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-600">Driver:</span>
+                  <span className="ml-2">{formatDriverName(consignment.driverName)}</span>
+                </div>
               <div>
                 <span className="font-medium text-gray-600">Warehouse:</span>
                 <span className="ml-2">{consignment.shipFromCity || 'Unknown'}</span>
@@ -479,19 +490,23 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Photo Gallery */}
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Photo Gallery
-              </CardTitle>
-              <div className="flex gap-2">
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+          
+          {/* Photo Gallery - Collapsible */}
+          <AccordionItem value="photos" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-3">
+                <Camera className="h-5 w-5 text-purple-600" />
+                <span className="font-semibold text-lg">Photo Gallery</span>
+                <Badge variant="outline" className="ml-2">{photos.length} Photos · {signatures.length} Signatures</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant={!viewingSignatures ? "default" : "outline"}
@@ -514,13 +529,11 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                 >
                   Signatures ({signatures.length})
                 </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+                  </div>
+                </div>
             {allImages.length > 0 ? (
               <div className="relative">
-                <div className="relative bg-gray-100 min-h-[300px] flex items-center justify-center rounded-lg">
+                <div className="relative bg-gray-100 h-[350px] flex items-center justify-center rounded-lg">
                   {imageLoading && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
@@ -529,7 +542,7 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                   <img
                     src={`/api/image?src=${encodeURIComponent(currentImage)}&w=800&q=90`}
                     alt={`${viewingSignatures ? 'Signature' : 'Photo'} ${currentPhotoIndex + 1}`}
-                    className="max-w-full h-auto max-h-[400px] object-contain"
+                    className="max-w-full h-auto max-h-[350px] object-contain"
                     onLoad={() => setImageLoading(false)}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -595,19 +608,25 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
                 <p>No {viewingSignatures ? 'signatures' : 'photos'} available</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+          
+          </Accordion>
+        </div>
         
-        {/* Action Buttons */}
-        <div className="flex gap-3 mt-6">
-          <Button variant="outline" className="flex-1" onClick={handleDownloadReport} data-testid="button-download-report">
-            <Download className="h-4 w-4 mr-2" />
-            Download Report
-          </Button>
-          <Button variant="outline" className="flex-1" onClick={handleFlagDelivery} data-testid="button-flag-review">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Flag for Review
-          </Button>
+        {/* Action Buttons - Footer */}
+        <div className="border-t px-6 py-4 bg-gray-50">
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={handleDownloadReport} data-testid="button-download-report">
+              <Download className="h-4 w-4 mr-2" />
+              Download Report
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handleFlagDelivery} data-testid="button-flag-review">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Flag for Review
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -754,15 +773,19 @@ export default function PODQualityDashboard() {
     const matchesDateRange = (() => {
       if (!filters.fromDate && !filters.toDate) return true;
       
-      // Check multiple ETA fields as suggested
-      const consignmentDate = (c as any).delivery_PlannedETA || 
-                              (c as any).delivery_ETA || 
-                              (c as any).delivery_FirstCalculatedETA ||
-                              (c as any).pickUp_PlannedETA ||
-                              (c as any).pickUp_ETA ||
-                              (c as any).pickUp_FirstCalculatedETA ||
+      // Check multiple date fields - use actual delivery outcome date first, then planned dates
+      const consignmentDate = (c as any).deliveryOutcomeDateTime ||
+                              (c as any).delivery_outcome_date_time ||
+                              (c as any).deliveryPlannedEta || 
+                              (c as any).delivery_planned_eta || 
+                              (c as any).deliveryEtaCalculated ||
+                              (c as any).delivery_eta_calculated ||
+                              (c as any).pickupPlannedEta ||
+                              (c as any).pickup_planned_eta ||
+                              (c as any).pickUpEtaCalculated ||
+                              (c as any).pick_up_eta_calculated ||
                               c.departureDateTime;
-      if (!consignmentDate) return true; // Show consignments without dates
+      if (!consignmentDate) return false; // Don't show consignments without dates when filtering
       
       // Convert UTC date to AEST (UTC+10) for comparison
       const utcDate = new Date(consignmentDate);
@@ -1174,31 +1197,6 @@ export default function PODQualityDashboard() {
     }
   };
   
-  // Sync data mutation
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/axylog/sync', {
-        syncFromDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        syncToDate: new Date().toISOString().split('T')[0]
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/consignments/stats"] });
-      toast({
-        title: "Sync complete",
-        description: "Data has been refreshed from Axylog",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Sync failed",
-        description: "Failed to sync data from Axylog",
-        variant: "destructive"
-      });
-    }
-  });
-  
   const resetFilters = () => {
     setFilters({
       shipper: "all",
@@ -1250,41 +1248,7 @@ export default function PODQualityDashboard() {
   ].filter(Boolean).length;
   
   if (isLoading) {
-    return (
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white border-b border-gray-200 shadow-sm z-10 sticky top-0">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <img 
-                src={chillLogo} 
-                alt="CHILL" 
-                className="h-10"
-              />
-              <span className="text-gray-600 text-sm font-medium font-montserrat">POD Quality Dashboard</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div className="hidden md:flex items-center text-gray-600 text-sm mr-4 bg-gray-100 px-3 py-1 rounded-full">
-                <span className="font-montserrat">{user?.email}</span>
-              </div>
-
-              <Button 
-                variant="outline"
-                onClick={logout}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </header>
-        <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center h-64">
-            <RefreshCw className="h-8 w-8 animate-spin" />
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
   return (
@@ -1346,10 +1310,6 @@ export default function PODQualityDashboard() {
                   Clear All
                 </Button>
               )}
-              <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} size="sm" variant="outline" className="text-xs sm:text-sm">
-                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                Sync
-              </Button>
             </div>
           </div>
 
@@ -1462,19 +1422,11 @@ export default function PODQualityDashboard() {
 
           {/* Search and Load Button */}
           <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by consignment, order, driver, customer, city..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search"
-                />
-              </div>
-            </div>
+            <SmartSearch
+              value={searchTerm}
+              onChange={setSearchTerm}
+              resultCount={sortedConsignments.length}
+            />
 
             <Button
               onClick={() => {
@@ -1540,8 +1492,21 @@ export default function PODQualityDashboard() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+      {/* Main Content with Tabs */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <Tabs defaultValue="pod-quality" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="pod-quality" className="flex items-center gap-2" data-testid="tab-pod-quality">
+              <BarChart3 className="h-4 w-4" />
+              POD Quality Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="driver-rankings" className="flex items-center gap-2" data-testid="tab-driver-rankings">
+              <Trophy className="h-4 w-4" />
+              Driver Rankings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pod-quality" className="space-y-4 sm:space-y-6 mt-0">
       
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1730,8 +1695,8 @@ export default function PODQualityDashboard() {
         </Card>
       )}
       
-      {/* Driver Leaderboard */}
-      {driverPerformance.length > 0 && (
+      {/* Driver Leaderboard - HIDDEN FOR NOW */}
+      {false && driverPerformance.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1818,8 +1783,8 @@ export default function PODQualityDashboard() {
         </Card>
       )}
       
-      {/* Warehouse Leaderboard */}
-      {warehouseComparison.length > 1 && (
+      {/* Warehouse Leaderboard - HIDDEN FOR NOW */}
+      {false && warehouseComparison.length > 1 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1923,9 +1888,8 @@ export default function PODQualityDashboard() {
               return (
                 <Card 
                   key={consignment.id} 
-                  className="hover:shadow-md transition-shadow cursor-pointer" 
+                  className="hover:shadow-md transition-shadow" 
                   data-testid={`card-consignment-${consignment.id}`}
-                  onClick={() => openDeliveryDetails(consignment)}
                 >
                   <CardContent className="p-4">
                     <div className="flex flex-col gap-3">
@@ -2161,24 +2125,42 @@ export default function PODQualityDashboard() {
           )}
         </CardContent>
       </Card>
-      
-      {/* Photo Modal */}
-      <PhotoModal
-        isOpen={photoModal.isOpen}
-        onClose={() => setPhotoModal({ ...photoModal, isOpen: false })}
-        photos={photoModal.photos}
-        signatures={photoModal.signatures}
-        consignmentNo={photoModal.consignmentNo}
-      />
-      
-      {/* Delivery Details Modal */}
-      <DeliveryDetailsModal
-        isOpen={deliveryDetailsModal.isOpen}
-        onClose={() => setDeliveryDetailsModal({ ...deliveryDetailsModal, isOpen: false })}
-        consignment={deliveryDetailsModal.consignment}
-        photos={deliveryDetailsModal.photos}
-        signatures={deliveryDetailsModal.signatures}
-      />
+          </TabsContent>
+
+          <TabsContent value="driver-rankings" className="mt-0">
+            {dataLoaded ? (
+              <DriverRankings consignments={consignments} />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-12">
+                    <Trophy className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Loaded</h3>
+                    <p className="text-gray-500">Please select filters and load data to view driver rankings</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Photo Modal */}
+        <PhotoModal
+          isOpen={photoModal.isOpen}
+          onClose={() => setPhotoModal({ ...photoModal, isOpen: false })}
+          photos={photoModal.photos}
+          signatures={photoModal.signatures}
+          consignmentNo={photoModal.consignmentNo}
+        />
+        
+        {/* Delivery Details Modal */}
+        <DeliveryDetailsModal
+          isOpen={deliveryDetailsModal.isOpen}
+          onClose={() => setDeliveryDetailsModal({ ...deliveryDetailsModal, isOpen: false })}
+          consignment={deliveryDetailsModal.consignment}
+          photos={deliveryDetailsModal.photos}
+          signatures={deliveryDetailsModal.signatures}
+        />
       </main>
     </div>
   );

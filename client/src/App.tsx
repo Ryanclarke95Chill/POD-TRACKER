@@ -15,7 +15,7 @@ function App() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
 
-  // Redirect to login if not authenticated and not already at login
+  // Redirect to login if not authenticated, otherwise redirect to POD dashboard
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token && location !== "/") {

@@ -142,7 +142,9 @@ app.use((req, res, next) => {
   }, async () => {
     log(`serving on port ${port}`);
     
-    // Initialize and start background photo ingestion worker
+    // Photo worker disabled - not needed for POD Quality Dashboard
+    // Uncomment below if photo ingestion is needed later
+    /*
     try {
       console.log('Starting background photo ingestion worker...');
       await photoWorker.initialize();
@@ -155,6 +157,8 @@ app.use((req, res, next) => {
       console.error('Failed to start photo ingestion worker:', error);
       // Continue running server even if worker fails to start
     }
+    */
+    console.log('Photo worker disabled - not needed for POD Quality Dashboard');
 
     // Start live sync worker for real-time Axylog integration
     try {

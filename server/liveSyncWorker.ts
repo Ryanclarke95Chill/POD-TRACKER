@@ -53,16 +53,31 @@ export class LiveSyncWorker {
         return await db.select().from(axylogSyncState).limit(1);
       });
 
+      const startDate = new Date('2025-10-06T00:00:00.000Z');
+
       if (existing.length === 0) {
-        // Initialize with timestamp from 7 days ago
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        // Initialize with timestamp from October 6th, 2025
         await executeWithRetry(async () => {
           await db.insert(axylogSyncState).values({
-            lastSyncTimestamp: sevenDaysAgo,
+            lastSyncTimestamp: startDate,
             isPolling: false,
           });
         });
-        console.log(`[LiveSync] Initialized sync state with timestamp: ${sevenDaysAgo.toISOString()}`);
+        console.log(`[LiveSync] Initialized sync state with timestamp: ${startDate.toISOString()}`);
+      } else {
+        // Check if existing timestamp is before October 6th, 2025 - if so, reset it
+        const existingTimestamp = new Date(existing[0].lastSyncTimestamp);
+        if (existingTimestamp < startDate) {
+          await executeWithRetry(async () => {
+            await db.update(axylogSyncState)
+              .set({
+                lastSyncTimestamp: startDate,
+                updatedAt: new Date(),
+              })
+              .where(eq(axylogSyncState.id, existing[0].id));
+          });
+          console.log(`[LiveSync] Reset sync state from ${existingTimestamp.toISOString()} to ${startDate.toISOString()} to enable historical backfill`);
+        }
       }
     } catch (error) {
       console.error('[LiveSync] Error initializing sync state:', error);
@@ -114,8 +129,8 @@ export class LiveSyncWorker {
       const lastSyncTime = syncState.lastSyncTimestamp;
       const now = new Date();
       
-      // Only track from October 6th, 2024 onwards
-      const MIN_TRACKING_DATE = new Date('2024-10-06');
+      // Only track from October 6th, 2025 onwards
+      const MIN_TRACKING_DATE = new Date('2025-10-06T00:00:00.000Z');
       const fromDate = lastSyncTime > MIN_TRACKING_DATE ? lastSyncTime : MIN_TRACKING_DATE;
       
       console.log(`[LiveSync] Checking for consignments from: ${fromDate.toISOString()}`);
