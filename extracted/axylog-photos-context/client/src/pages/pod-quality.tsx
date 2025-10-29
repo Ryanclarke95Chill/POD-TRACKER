@@ -1861,11 +1861,8 @@ export default function PODQualityDashboard() {
               
               // Parse expected temperature from document_note
               const tempRange = parseRequiredTemperature(consignment.documentNote);
-              const shipperUpper = (consignment.shipperCompanyName || '').toUpperCase();
-              const isGreencross = shipperUpper.includes('GREENCROSS');
-              const expectedTemp = isGreencross ? '0°C to 5°C & -25°C to -15°C' :
-                                   (tempRange ? `${tempRange.min}°C to ${tempRange.max}°C` : 
-                                   (consignment.documentNote?.toLowerCase().includes('dry') ? 'Dry' : null));
+              const expectedTemp = tempRange ? `${tempRange.min}°C to ${tempRange.max}°C` : 
+                                   (consignment.documentNote?.toLowerCase().includes('dry') ? 'Dry' : null);
               
               const thumbnail = photoThumbnails.get(consignment.id);
               

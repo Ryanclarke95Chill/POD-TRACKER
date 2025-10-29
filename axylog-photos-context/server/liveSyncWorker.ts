@@ -65,17 +65,19 @@ export class LiveSyncWorker {
         });
         console.log(`[LiveSync] Initialized sync state with timestamp: ${startDate.toISOString()}`);
       } else {
-        // ALWAYS reset to October 6th on startup to ensure we get all data
-        // This ensures both preview and production always sync from the beginning
-        await executeWithRetry(async () => {
-          await db.update(axylogSyncState)
-            .set({
-              lastSyncTimestamp: startDate,
-              updatedAt: new Date(),
-            })
-            .where(eq(axylogSyncState.id, existing[0].id));
-        });
-        console.log(`[LiveSync] Reset sync state to ${startDate.toISOString()} to sync all data from October 6th`);
+        // Check if existing timestamp is before October 6th, 2025 - if so, reset it
+        const existingTimestamp = new Date(existing[0].lastSyncTimestamp);
+        if (existingTimestamp < startDate) {
+          await executeWithRetry(async () => {
+            await db.update(axylogSyncState)
+              .set({
+                lastSyncTimestamp: startDate,
+                updatedAt: new Date(),
+              })
+              .where(eq(axylogSyncState.id, existing[0].id));
+          });
+          console.log(`[LiveSync] Reset sync state from ${existingTimestamp.toISOString()} to ${startDate.toISOString()} to enable historical backfill`);
+        }
       }
     } catch (error) {
       console.error('[LiveSync] Error initializing sync state:', error);
@@ -133,14 +135,17 @@ export class LiveSyncWorker {
       
       console.log(`[LiveSync] Checking for consignments from: ${fromDate.toISOString()}`);
 
-      // Fetch ALL consignments since last sync (but not before Oct 6th)
-      // Include all statuses: pending, in-transit, delivered, etc.
-      const newConsignments = await this.axylogAPI.getConsignmentsWithFilters({
+      // Fetch consignments that were completed/closed since last sync (but not before Oct 6th)
+      // Use a date range from the later of (last sync or Oct 6th) to now
+      const allConsignments = await this.axylogAPI.getConsignmentsWithFilters({
         pickupDateFrom: fromDate.toISOString().split('T')[0],
         pickupDateTo: now.toISOString().split('T')[0],
       });
 
-      console.log(`[LiveSync] Found ${newConsignments.length} total consignments in date range`);
+      // Filter to only include consignments with Positive delivery outcome
+      const newConsignments = allConsignments.filter(c => c.delivery_OutcomeEnum === 'Positive');
+
+      console.log(`[LiveSync] Found ${newConsignments.length} consignments with Positive outcome (${allConsignments.length} total in date range)`);
 
       if (newConsignments.length > 0) {
         // Get existing consignment numbers efficiently (just IDs, not full records)

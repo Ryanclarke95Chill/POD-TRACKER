@@ -250,10 +250,6 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
   const tempCompliant = checkTemperatureCompliance(consignment);
   const actualTemp = getActualTemperature(consignment);
   
-  // Check if this is a GREENCROSS delivery
-  const shipperUpper = (consignment.shipperCompanyName || '').toUpperCase();
-  const isGreencross = shipperUpper.includes('GREENCROSS');
-  
   if (tempCompliant) {
     if (consignment.expectedTemperature === "Dry") {
       scoreBreakdown.temperature = { 
@@ -269,8 +265,7 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
       };
     }
   } else {
-    // For GREENCROSS, show special requirement message
-    const expectedTemp = isGreencross ? "0°C to 5°C & -25°C to -15°C" : consignment.expectedTemperature;
+    const expectedTemp = consignment.expectedTemperature;
     scoreBreakdown.temperature = { 
       points: 0, 
       reason: `Temperature out of range (${actualTemp || "Not recorded"}, expected ${expectedTemp})`, 

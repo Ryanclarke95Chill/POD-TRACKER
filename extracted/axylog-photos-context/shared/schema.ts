@@ -3,7 +3,6 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const userRoles = [
-  "superadmin",   // System-level access, score history, all admin features
   "admin",        // Full system access, user management
   "manager",      // All analytics, driver management, no user management
   "supervisor",   // Department analytics, limited driver access
@@ -404,43 +403,6 @@ export const insertPhotoAssetSchema = createInsertSchema(photoAssets).pick({
 
 export type PhotoAsset = typeof photoAssets.$inferSelect;
 export type InsertPhotoAsset = z.infer<typeof insertPhotoAssetSchema>;
-
-// Consignment Score History - tracks POD quality score changes over time
-export const consignmentScoreHistory = pgTable("consignment_score_history", {
-  id: serial("id").primaryKey(),
-  consignmentNo: text("consignment_no").notNull(), // Reference to consignment
-  warehouseName: text("warehouse_name"), // Warehouse for filtering
-  driverName: text("driver_name"), // Driver for filtering
-  orderRef: text("order_ref"), // Order reference for easy identification
-  
-  // Score data at this point in time
-  score: integer("score").notNull(), // Total score 0-100
-  photoScore: integer("photo_score").notNull(), // Points from photos (0-25)
-  signatureScore: integer("signature_score").notNull(), // Points from signature (0-15)
-  receiverScore: integer("receiver_score").notNull(), // Points from receiver name (0-20)
-  temperatureScore: integer("temperature_score").notNull(), // Points from temperature (0-40)
-  
-  // What changed in this update
-  changeType: text("change_type"), // 'initial' | 'photos_added' | 'signature_added' | 'temperature_updated' | 'receiver_added' | 'full_sync'
-  changeDetails: text("change_details"), // Human-readable description of what changed
-  
-  // Metadata
-  recordedAt: timestamp("recorded_at").defaultNow().notNull(),
-  syncSource: text("sync_source").default('live_sync'), // 'live_sync' | 'manual' | 'import'
-}, (table) => ({
-  consignmentIdx: index("score_history_consignment_idx").on(table.consignmentNo),
-  warehouseIdx: index("score_history_warehouse_idx").on(table.warehouseName),
-  recordedAtIdx: index("score_history_recorded_at_idx").on(table.recordedAt),
-  consignmentDateIdx: index("score_history_consignment_date_idx").on(table.consignmentNo, table.recordedAt),
-}));
-
-export const insertConsignmentScoreHistorySchema = createInsertSchema(consignmentScoreHistory).omit({
-  id: true,
-  recordedAt: true,
-});
-
-export type ConsignmentScoreHistory = typeof consignmentScoreHistory.$inferSelect;
-export type InsertConsignmentScoreHistory = z.infer<typeof insertConsignmentScoreHistorySchema>;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
