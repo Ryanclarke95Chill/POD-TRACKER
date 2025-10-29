@@ -2723,6 +2723,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Score History endpoint (super admin only)
+  app.get('/api/score-history', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+      // Only super admin can access score history
+      if (!req.user || req.user.role !== 'superadmin') {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Access denied. Super admin role required.' 
+        });
+      }
+
+      const { warehouse, dateFrom, dateTo, consignmentNo, orderRef } = req.query;
+
+      let query = db.select().from(consignmentScoreHistory);
+
+      // Apply filters
+      const conditions = [];
+      if (warehouse) {
+        conditions.push(`warehouse_name ILIKE '%${warehouse}%'`);
+      }
+      if (dateFrom) {
+        conditions.push(`recorded_at >= '${dateFrom}'`);
+      }
+      if (dateTo) {
+        conditions.push(`recorded_at <= '${dateTo}'`);
+      }
+      if (consignmentNo) {
+        conditions.push(`consignment_no = '${consignmentNo}'`);
+      }
+      if (orderRef) {
+        conditions.push(`order_ref ILIKE '%${orderRef}%'`);
+      }
+
+      let historyQuery = `
+        SELECT * FROM consignment_score_history
+        ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}
+        ORDER BY recorded_at DESC
+        LIMIT 500
+      `;
+
+      const historyRecords = await pool.query(historyQuery);
+
+      res.json({
+        success: true,
+        history: historyRecords.rows,
+        count: historyRecords.rows.length
+      });
+
+    } catch (error) {
+      console.error('Error fetching score history:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch score history' 
+      });
+    }
+  });
+
   // Axylog sync endpoint (admin only) - multiple routes for compatibility
   const axylogSyncHandler = async (req: AuthRequest, res: Response) => {
     console.log("=== AXYLOG SYNC ENDPOINT ===");
