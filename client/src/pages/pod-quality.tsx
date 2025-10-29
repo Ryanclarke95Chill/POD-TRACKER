@@ -876,7 +876,7 @@ export default function PODQualityDashboard() {
       else stats.needsImprovementCount++;
     });
     
-    stats.avgScore = Math.round(totalScore / filteredConsignments.length);
+    stats.avgScore = Math.round((totalScore / filteredConsignments.length) * 10) / 10;
     stats.avgPhotoCount = Math.round((totalPhotos / filteredConsignments.length) * 10) / 10;
     stats.signatureRate = Math.round((signaturesCount / filteredConsignments.length) * 100);
     stats.tempComplianceRate = Math.round((tempCompliantCount / filteredConsignments.length) * 100);
@@ -922,7 +922,7 @@ export default function PODQualityDashboard() {
     return Array.from(warehouseMap.values()).map(w => ({
       warehouse: w.warehouse,
       deliveryCount: w.deliveryCount,
-      avgScore: Math.round(w.totalScore / w.deliveryCount),
+      avgScore: Math.round((w.totalScore / w.deliveryCount) * 10) / 10,
       photoRate: Math.round((w.totalPhotos / w.deliveryCount) * 10) / 10,
       signatureRate: Math.round((w.signaturesCount / w.deliveryCount) * 100),
       tempComplianceRate: Math.round((w.tempCompliantCount / w.deliveryCount) * 100),
@@ -968,7 +968,7 @@ export default function PODQualityDashboard() {
     return Array.from(driverMap.values()).map(d => ({
       driver: d.driver,
       deliveryCount: d.deliveryCount,
-      avgScore: Math.round(d.totalScore / d.deliveryCount),
+      avgScore: Math.round((d.totalScore / d.deliveryCount) * 10) / 10,
       photoRate: Math.round((d.totalPhotos / d.deliveryCount) * 10) / 10,
       receiverNameRate: Math.round((d.receiverNameCount / d.deliveryCount) * 100),
       tempComplianceRate: Math.round((d.tempCompliantCount / d.deliveryCount) * 100)
