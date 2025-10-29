@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { pool, db, executeWithRetry } from "./db";
 import { axylogAPI } from "./axylog";
 import { getUserPermissions, hasPermission, requirePermission, getAccessibleConsignmentFilter } from "./permissions";
-import { consignments } from "@shared/schema";
+import { consignments, consignmentScoreHistory } from "@shared/schema";
 import puppeteer from "puppeteer";
 import sharp from "sharp";
 import { createHash } from "crypto";
@@ -2282,12 +2282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      // Single hardcoded user account - check credentials first
-      // Accept both username "Chill" and email "chill@chill.com.au"
+      // Special handling for hardcoded Chill user
       if ((email === "Chill" || email === "chill@chill.com.au") && password === "Ch1ll5000!") {
         let user = await storage.getUserByUsername("Chill");
         
-        // If user exists, update password to match, otherwise create
         const hashedPassword = await bcrypt.hash(password, 10);
         if (!user) {
           user = await storage.createUser({
@@ -2298,7 +2296,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: "admin"
           });
         } else {
-          // Update password and role to ensure they match
           user = await storage.updateUser(user.id, { 
             password: hashedPassword,
             role: "admin"
@@ -2311,7 +2308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { expiresIn: "24h" }
         );
 
-        res.json({
+        return res.json({
           token,
           user: {
             id: user.id,
@@ -2319,9 +2316,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: user.name
           }
         });
-      } else {
+      }
+
+      // Generic user authentication for all other users
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
+        user = await storage.getUserByUsername(email);
+      }
+
+      if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        SECRET_KEY,
+        { expiresIn: "24h" }
+      );
+
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Server error" });
