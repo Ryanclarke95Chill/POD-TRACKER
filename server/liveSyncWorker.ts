@@ -1,9 +1,64 @@
 import { AxylogAPI } from './axylog';
 import { storage } from './storage';
 import { db, executeWithRetry } from './db';
-import { axylogSyncState, consignments } from '@shared/schema';
+import { axylogSyncState, consignments, consignmentScoreHistory, type Consignment } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import { photoWorker } from './photoIngestionWorker';
+
+// Simple server-side POD score calculator
+function calculatePODScore(consignment: Consignment): {
+  total: number;
+  photoScore: number;
+  signatureScore: number;
+  receiverScore: number;
+  temperatureScore: number;
+} {
+  let photoScore = 0;
+  let signatureScore = 0;
+  let receiverScore = 0;
+  let temperatureScore = 0;
+
+  // Photos (25 points) - based on received vs expected
+  const received = consignment.pickupReceivedFileCount || 0;
+  const expected = consignment.pickupExpectedFileCount || 0;
+  if (expected > 0 && received >= expected) {
+    photoScore = 25;
+  }
+
+  // Signature (15 points)
+  if (consignment.deliverySignatureName || consignment.pickupSignatureName) {
+    signatureScore = 15;
+  }
+
+  // Receiver name (20 points)
+  if (consignment.deliverySignatureName) {
+    receiverScore = 20;
+  }
+
+  // Temperature (40 points) - check if temperature is within valid ranges
+  const temp1 = consignment.paymentMethod; // Primary temperature field
+  const temp2 = consignment.amountToCollect; // Secondary temperature field
+  
+  const isValidTemp = (tempStr: string | null | undefined): boolean => {
+    if (!tempStr || tempStr === 'null' || tempStr === '') return false;
+    try {
+      const temp = parseFloat(tempStr);
+      if (isNaN(temp)) return false;
+      // Frozen range: -25 to -15°C, Chilled range: 0 to 5°C
+      return (temp >= -25 && temp <= -15) || (temp >= 0 && temp <= 5);
+    } catch {
+      return false;
+    }
+  };
+
+  if (isValidTemp(temp1) || isValidTemp(temp2)) {
+    temperatureScore = 40;
+  }
+
+  const total = photoScore + signatureScore + receiverScore + temperatureScore;
+
+  return { total, photoScore, signatureScore, receiverScore, temperatureScore };
+}
 
 export class LiveSyncWorker {
   private axylogAPI: AxylogAPI;
@@ -187,16 +242,53 @@ export class LiveSyncWorker {
           }
         }
 
-        // Update existing consignments
+        // Update existing consignments and track score changes
         if (toUpdate.length > 0) {
           console.log(`[LiveSync] Updating ${toUpdate.length} existing consignments`);
           for (const consignment of toUpdate) {
             if (consignment.consignmentNo) {
+              // Get the old consignment to compare scores
+              const oldConsignment = await storage.getConsignmentByNumber(consignment.consignmentNo);
+              
+              // Update the consignment
               await storage.updateConsignmentByNumber(consignment.consignmentNo, {
                 ...consignment,
                 userId: 1,
                 syncedAt: now, // Update sync timestamp
               });
+
+              // Track score changes (if old consignment exists)
+              if (oldConsignment) {
+                const oldScore = calculatePODScore(oldConsignment);
+                const newScore = calculatePODScore({...oldConsignment, ...consignment});
+
+                // Only log if score changed
+                if (oldScore.total !== newScore.total) {
+                  // Determine what changed
+                  const changes: string[] = [];
+                  if (oldScore.photoScore !== newScore.photoScore) changes.push('photos');
+                  if (oldScore.signatureScore !== newScore.signatureScore) changes.push('signature');
+                  if (oldScore.receiverScore !== newScore.receiverScore) changes.push('receiver');
+                  if (oldScore.temperatureScore !== newScore.temperatureScore) changes.push('temperature');
+
+                  await executeWithRetry(async () => {
+                    await db.insert(consignmentScoreHistory).values({
+                      consignmentNo: consignment.consignmentNo!,
+                      warehouseName: consignment.warehouseCompanyName || null,
+                      driverName: consignment.driverName || null,
+                      orderRef: consignment.orderNumberRef || null,
+                      score: newScore.total,
+                      photoScore: newScore.photoScore,
+                      signatureScore: newScore.signatureScore,
+                      receiverScore: newScore.receiverScore,
+                      temperatureScore: newScore.temperatureScore,
+                      changeType: changes.length > 0 ? changes.join(', ') + ' updated' : 'full_sync',
+                      changeDetails: `Score changed from ${oldScore.total} to ${newScore.total} (${changes.join(', ')})`,
+                      syncSource: 'live_sync',
+                    });
+                  });
+                }
+              }
             }
           }
           totalProcessed += toUpdate.length;
