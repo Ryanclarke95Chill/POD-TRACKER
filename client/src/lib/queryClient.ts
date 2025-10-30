@@ -2,6 +2,16 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 Unauthorized by clearing auth and redirecting to login
+    if (res.status === 401) {
+      console.log('[Auth] 401 Unauthorized - clearing session and redirecting to login');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      // Only redirect if not already on login page
+      if (window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -14,6 +24,10 @@ export async function apiRequest(
 ): Promise<Response> {
   const token = localStorage.getItem('token');
   const isFormData = data instanceof FormData;
+  
+  if (!token) {
+    console.warn('[API Request] No auth token found in localStorage for:', method, url);
+  }
   
   const headers: Record<string, string> = {
     ...(!isFormData && data ? { "Content-Type": "application/json" } : {}),
@@ -58,6 +72,11 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.warn('[Query] No auth token found in localStorage for:', queryKey[0]);
+    }
+    
     const headers: Record<string, string> = token 
       ? { "Authorization": `Bearer ${token}` } 
       : {};
@@ -68,6 +87,7 @@ export const getQueryFn: <T>(options: {
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      console.log('[Query] 401 response, returning null for:', queryKey[0]);
       return null;
     }
 

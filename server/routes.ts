@@ -1363,14 +1363,28 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
+      console.log('[Auth] No authorization header provided');
       return res.status(401).json({ message: "No authentication token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
+    // Ensure authHeader follows "Bearer <token>" format
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
+      console.log('[Auth] Invalid authorization header format:', authHeader);
+      return res.status(401).json({ message: "Invalid authorization header format" });
+    }
+
+    const token = parts[1];
+    if (!token || token === "undefined" || token === "null") {
+      console.log('[Auth] Invalid token value:', token);
+      return res.status(401).json({ message: "Invalid token value" });
+    }
+
     const decoded = jwt.verify(token, SECRET_KEY) as { id: number; email: string };
     const user = await storage.getUser(decoded.id);
     
     if (!user || !user.isActive) {
+      console.log('[Auth] User not found or inactive:', decoded.id);
       return res.status(401).json({ message: "User not found or inactive" });
     }
     
@@ -1383,6 +1397,13 @@ const authenticate = async (req: AuthRequest, res: Response, next: Function) => 
     };
     next();
   } catch (error) {
+    console.error('[Auth] Authentication error:', error instanceof Error ? error.message : error);
+    if (error instanceof Error && error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: "Token has expired" });
+    }
+    if (error instanceof Error && error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: "Invalid token" });
+    }
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
