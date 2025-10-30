@@ -1,64 +1,9 @@
 import { AxylogAPI } from './axylog';
 import { storage } from './storage';
 import { db, executeWithRetry } from './db';
-import { axylogSyncState, consignments, consignmentScoreHistory, type Consignment } from '@shared/schema';
+import { axylogSyncState, consignments } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import { photoWorker } from './photoIngestionWorker';
-
-// Simple server-side POD score calculator
-function calculatePODScore(consignment: Consignment): {
-  total: number;
-  photoScore: number;
-  signatureScore: number;
-  receiverScore: number;
-  temperatureScore: number;
-} {
-  let photoScore = 0;
-  let signatureScore = 0;
-  let receiverScore = 0;
-  let temperatureScore = 0;
-
-  // Photos (25 points) - based on received vs expected
-  const received = consignment.pickupReceivedFileCount || 0;
-  const expected = consignment.pickupExpectedFileCount || 0;
-  if (expected > 0 && received >= expected) {
-    photoScore = 25;
-  }
-
-  // Signature (15 points)
-  if (consignment.deliverySignatureName || consignment.pickupSignatureName) {
-    signatureScore = 15;
-  }
-
-  // Receiver name (20 points)
-  if (consignment.deliverySignatureName) {
-    receiverScore = 20;
-  }
-
-  // Temperature (40 points) - check if temperature is within valid ranges
-  const temp1 = consignment.paymentMethod; // Primary temperature field
-  const temp2 = consignment.amountToCollect; // Secondary temperature field
-  
-  const isValidTemp = (tempStr: string | null | undefined): boolean => {
-    if (!tempStr || tempStr === 'null' || tempStr === '') return false;
-    try {
-      const temp = parseFloat(tempStr);
-      if (isNaN(temp)) return false;
-      // Frozen range: -25 to -15°C, Chilled range: 0 to 5°C
-      return (temp >= -25 && temp <= -15) || (temp >= 0 && temp <= 5);
-    } catch {
-      return false;
-    }
-  };
-
-  if (isValidTemp(temp1) || isValidTemp(temp2)) {
-    temperatureScore = 40;
-  }
-
-  const total = photoScore + signatureScore + receiverScore + temperatureScore;
-
-  return { total, photoScore, signatureScore, receiverScore, temperatureScore };
-}
 
 export class LiveSyncWorker {
   private axylogAPI: AxylogAPI;
@@ -120,17 +65,19 @@ export class LiveSyncWorker {
         });
         console.log(`[LiveSync] Initialized sync state with timestamp: ${startDate.toISOString()}`);
       } else {
-        // ALWAYS reset to October 6th on startup to ensure we get all data
-        // This ensures both preview and production always sync from the beginning
-        await executeWithRetry(async () => {
-          await db.update(axylogSyncState)
-            .set({
-              lastSyncTimestamp: startDate,
-              updatedAt: new Date(),
-            })
-            .where(eq(axylogSyncState.id, existing[0].id));
-        });
-        console.log(`[LiveSync] Reset sync state to ${startDate.toISOString()} to sync all data from October 6th`);
+        // Check if existing timestamp is before October 6th, 2025 - if so, reset it
+        const existingTimestamp = new Date(existing[0].lastSyncTimestamp);
+        if (existingTimestamp < startDate) {
+          await executeWithRetry(async () => {
+            await db.update(axylogSyncState)
+              .set({
+                lastSyncTimestamp: startDate,
+                updatedAt: new Date(),
+              })
+              .where(eq(axylogSyncState.id, existing[0].id));
+          });
+          console.log(`[LiveSync] Reset sync state from ${existingTimestamp.toISOString()} to ${startDate.toISOString()} to enable historical backfill`);
+        }
       }
     } catch (error) {
       console.error('[LiveSync] Error initializing sync state:', error);
@@ -188,14 +135,17 @@ export class LiveSyncWorker {
       
       console.log(`[LiveSync] Checking for consignments from: ${fromDate.toISOString()}`);
 
-      // Fetch ALL consignments since last sync (but not before Oct 6th)
-      // Include all statuses: pending, in-transit, delivered, etc.
-      const newConsignments = await this.axylogAPI.getConsignmentsWithFilters({
+      // Fetch consignments that were completed/closed since last sync (but not before Oct 6th)
+      // Use a date range from the later of (last sync or Oct 6th) to now
+      const allConsignments = await this.axylogAPI.getConsignmentsWithFilters({
         pickupDateFrom: fromDate.toISOString().split('T')[0],
         pickupDateTo: now.toISOString().split('T')[0],
       });
 
-      console.log(`[LiveSync] Found ${newConsignments.length} total consignments in date range`);
+      // Filter to only include consignments with Positive delivery outcome
+      const newConsignments = allConsignments.filter(c => c.delivery_OutcomeEnum === 'Positive');
+
+      console.log(`[LiveSync] Found ${newConsignments.length} consignments with Positive outcome (${allConsignments.length} total in date range)`);
 
       if (newConsignments.length > 0) {
         // Get existing consignment numbers efficiently (just IDs, not full records)
@@ -242,53 +192,16 @@ export class LiveSyncWorker {
           }
         }
 
-        // Update existing consignments and track score changes
+        // Update existing consignments
         if (toUpdate.length > 0) {
           console.log(`[LiveSync] Updating ${toUpdate.length} existing consignments`);
           for (const consignment of toUpdate) {
             if (consignment.consignmentNo) {
-              // Get the old consignment to compare scores
-              const oldConsignment = await storage.getConsignmentByNumber(consignment.consignmentNo);
-              
-              // Update the consignment
               await storage.updateConsignmentByNumber(consignment.consignmentNo, {
                 ...consignment,
                 userId: 1,
                 syncedAt: now, // Update sync timestamp
               });
-
-              // Track score changes (if old consignment exists)
-              if (oldConsignment) {
-                const oldScore = calculatePODScore(oldConsignment);
-                const newScore = calculatePODScore({...oldConsignment, ...consignment});
-
-                // Only log if score changed
-                if (oldScore.total !== newScore.total) {
-                  // Determine what changed
-                  const changes: string[] = [];
-                  if (oldScore.photoScore !== newScore.photoScore) changes.push('photos');
-                  if (oldScore.signatureScore !== newScore.signatureScore) changes.push('signature');
-                  if (oldScore.receiverScore !== newScore.receiverScore) changes.push('receiver');
-                  if (oldScore.temperatureScore !== newScore.temperatureScore) changes.push('temperature');
-
-                  await executeWithRetry(async () => {
-                    await db.insert(consignmentScoreHistory).values({
-                      consignmentNo: consignment.consignmentNo!,
-                      warehouseName: consignment.warehouseCompanyName || null,
-                      driverName: consignment.driverName || null,
-                      orderRef: consignment.orderNumberRef || null,
-                      score: newScore.total,
-                      photoScore: newScore.photoScore,
-                      signatureScore: newScore.signatureScore,
-                      receiverScore: newScore.receiverScore,
-                      temperatureScore: newScore.temperatureScore,
-                      changeType: changes.length > 0 ? changes.join(', ') + ' updated' : 'full_sync',
-                      changeDetails: `Score changed from ${oldScore.total} to ${newScore.total} (${changes.join(', ')})`,
-                      syncSource: 'live_sync',
-                    });
-                  });
-                }
-              }
             }
           }
           totalProcessed += toUpdate.length;

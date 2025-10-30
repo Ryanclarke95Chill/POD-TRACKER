@@ -1,24 +1,5 @@
 import { Consignment, ScoreBreakdown } from "@shared/schema";
 
-// Format driver name from "Last First" to "First Last"
-export function formatDriverName(driverName: string | null | undefined): string {
-  if (!driverName) return "";
-  
-  const trimmed = driverName.trim();
-  if (!trimmed) return "";
-  
-  // Split by whitespace and filter out empty strings
-  const parts = trimmed.split(/\s+/).filter(p => p.length > 0);
-  
-  // If we have exactly 2 parts, assume it's "Last First" and swap them
-  if (parts.length === 2) {
-    return `${parts[1]} ${parts[0]}`; // "First Last"
-  }
-  
-  // Otherwise return as-is
-  return trimmed;
-}
-
 export interface PODMetrics {
   photoCount: number;
   hasSignature: boolean;
@@ -109,29 +90,6 @@ export function parseRequiredTemperature(documentNote: string | null): { min: nu
 
 // Check if temperature reading is compliant with expected temperature zone
 export function checkTemperatureCompliance(consignment: Consignment): boolean {
-  // Get driver-recorded temperatures
-  const driverTemps = getDriverTemperatures(consignment);
-  
-  // Special handling for GREENCROSS: require BOTH chilled AND frozen temps
-  const shipperUpper = (consignment.shipperCompanyName || '').toUpperCase();
-  if (shipperUpper.includes('GREENCROSS')) {
-    // Need at least 2 temperature readings
-    if (driverTemps.length < 2) {
-      return false;
-    }
-    
-    // Define ranges
-    const chilledRange = { min: 0, max: 5 };
-    const frozenRange = { min: -25, max: -15 };
-    
-    // Check if we have at least one temp in chilled range AND one in frozen range
-    const hasChilled = driverTemps.some(temp => temp >= chilledRange.min && temp <= chilledRange.max);
-    const hasFrozen = driverTemps.some(temp => temp >= frozenRange.min && temp <= frozenRange.max);
-    
-    return hasChilled && hasFrozen;
-  }
-  
-  // Standard validation for all other shippers
   // Parse required temperature from document_note
   const requiredTemp = parseRequiredTemperature(consignment.documentNote);
   
@@ -139,6 +97,9 @@ export function checkTemperatureCompliance(consignment: Consignment): boolean {
   if (!requiredTemp) {
     return true;
   }
+  
+  // Get driver-recorded temperatures
+  const driverTemps = getDriverTemperatures(consignment);
   
   // No temperature readings = not compliant if temperature is required
   if (driverTemps.length === 0) {
@@ -250,10 +211,6 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
   const tempCompliant = checkTemperatureCompliance(consignment);
   const actualTemp = getActualTemperature(consignment);
   
-  // Check if this is a GREENCROSS delivery
-  const shipperUpper = (consignment.shipperCompanyName || '').toUpperCase();
-  const isGreencross = shipperUpper.includes('GREENCROSS');
-  
   if (tempCompliant) {
     if (consignment.expectedTemperature === "Dry") {
       scoreBreakdown.temperature = { 
@@ -269,8 +226,7 @@ export function calculatePODScore(consignment: Consignment, actualPhotoCount?: n
       };
     }
   } else {
-    // For GREENCROSS, show special requirement message
-    const expectedTemp = isGreencross ? "0°C to 5°C & -25°C to -15°C" : consignment.expectedTemperature;
+    const expectedTemp = consignment.expectedTemperature;
     scoreBreakdown.temperature = { 
       points: 0, 
       reason: `Temperature out of range (${actualTemp || "Not recorded"}, expected ${expectedTemp})`, 

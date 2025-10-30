@@ -233,16 +233,16 @@ export class AxylogAPI {
         console.log(`Filtered to ${deliveries.length} deliveries by warehouse company name: ${filters.warehouseCompanyName}`);
       }
 
-      // Filter out internal depot transfers - we only want customer-facing deliveries
+      // Filter out auto-generated consignments using master data codes
       const initialCount = deliveries.length;
       
       // Debug: Show first few master data code combinations
       for (let i = 0; i < Math.min(5, deliveries.length); i++) {
         const d = deliveries[i];
-        console.log(`Sample ${i+1}: Order ${d.orderNumberRef} - From: "${d.shipFromMasterDataCode}" To: "${d.shipToMasterDataCode}" Customer: "${d.shipToCompanyName}"`);
+        console.log(`Sample ${i+1}: Order ${d.orderNumberRef} - From: "${d.shipFromMasterDataCode}" To: "${d.shipToMasterDataCode}"`);
       }
       
-      // Filter out depot-to-depot transfers where both pickup and delivery are at depots
+      // Filter out depot transfers where pickup and delivery are the same depot
       const depotTransferPatterns = [
         { from: 'WA_8', to: 'WA_8D' },
         { from: 'WA_8D', to: 'WA_8' },
@@ -258,30 +258,29 @@ export class AxylogAPI {
         const from = delivery.shipFromMasterDataCode;
         const to = delivery.shipToMasterDataCode;
         
-        // Check if this is a depot transfer (pickup and delivery both at same depot)
+        // Check if this is a depot transfer
         const isDepotTransfer = depotTransferPatterns.some(pattern => 
           pattern.from === from && pattern.to === to
         );
         
-        // Exclude deliveries where the CUSTOMER (shipTo) is a Chill internal location
-        // Real customer deliveries go TO customers, not TO Chill depots
+        // Exclude internal depot transfers where CUSTOMER is a Chill depot/location
+        // Legitimate deliveries have real customers delivered TO Chill depots (warehouse)
         const customerName = (delivery.shipToCompanyName || '').toLowerCase().trim();
         
-        // Filter out if customer is a Chill internal location (depot)
-        const isInternalChillCustomer = 
+        // Filter out if customer is a Chill internal location (depot transfer)
+        const isInternalChillLocation = 
           customerName.includes('chill') && (
             customerName.includes('depot') ||
             /^chill\s+(vic|qld|wa|nsw|sa)$/i.test(customerName) ||
-            /^\*\*\s*chill\s+(vic|qld|wa|nsw|sa)$/i.test(customerName)
+            /^\*?chill\s+(vic|qld|wa|nsw|sa)$/i.test(customerName)
           );
         
-        // KEEP this delivery if it's NOT a depot transfer AND NOT to an internal Chill location
-        return !isDepotTransfer && !isInternalChillCustomer;
+        return !isDepotTransfer && !isInternalChillLocation;
       });
 
       const filteredCount = deliveries.length;
-      const removedCount = initialCount - filteredCount;
-      console.log(`Filtered out ${removedCount} internal transfers, keeping ${filteredCount} customer deliveries`);
+      const depotTransfers = initialCount - filteredCount;
+      console.log(`Filtered out ${depotTransfers} internal transfers (depot-to-depot, auto-generated, Chill depot customers), keeping ${filteredCount} customer deliveries`);
 
       // Convert to our format
       return this.convertAndFilterDeliveries(deliveries, '');

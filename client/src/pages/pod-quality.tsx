@@ -42,7 +42,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Consignment } from "@shared/schema";
-import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature, parseRequiredTemperature, formatDriverName } from "@/utils/podMetrics";
+import { calculatePODScore, getQualityTier, getPhotoCount, getActualTemperature, parseRequiredTemperature } from "@/utils/podMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { getUser, logout } from "@/lib/auth";
@@ -260,6 +260,12 @@ function DeliveryDetailsModal({ isOpen, onClose, consignment, photos, signatures
   const tierColor = qualityTier.tier === 'Excellent' ? 'bg-green-100 text-green-800' :
                     qualityTier.tier === 'Good' ? 'bg-blue-100 text-blue-800' :
                     qualityTier.tier === 'Fair' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+  
+  const formatDriverName = (name: string | null) => {
+    if (!name) return 'Unknown';
+    const parts = name.split(',').map(p => p.trim());
+    return parts.length === 2 ? `${parts[1]} ${parts[0]}` : name;
+  };
   
   const formatDateTime = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -679,6 +685,19 @@ export default function PODQualityDashboard() {
   });
   
   const consignments = consignmentsData?.consignments || [];
+  
+  // Helper function to format driver name from "Last, First" to "First Last"
+  const formatDriverName = (driverName: string | null | undefined): string => {
+    if (!driverName) return "";
+    // Check if name is in "Last, First" format
+    if (driverName.includes(",")) {
+      const parts = driverName.split(",").map(p => p.trim());
+      if (parts.length === 2) {
+        return `${parts[1]} ${parts[0]}`; // "First Last"
+      }
+    }
+    return driverName;
+  };
   
   // Get unique shippers, warehouses, and drivers for filter dropdowns
   const uniqueShippers = Array.from(new Set(consignments.map((c: Consignment) => (c as any).shipperCompanyName).filter((name): name is string => Boolean(name)))).sort();
@@ -1861,11 +1880,8 @@ export default function PODQualityDashboard() {
               
               // Parse expected temperature from document_note
               const tempRange = parseRequiredTemperature(consignment.documentNote);
-              const shipperUpper = (consignment.shipperCompanyName || '').toUpperCase();
-              const isGreencross = shipperUpper.includes('GREENCROSS');
-              const expectedTemp = isGreencross ? '0°C to 5°C & -25°C to -15°C' :
-                                   (tempRange ? `${tempRange.min}°C to ${tempRange.max}°C` : 
-                                   (consignment.documentNote?.toLowerCase().includes('dry') ? 'Dry' : null));
+              const expectedTemp = tempRange ? `${tempRange.min}°C to ${tempRange.max}°C` : 
+                                   (consignment.documentNote?.toLowerCase().includes('dry') ? 'Dry' : null);
               
               const thumbnail = photoThumbnails.get(consignment.id);
               
@@ -2113,7 +2129,7 @@ export default function PODQualityDashboard() {
 
           <TabsContent value="driver-rankings" className="mt-0">
             {dataLoaded ? (
-              <DriverRankings consignments={filteredConsignments} />
+              <DriverRankings consignments={consignments} />
             ) : (
               <Card>
                 <CardContent className="pt-6">
